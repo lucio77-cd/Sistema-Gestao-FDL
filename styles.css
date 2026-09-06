@@ -1,0 +1,289 @@
+@import url("https://fonts.googleapis.com/css2?family=Public+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@500;600&display=swap");
+
+:root {
+  --bg: #eef3f2;
+  --surface: #ffffff;
+  --ink: #16232b;
+  --ink-soft: #4d5c63;
+  --steel: #52707d;
+  --steel-light: #cdd9d6;
+  --primary: #235571;
+  --primary-dark: #163b4f;
+  --normal: #3e7a5b;
+  --atencao: #c2790a;
+  --vencido: #a83232;
+  --promocao: #6a4c93;
+
+  --font-body: "Public Sans", -apple-system, BlinkMacSystemFont, sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, monospace;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--font-body);
+  line-height: 1.5;
+}
+
+a {
+  color: inherit;
+}
+
+/* ---------- Cabeçalho / navegação ---------- */
+
+.topo {
+  background: var(--primary-dark);
+  color: #fff;
+  padding: 0.9rem 1rem;
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+
+.topo-marca {
+  font-weight: 700;
+  font-size: 1.05rem;
+  letter-spacing: -0.01em;
+}
+
+.topo-sub {
+  font-size: 0.8rem;
+  color: #b9d3de;
+  margin-top: 0.1rem;
+}
+
+.nav {
+  display: flex;
+  gap: 0.25rem;
+  overflow-x: auto;
+  background: var(--primary);
+  padding: 0 0.5rem;
+}
+
+.nav a {
+  display: block;
+  padding: 0.7rem 0.8rem;
+  text-decoration: none;
+  color: #d9ebf1;
+  font-weight: 500;
+  font-size: 0.88rem;
+  white-space: nowrap;
+  border-bottom: 3px solid transparent;
+}
+
+.nav a.ativo {
+  color: #fff;
+  border-bottom-color: #fff;
+}
+
+/* ---------- Layout geral ---------- */
+
+main {
+  max-width: 720px;
+  margin: 0 auto;
+  padding: 1.1rem 1rem 3rem;
+}
+
+h1 {
+  font-size: 1.25rem;
+  margin: 0 0 0.2rem;
+}
+
+h2 {
+  font-size: 1rem;
+  margin: 1.6rem 0 0.6rem;
+  color: var(--ink);
+}
+
+.legenda {
+  color: var(--ink-soft);
+  font-size: 0.88rem;
+  margin-bottom: 1.2rem;
+}
+
+.painel {
+  background: var(--surface);
+  border: 1px solid var(--steel-light);
+  border-radius: 6px;
+  padding: 1rem;
+  margin-bottom: 1rem;
+}
+
+/* ---------- Lista tipo "etiqueta de prateleira" ---------- */
+
+.lote {
+  display: flex;
+  align-items: center;
+  gap: 0.8rem;
+  border: 1px solid var(--steel-light);
+  border-left-width: 5px;
+  border-radius: 4px;
+  padding: 0.7rem 0.8rem;
+  margin-bottom: 0.55rem;
+  background: var(--surface);
+}
+
+.lote--normal { border-left-color: var(--normal); }
+.lote--atencao { border-left-color: var(--atencao); }
+.lote--vencido { border-left-color: var(--vencido); }
+.lote--promocao { border-left-color: var(--promocao); }
+
+.lote-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.lote-produto {
+  font-weight: 600;
+  font-size: 0.96rem;
+}
+
+.lote-meta {
+  color: var(--ink-soft);
+  font-size: 0.82rem;
+  margin-top: 0.15rem;
+}
+
+.lote-dados {
+  text-align: right;
+  font-family: var(--font-mono);
+}
+
+.lote-dias {
+  font-weight: 600;
+  font-size: 0.85rem;
+}
+
+.lote-dias--normal { color: var(--normal); }
+.lote-dias--atencao { color: var(--atencao); }
+.lote-dias--vencido { color: var(--vencido); }
+.lote-dias--promocao { color: var(--promocao); }
+
+.lote-valor {
+  color: var(--ink-soft);
+  font-size: 0.78rem;
+  margin-top: 0.1rem;
+}
+
+.selo {
+  display: inline-block;
+  font-size: 0.72rem;
+  font-weight: 600;
+  padding: 0.15rem 0.5rem;
+  border-radius: 3px;
+  margin-left: 0.4rem;
+}
+
+.selo--promocao {
+  background: #efe7f7;
+  color: var(--promocao);
+}
+
+/* ---------- Formulários ---------- */
+
+label {
+  display: block;
+  font-size: 0.85rem;
+  font-weight: 500;
+  margin: 0.7rem 0 0.25rem;
+}
+
+input, select, button {
+  font-family: var(--font-body);
+  font-size: 0.95rem;
+}
+
+input, select {
+  width: 100%;
+  padding: 0.55rem 0.65rem;
+  border: 1px solid var(--steel-light);
+  border-radius: 4px;
+  background: var(--surface);
+  color: var(--ink);
+}
+
+input:focus, select:focus, button:focus, a:focus {
+  outline: 2px solid var(--primary);
+  outline-offset: 1px;
+}
+
+.btn {
+  display: inline-block;
+  background: var(--primary);
+  color: #fff;
+  border: none;
+  padding: 0.65rem 1.1rem;
+  border-radius: 4px;
+  font-weight: 600;
+  cursor: pointer;
+  margin-top: 0.9rem;
+}
+
+.btn:hover {
+  background: var(--primary-dark);
+}
+
+.btn-secundario {
+  background: transparent;
+  color: var(--primary);
+  border: 1px solid var(--primary);
+}
+
+.btn-texto {
+  background: none;
+  border: none;
+  color: var(--steel);
+  font-size: 0.82rem;
+  padding: 0.3rem 0;
+  cursor: pointer;
+  text-decoration: underline;
+}
+
+.linha-form {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.8rem;
+}
+
+.mensagem-vazio {
+  color: var(--ink-soft);
+  font-size: 0.9rem;
+  padding: 1rem 0;
+}
+
+.aviso-erro {
+  color: var(--vencido);
+  font-size: 0.85rem;
+  margin-top: 0.5rem;
+}
+
+.aviso-ok {
+  color: var(--normal);
+  font-size: 0.85rem;
+  margin-top: 0.5rem;
+}
+
+.cartao-login {
+  max-width: 340px;
+  margin: 3rem auto;
+  background: var(--surface);
+  border: 1px solid var(--steel-light);
+  border-radius: 6px;
+  padding: 1.6rem;
+}
+
+.rodape-token {
+  font-family: var(--font-mono);
+  font-size: 0.78rem;
+  color: var(--ink-soft);
+  word-break: break-all;
+  background: var(--bg);
+  padding: 0.6rem;
+  border-radius: 4px;
+  margin-top: 0.4rem;
+}
