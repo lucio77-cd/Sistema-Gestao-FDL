@@ -1,0 +1,89 @@
+import { db } from "./firebase-config.js";
+import { calcularStatus, formatarDiasRestantes } from "./status.js";
+import {
+  collection,
+  query,
+  where,
+  limit,
+  getDocs,
+} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+
+async function iniciar() {
+  const token = new URLSearchParams(window.location.search).get("token");
+  if (!token) return mostrarErro();
+
+  const snapEstab = await getDocs(
+    query(collection(db, "estabelecimentos"), where("linkToken", "==", token), limit(1))
+  );
+  if (snapEstab.empty) return mostrarErro();
+
+  const estabelecimento = { id: snapEstab.docs[0].id, ...snapEstab.docs[0].data() };
+  document.getElementById("nome-estabelecimento").textContent = estabelecimento.nome;
+  renderizarAtualizacao(estabelecimento.ultimaVistoria);
+
+  const diasAlertaPadrao = estabelecimento.diasAlertaPadrao ?? 3;
+
+  const [produtosSnap, lotesSnap] = await Promise.all([
+    getDocs(query(collection(db, "produtos"), where("estabelecimentoId", "==", estabelecimento.id))),
+    getDocs(query(collection(db, "lotes"), where("estabelecimentoId", "==", estabelecimento.id))),
+  ]);
+
+  const produtos = {};
+  produtosSnap.forEach((d) => (produtos[d.id] = { id: d.id, ...d.data() }));
+
+  const lotes = lotesSnap.docs
+    .map((d) => {
+      const dados = d.data();
+      const produto = produtos[dados.produtoId] || { nome: "(produto removido)" };
+      const diasAlerta = produto.diasAlerta ?? diasAlertaPadrao;
+      const { diasRestantes, status } = calcularStatus(dados.dataVencimento, diasAlerta, dados.promocaoAtiva);
+      return { ...dados, produtoNome: produto.nome, diasRestantes, status };
+    })
+    .filter((l) => l.status !== "normal")
+    .sort((a, b) => a.diasRestantes - b.diasRestantes);
+
+  renderizarLista(lotes);
+}
+
+function renderizarAtualizacao(ultimaVistoria) {
+  const el = document.getElementById("legenda-atualizacao");
+  if (!ultimaVistoria) {
+    el.textContent = "Nenhuma vistoria registrada ainda.";
+    return;
+  }
+  const data = ultimaVistoria.toDate ? ultimaVistoria.toDate() : new Date(ultimaVistoria);
+  el.textContent = `Atualizado pela última vez em ${data.toLocaleDateString("pt-BR")} às ${data.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}`;
+}
+
+function renderizarLista(lotes) {
+  const container = document.getElementById("lista-lotes");
+  container.innerHTML = "";
+
+  if (lotes.length === 0) {
+    container.innerHTML = '<p class="mensagem-vazio">Nada em atenção ou vencido no momento.</p>';
+    return;
+  }
+
+  lotes.forEach((l) => {
+    const div = document.createElement("div");
+    div.className = `lote lote--${l.status}`;
+    div.innerHTML = `
+      <div class="lote-info">
+        <div class="lote-produto">${l.produtoNome}${l.status === "promocao" ? '<span class="selo selo--promocao">Promoção</span>' : ""}</div>
+        <div class="lote-meta">${l.local || "—"} · ${l.quantidade} un.</div>
+      </div>
+      <div class="lote-dados">
+        <div class="lote-dias lote-dias--${l.status}">${formatarDiasRestantes(l.diasRestantes)}</div>
+      </div>
+    `;
+    container.appendChild(div);
+  });
+}
+
+function mostrarErro() {
+  document.getElementById("erro-token").hidden = false;
+  document.getElementById("lista-lotes").innerHTML = "";
+  document.getElementById("legenda-atualizacao").textContent = "";
+}
+
+iniciar();
