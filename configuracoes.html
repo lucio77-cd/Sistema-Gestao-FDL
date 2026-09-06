@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Configurações — Controle de Bebidas</title>
+<link rel="stylesheet" href="css/styles.css" />
+</head>
+<body>
+  <header class="topo">
+    <div class="topo-marca">Controle de Bebidas</div>
+    <div class="topo-sub" id="nome-estabelecimento">Carregando…</div>
+  </header>
+  <nav class="nav">
+    <a href="index.html">Dashboard</a>
+    <a href="vistoria.html">Vistoria</a>
+    <a href="promocoes.html">Promoções</a>
+    <a href="configuracoes.html" class="ativo">Configurações</a>
+    <a href="#" id="link-sair">Sair</a>
+  </nav>
+
+  <main>
+    <h1>Configurações</h1>
+
+    <div class="painel">
+      <h2 style="margin-top:0">Nome do estabelecimento</h2>
+      <input type="text" id="nome-input" />
+
+      <h2>Antecedência padrão de alerta</h2>
+      <p class="legenda" style="margin-bottom:0.4rem">Quantos dias antes do vencimento um lote deve entrar em "atenção". Pode ser ajustado por produto na tela de Vistoria.</p>
+      <input type="number" id="dias-alerta-input" min="0" />
+
+      <button class="btn" id="btn-salvar-config">Salvar</button>
+      <p id="msg-config" class="aviso-ok" hidden></p>
+    </div>
+
+    <div class="painel">
+      <h2 style="margin-top:0">Link de visualização para a gerente</h2>
+      <p class="legenda" style="margin-bottom:0.4rem">Link somente leitura, sem necessidade de login. Compartilhe apenas se quiser dar acesso.</p>
+      <div class="rodape-token" id="link-gerente">—</div>
+      <button class="btn-texto" id="btn-gerar-novo-link">Gerar novo link (invalida o anterior)</button>
+    </div>
+  </main>
+
+  <script type="module" src="js/configuracoes.js"></script>
+</body>
+</html>

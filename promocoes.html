@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Promoções — Controle de Bebidas</title>
+<link rel="stylesheet" href="css/styles.css" />
+</head>
+<body>
+  <header class="topo">
+    <div class="topo-marca">Controle de Bebidas</div>
+    <div class="topo-sub" id="nome-estabelecimento">Carregando…</div>
+  </header>
+  <nav class="nav">
+    <a href="index.html">Dashboard</a>
+    <a href="vistoria.html">Vistoria</a>
+    <a href="promocoes.html" class="ativo">Promoções</a>
+    <a href="configuracoes.html">Configurações</a>
+    <a href="#" id="link-sair">Sair</a>
+  </nav>
+
+  <main>
+    <h1>Promoções</h1>
+    <p class="legenda">Lotes em atenção ou vencidos podem ser marcados para promoção, com um preço específico.</p>
+    <div id="lista-promocoes">
+      <p class="mensagem-vazio">Carregando…</p>
+    </div>
+  </main>
+
+  <script type="module" src="js/promocoes.js"></script>
+</body>
+</html>

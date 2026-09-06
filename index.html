@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Dashboard — Controle de Bebidas</title>
+<link rel="stylesheet" href="css/styles.css" />
+</head>
+<body>
+  <header class="topo">
+    <div class="topo-marca">Controle de Bebidas</div>
+    <div class="topo-sub" id="nome-estabelecimento">Carregando…</div>
+  </header>
+  <nav class="nav">
+    <a href="index.html" class="ativo">Dashboard</a>
+    <a href="vistoria.html">Vistoria</a>
+    <a href="promocoes.html">Promoções</a>
+    <a href="configuracoes.html">Configurações</a>
+    <a href="#" id="link-sair">Sair</a>
+  </nav>
+
+  <main>
+    <h1>O que está por vencer</h1>
+    <p class="legenda" id="legenda-atualizacao">—</p>
+
+    <div class="painel">
+      <canvas id="grafico-vencimentos" height="180"></canvas>
+    </div>
+
+    <h2>Lotes em atenção ou vencidos</h2>
+    <div id="lista-lotes">
+      <p class="mensagem-vazio">Carregando lotes…</p>
+    </div>
+  </main>
+
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <script type="module" src="js/dashboard.js"></script>
+</body>
+</html>

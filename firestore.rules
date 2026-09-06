@@ -1,0 +1,31 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // "estabelecimentos" e "lotes" têm leitura pública porque a página da
+    // gerente (gerente.html) acessa via link com token, sem login.
+    // Isso é uma simplificação consciente para o MVP: qualquer pessoa com o
+    // link do documento pode ler. Se isso virar um problema (múltiplos
+    // estabelecimentos, dados mais sensíveis), migrar a validação de token
+    // para uma Cloud Function que gere um custom token de leitura.
+    match /estabelecimentos/{id} {
+      allow read: if true;
+      allow write: if request.auth != null;
+    }
+
+    match /lotes/{id} {
+      allow read: if true;
+      allow write: if request.auth != null;
+    }
+
+    // Produtos e promoções não têm necessidade de leitura pública hoje
+    // (a página da gerente não exibe custo/preço), então ficam restritos.
+    match /produtos/{id} {
+      allow read, write: if request.auth != null;
+    }
+
+    match /vistorias/{id} {
+      allow read, write: if request.auth != null;
+    }
+  }
+}
