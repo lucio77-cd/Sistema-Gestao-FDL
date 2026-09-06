@@ -1,15 +1,14 @@
-// Substitua pelos dados do SEU projeto Firebase (Configurações do projeto > Seus apps > SDK).
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
 import { getFirestore } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 import { getAuth } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 
 const firebaseConfig = {
-  apiKey: "SUA_API_KEY",
-  authDomain: "SEU_PROJETO.firebaseapp.com",
-  projectId: "SEU_PROJETO",
-  storageBucket: "SEU_PROJETO.appspot.com",
-  messagingSenderId: "SEU_SENDER_ID",
-  appId: "SEU_APP_ID",
+  apiKey: "AIzaSyCjamudm8uZozg0T6Xd9_Anc0cSz7wqoBA",
+  authDomain: "sistema-gv-fdl.firebaseapp.com",
+  projectId: "sistema-gv-fdl",
+  storageBucket: "sistema-gv-fdl.firebasestorage.app",
+  messagingSenderId: "1023604721555",
+  appId: "1:1023604721555:web:46d9f5bc3daef29a7e8a66",
 };
 
 export const app = initializeApp(firebaseConfig);
