@@ -27,6 +27,7 @@
     <div class="segmentado" role="tablist" aria-label="Seção da vistoria">
       <button type="button" id="seg-atualizar" class="ativo" role="tab" aria-selected="true">Atualizar quantidades</button>
       <button type="button" id="seg-adicionar" role="tab" aria-selected="false">Adicionar novo</button>
+      <button type="button" id="seg-excluidos" role="tab" aria-selected="false">Excluídos</button>
     </div>
 
     <section id="secao-atualizar">
@@ -37,6 +38,13 @@
       </div>
 
       <button class="btn" id="btn-salvar-vistoria">Salvar vistoria</button>
+    </section>
+
+    <section id="secao-excluidos" hidden>
+      <p class="legenda">Lotes marcados como "Vendido" ao zerar a quantidade — ficam aqui como histórico, em vez de simplesmente sumir.</p>
+      <div id="lista-excluidos">
+        <p class="mensagem-vazio">Carregando…</p>
+      </div>
     </section>
 
     <section id="secao-adicionar" hidden>

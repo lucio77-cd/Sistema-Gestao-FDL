@@ -31,6 +31,19 @@
     </div>
 
     <section id="secao-acao">
+      <div class="filtros">
+        <select id="filtro-status" aria-label="Filtrar por status">
+          <option value="todos">Todos os status</option>
+          <option value="atencao">Atenção</option>
+          <option value="vencido">Vencido</option>
+          <option value="promocao">Em promoção</option>
+        </select>
+        <select id="filtro-local" aria-label="Filtrar por local">
+          <option value="todos">Todos os locais</option>
+          <option value="Geladeira">Geladeira</option>
+          <option value="Estoque seco">Estoque seco</option>
+        </select>
+      </div>
       <h2 style="margin-top:0">Lotes em atenção ou vencidos</h2>
       <div id="lista-lotes">
         <p class="mensagem-vazio">Carregando lotes…</p>
