@@ -252,6 +252,25 @@ h2 {
   color: #fff;
 }
 
+/* ---------- Filtros do dashboard ---------- */
+
+.filtros {
+  display: flex;
+  gap: 0.6rem;
+  margin-bottom: 1rem;
+}
+
+.filtros select {
+  width: auto;
+  flex: 1;
+}
+
+/* ---------- Lista de excluídos (vistoria) ---------- */
+
+.lote--excluido {
+  border-left-color: var(--steel);
+}
+
 .stepper button {
   width: 44px;
   height: 44px;
