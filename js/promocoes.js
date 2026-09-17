@@ -1,6 +1,7 @@
 import { db } from "./firebase-config.js";
 import { protegerPagina, sair } from "./auth-guard.js";
 import { calcularStatus, formatarDiasRestantes } from "./status.js";
+import { mostrarToast } from "./toast.js";
 import {
   collection,
   query,
@@ -86,8 +87,17 @@ function renderizar(lotes) {
       const id = btn.dataset.id;
       const promocaoAtiva = container.querySelector(`.chk-promo[data-id="${id}"]`).checked;
       const precoPromocional = Number(container.querySelector(`.input-preco-promo[data-id="${id}"]`).value) || null;
-      await updateDoc(doc(db, "lotes", id), { promocaoAtiva, precoPromocional });
-      await carregar();
+
+      btn.disabled = true;
+      try {
+        await updateDoc(doc(db, "lotes", id), { promocaoAtiva, precoPromocional });
+        mostrarToast("Promoção atualizada.", "ok");
+        await carregar();
+      } catch (erro) {
+        console.error(erro);
+        mostrarToast("Não foi possível salvar. Tente novamente.", "erro");
+        btn.disabled = false;
+      }
     });
   });
 }

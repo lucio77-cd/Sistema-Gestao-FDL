@@ -1,6 +1,6 @@
 import { db } from "./firebase-config.js";
 import { protegerPagina, sair } from "./auth-guard.js";
-import { calcularStatus, STATUS_LABEL, formatarDiasRestantes } from "./status.js";
+import { calcularStatus, formatarDiasRestantes, agruparPorFaixa, seloHtml } from "./status.js";
 import {
   collection,
   query,
@@ -12,6 +12,38 @@ document.getElementById("link-sair").addEventListener("click", (e) => {
   e.preventDefault();
   sair();
 });
+
+// ---------- Abas Ação / Panorama ----------
+// O gráfico só é montado quando a aba "Panorama" é aberta pela primeira vez —
+// evita o custo de inicializar o Chart.js se a pessoa só olhar a tabela.
+
+const segAcao = document.getElementById("seg-acao");
+const segPanorama = document.getElementById("seg-panorama");
+const secaoAcao = document.getElementById("secao-acao");
+const secaoPanorama = document.getElementById("secao-panorama");
+
+let lotesCarregados = [];
+let graficoMontado = false;
+
+function mostrarAba(nome) {
+  const ehAcao = nome === "acao";
+  secaoAcao.hidden = !ehAcao;
+  secaoPanorama.hidden = ehAcao;
+  segAcao.classList.toggle("ativo", ehAcao);
+  segAcao.setAttribute("aria-selected", String(ehAcao));
+  segPanorama.classList.toggle("ativo", !ehAcao);
+  segPanorama.setAttribute("aria-selected", String(!ehAcao));
+
+  if (!ehAcao && !graficoMontado) {
+    renderizarGrafico(lotesCarregados);
+    graficoMontado = true;
+  }
+}
+
+segAcao.addEventListener("click", () => mostrarAba("acao"));
+segPanorama.addEventListener("click", () => mostrarAba("panorama"));
+
+// ---------- Carregamento ----------
 
 protegerPagina(async ({ estabelecimento }) => {
   document.getElementById("nome-estabelecimento").textContent = estabelecimento.nome;
@@ -35,9 +67,9 @@ protegerPagina(async ({ estabelecimento }) => {
   });
 
   lotes.sort((a, b) => a.diasRestantes - b.diasRestantes);
+  lotesCarregados = lotes;
 
   renderizarLegendaAtualizacao(estabelecimento.ultimaVistoria);
-  renderizarGrafico(lotes);
   renderizarTabela(lotes.filter((l) => l.status !== "normal"));
 });
 
@@ -51,22 +83,12 @@ function renderizarLegendaAtualizacao(ultimaVistoria) {
   el.textContent = `Última vistoria: ${data.toLocaleDateString("pt-BR")} às ${data.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}`;
 }
 
+// O gráfico soma o VALOR em risco (quantidade × custo) por faixa de urgência
+// — incluindo os já vencidos, que antes ficavam de fora do gráfico e só
+// apareciam na tabela — e agrupa em faixas de decisão em vez de 14 dias
+// individuais, que dão o mesmo peso visual a "vence hoje" e "vence em 9 dias".
 function renderizarGrafico(lotes) {
-  const dias = 14;
-  const labels = [];
-  const valores = new Array(dias).fill(0);
-
-  for (let i = 0; i < dias; i++) {
-    const d = new Date();
-    d.setDate(d.getDate() + i);
-    labels.push(d.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" }));
-  }
-
-  lotes.forEach((l) => {
-    if (l.diasRestantes >= 0 && l.diasRestantes < dias) {
-      valores[l.diasRestantes] += Number(l.quantidade) || 0;
-    }
-  });
+  const { labels, cores, valores } = agruparPorFaixa(lotes);
 
   new Chart(document.getElementById("grafico-vencimentos"), {
     type: "bar",
@@ -74,18 +96,28 @@ function renderizarGrafico(lotes) {
       labels,
       datasets: [
         {
-          label: "Unidades vencendo",
+          label: "Valor em risco (R$)",
           data: valores,
-          backgroundColor: "#235571",
-          borderRadius: 3,
+          backgroundColor: cores,
+          borderRadius: 4,
         },
       ],
     },
     options: {
       responsive: true,
-      plugins: { legend: { display: false } },
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          callbacks: {
+            label: (ctx) => `R$ ${ctx.parsed.y.toFixed(2)}`,
+          },
+        },
+      },
       scales: {
-        y: { beginAtZero: true, ticks: { precision: 0 } },
+        y: {
+          beginAtZero: true,
+          ticks: { callback: (v) => `R$ ${v}` },
+        },
       },
     },
   });
@@ -106,7 +138,7 @@ function renderizarTabela(lotes) {
     div.className = `lote lote--${l.status}`;
     div.innerHTML = `
       <div class="lote-info">
-        <div class="lote-produto">${l.produtoNome}${l.status === "promocao" ? '<span class="selo selo--promocao">Promoção</span>' : ""}</div>
+        <div class="lote-produto">${l.produtoNome}${l.status === "promocao" ? seloHtml("promocao") : ""}</div>
         <div class="lote-meta">${l.local || "—"} · ${l.quantidade} un.</div>
       </div>
       <div class="lote-dados">

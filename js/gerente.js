@@ -1,5 +1,5 @@
 import { db } from "./firebase-config.js";
-import { calcularStatus, formatarDiasRestantes } from "./status.js";
+import { calcularStatus, formatarDiasRestantes, calcularResumoGerente, sugestaoAcao, STATUS_ICONE } from "./status.js";
 import {
   collection,
   query,
@@ -42,7 +42,21 @@ async function iniciar() {
     .filter((l) => l.status !== "normal")
     .sort((a, b) => a.diasRestantes - b.diasRestantes);
 
+  renderizarResumo(lotes);
   renderizarLista(lotes);
+}
+
+// Cartão-resumo: uma frase e um número, pensados para leitura de 5 segundos
+// sem precisar interpretar tabela — a decisão certa para quem não tem
+// contexto do sistema e pode nem chegar a abrir esta página com frequência.
+function renderizarResumo(lotes) {
+  const resumo = calcularResumoGerente(lotes);
+  const el = document.getElementById("resumo");
+  el.hidden = false;
+  el.className = `resumo resumo--${resumo.status}`;
+  document.getElementById("resumo-numero").textContent =
+    resumo.numero !== null ? resumo.numero : "✓";
+  document.getElementById("resumo-texto").textContent = resumo.texto;
 }
 
 function renderizarAtualizacao(ultimaVistoria) {
@@ -69,8 +83,9 @@ function renderizarLista(lotes) {
     div.className = `lote lote--${l.status}`;
     div.innerHTML = `
       <div class="lote-info">
-        <div class="lote-produto">${l.produtoNome}${l.status === "promocao" ? '<span class="selo selo--promocao">Promoção</span>' : ""}</div>
+        <div class="lote-produto">${STATUS_ICONE[l.status]} ${l.produtoNome}</div>
         <div class="lote-meta">${l.local || "—"} · ${l.quantidade} un.</div>
+        <div class="lote-instrucao lote-dias--${l.status}">${sugestaoAcao(l.status, l.diasRestantes)}</div>
       </div>
       <div class="lote-dados">
         <div class="lote-dias lote-dias--${l.status}">${formatarDiasRestantes(l.diasRestantes)}</div>

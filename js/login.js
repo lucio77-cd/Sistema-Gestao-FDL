@@ -14,8 +14,13 @@ const erro = document.getElementById("erro-login");
 form.addEventListener("submit", async (e) => {
   e.preventDefault();
   erro.hidden = true;
+  const botao = form.querySelector('button[type="submit"]');
   const email = document.getElementById("email").value.trim();
   const senha = document.getElementById("senha").value;
+
+  botao.disabled = true;
+  const textoOriginal = botao.textContent;
+  botao.textContent = "Entrando…";
 
   try {
     await signInWithEmailAndPassword(auth, email, senha);
@@ -23,5 +28,7 @@ form.addEventListener("submit", async (e) => {
   } catch (e) {
     erro.textContent = "E-mail ou senha inválidos.";
     erro.hidden = false;
+    botao.disabled = false;
+    botao.textContent = textoOriginal;
   }
 });
