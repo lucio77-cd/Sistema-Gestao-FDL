@@ -3,6 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<meta name="robots" content="noindex, nofollow" />
 <title>Dashboard — Controle de Bebidas</title>
 <link rel="stylesheet" href="css/styles.css" />
 </head>
@@ -23,14 +24,24 @@
     <h1>O que está por vencer</h1>
     <p class="legenda" id="legenda-atualizacao">—</p>
 
-    <div class="painel">
-      <canvas id="grafico-vencimentos" height="180"></canvas>
+    <div class="segmentado" role="tablist" aria-label="Visão do dashboard">
+      <button type="button" id="seg-acao" class="ativo" role="tab" aria-selected="true">Ação</button>
+      <button type="button" id="seg-panorama" role="tab" aria-selected="false">Panorama</button>
     </div>
 
-    <h2>Lotes em atenção ou vencidos</h2>
-    <div id="lista-lotes">
-      <p class="mensagem-vazio">Carregando lotes…</p>
-    </div>
+    <section id="secao-acao">
+      <h2 style="margin-top:0">Lotes em atenção ou vencidos</h2>
+      <div id="lista-lotes">
+        <p class="mensagem-vazio">Carregando lotes…</p>
+      </div>
+    </section>
+
+    <section id="secao-panorama" hidden>
+      <div class="painel">
+        <canvas id="grafico-vencimentos" height="200"></canvas>
+      </div>
+      <p class="legenda">Valor em risco (quantidade × custo) agrupado por faixa de urgência — não a contagem de unidades, que esconde diferença de preço entre produtos.</p>
+    </section>
   </main>
 
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>

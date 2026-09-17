@@ -3,6 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<meta name="robots" content="noindex, nofollow" />
 <title>Vistoria — Controle de Bebidas</title>
 <link rel="stylesheet" href="css/styles.css" />
 </head>
@@ -21,70 +22,80 @@
 
   <main>
     <h1>Vistoria</h1>
-    <p class="legenda">Confira a geladeira/estoque e atualize as quantidades. Ao salvar, a data desta vistoria fica registrada no dashboard.</p>
 
-    <h2>Lotes existentes</h2>
-    <div id="lista-lotes-vistoria">
-      <p class="mensagem-vazio">Carregando…</p>
+    <div class="segmentado" role="tablist" aria-label="Seção da vistoria">
+      <button type="button" id="seg-atualizar" class="ativo" role="tab" aria-selected="true">Atualizar quantidades</button>
+      <button type="button" id="seg-adicionar" role="tab" aria-selected="false">Adicionar novo</button>
     </div>
-    <button class="btn" id="btn-salvar-vistoria">Salvar vistoria</button>
-    <p id="msg-vistoria" class="aviso-ok" hidden></p>
 
-    <h2>Adicionar novo lote</h2>
-    <div class="painel">
-      <form id="form-novo-lote">
-        <label for="produto">Produto</label>
-        <select id="produto" required>
-          <option value="">Selecione…</option>
-        </select>
-        <button type="button" class="btn-texto" id="btn-novo-produto">+ Cadastrar novo produto</button>
+    <section id="secao-atualizar">
+      <p class="legenda">Confira a geladeira/estoque e ajuste as quantidades. Campos em destaque foram alterados nesta sessão.</p>
+
+      <div id="lista-lotes-vistoria">
+        <p class="mensagem-vazio">Carregando…</p>
+      </div>
+
+      <button class="btn" id="btn-salvar-vistoria">Salvar vistoria</button>
+    </section>
+
+    <section id="secao-adicionar" hidden>
+      <p class="legenda">Cadastre um produto novo (raro) ou registre um lote novo que chegou.</p>
+
+      <div class="painel">
+        <h2 style="margin-top:0">Novo produto</h2>
+        <label for="np-nome">Nome</label>
+        <input type="text" id="np-nome" />
+
+        <label for="np-categoria">Categoria</label>
+        <input type="text" id="np-categoria" placeholder="Ex: Refrigerante, Suco, Cerveja" />
 
         <div class="linha-form">
           <div>
-            <label for="quantidade">Quantidade</label>
-            <input type="number" id="quantidade" min="0" required />
+            <label for="np-custo">Preço de custo (R$)</label>
+            <input type="number" id="np-custo" step="0.01" min="0" />
           </div>
           <div>
-            <label for="local">Local</label>
-            <select id="local">
-              <option value="Geladeira">Geladeira</option>
-              <option value="Estoque seco">Estoque seco</option>
-            </select>
+            <label for="np-venda">Preço de venda (R$)</label>
+            <input type="number" id="np-venda" step="0.01" min="0" />
           </div>
         </div>
 
-        <label for="vencimento">Data de vencimento</label>
-        <input type="date" id="vencimento" required />
+        <label for="np-dias-alerta">Antecedência de alerta específica (opcional)</label>
+        <input type="number" id="np-dias-alerta" min="0" placeholder="Deixe em branco para usar o padrão" />
 
-        <button type="submit" class="btn">Adicionar lote</button>
-        <p id="erro-lote" class="aviso-erro" hidden></p>
-      </form>
-    </div>
-
-    <div id="painel-novo-produto" class="painel" hidden>
-      <h2 style="margin-top:0">Novo produto</h2>
-      <label for="np-nome">Nome</label>
-      <input type="text" id="np-nome" />
-
-      <label for="np-categoria">Categoria</label>
-      <input type="text" id="np-categoria" placeholder="Ex: Refrigerante, Suco, Cerveja" />
-
-      <div class="linha-form">
-        <div>
-          <label for="np-custo">Preço de custo (R$)</label>
-          <input type="number" id="np-custo" step="0.01" min="0" />
-        </div>
-        <div>
-          <label for="np-venda">Preço de venda (R$)</label>
-          <input type="number" id="np-venda" step="0.01" min="0" />
-        </div>
+        <button type="button" class="btn" id="btn-salvar-produto">Salvar produto</button>
       </div>
 
-      <label for="np-dias-alerta">Antecedência de alerta específica (opcional)</label>
-      <input type="number" id="np-dias-alerta" min="0" placeholder="Deixe em branco para usar o padrão" />
+      <div class="painel">
+        <h2 style="margin-top:0">Novo lote</h2>
+        <form id="form-novo-lote">
+          <label for="produto">Produto</label>
+          <select id="produto" required>
+            <option value="">Selecione…</option>
+          </select>
 
-      <button type="button" class="btn" id="btn-salvar-produto">Salvar produto</button>
-    </div>
+          <div class="linha-form">
+            <div>
+              <label for="quantidade">Quantidade</label>
+              <input type="number" id="quantidade" min="0" required />
+            </div>
+            <div>
+              <label for="local">Local</label>
+              <select id="local">
+                <option value="Geladeira">Geladeira</option>
+                <option value="Estoque seco">Estoque seco</option>
+              </select>
+            </div>
+          </div>
+
+          <label for="vencimento">Data de vencimento</label>
+          <input type="date" id="vencimento" required />
+
+          <button type="submit" class="btn">Adicionar lote</button>
+          <p id="erro-lote" class="aviso-erro" hidden></p>
+        </form>
+      </div>
+    </section>
   </main>
 
   <script type="module" src="js/vistoria.js"></script>
