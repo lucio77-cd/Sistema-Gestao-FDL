@@ -60,10 +60,14 @@ protegerPagina(async ({ estabelecimento }) => {
 
   const lotes = lotesSnap.docs.map((d) => {
     const dados = d.data();
-    const produto = produtos[dados.produtoId] || { nome: "(produto removido)", diasAlerta: null };
+    const produto = produtos[dados.produtoId] || {
+      nome: dados.produtoNome || "(produto removido)",
+      diasAlerta: dados.diasAlerta ?? null,
+      precoCusto: dados.precoCusto ?? 0,
+    };
     const diasAlerta = produto.diasAlerta ?? diasAlertaPadrao;
     const { diasRestantes, status } = calcularStatus(dados.dataVencimento, diasAlerta, dados.promocaoAtiva);
-    return { id: d.id, ...dados, produtoNome: produto.nome, diasRestantes, status };
+    return { id: d.id, ...dados, produtoNome: produto.nome, precoCusto: dados.precoCusto ?? produto.precoCusto, diasRestantes, status };
   });
 
   lotes.sort((a, b) => a.diasRestantes - b.diasRestantes);

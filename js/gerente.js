@@ -8,42 +8,48 @@ import {
   getDocs,
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
+// Esta página não tem login (acesso via token na URL). Por isso ela nunca
+// consulta a coleção "produtos" (restrita, tem preço de custo) — o nome e a
+// antecedência de alerta de cada lote já vêm gravados no próprio documento
+// do lote (ver vistoria.js). Isso evita "permissão negada" travando a
+// página em "Carregando…" para sempre.
+
 async function iniciar() {
-  const token = new URLSearchParams(window.location.search).get("token");
-  if (!token) return mostrarErro();
+  try {
+    const token = new URLSearchParams(window.location.search).get("token");
+    if (!token) return mostrarErro();
 
-  const snapEstab = await getDocs(
-    query(collection(db, "estabelecimentos"), where("linkToken", "==", token), limit(1))
-  );
-  if (snapEstab.empty) return mostrarErro();
+    const snapEstab = await getDocs(
+      query(collection(db, "estabelecimentos"), where("linkToken", "==", token), limit(1))
+    );
+    if (snapEstab.empty) return mostrarErro();
 
-  const estabelecimento = { id: snapEstab.docs[0].id, ...snapEstab.docs[0].data() };
-  document.getElementById("nome-estabelecimento").textContent = estabelecimento.nome;
-  renderizarAtualizacao(estabelecimento.ultimaVistoria);
+    const estabelecimento = { id: snapEstab.docs[0].id, ...snapEstab.docs[0].data() };
+    document.getElementById("nome-estabelecimento").textContent = estabelecimento.nome;
+    renderizarAtualizacao(estabelecimento.ultimaVistoria);
 
-  const diasAlertaPadrao = estabelecimento.diasAlertaPadrao ?? 3;
+    const diasAlertaPadrao = estabelecimento.diasAlertaPadrao ?? 3;
 
-  const [produtosSnap, lotesSnap] = await Promise.all([
-    getDocs(query(collection(db, "produtos"), where("estabelecimentoId", "==", estabelecimento.id))),
-    getDocs(query(collection(db, "lotes"), where("estabelecimentoId", "==", estabelecimento.id))),
-  ]);
+    const lotesSnap = await getDocs(
+      query(collection(db, "lotes"), where("estabelecimentoId", "==", estabelecimento.id))
+    );
 
-  const produtos = {};
-  produtosSnap.forEach((d) => (produtos[d.id] = { id: d.id, ...d.data() }));
+    const lotes = lotesSnap.docs
+      .map((d) => {
+        const dados = d.data();
+        const diasAlerta = dados.diasAlerta ?? diasAlertaPadrao;
+        const { diasRestantes, status } = calcularStatus(dados.dataVencimento, diasAlerta, dados.promocaoAtiva);
+        return { ...dados, produtoNome: dados.produtoNome || "Produto", diasRestantes, status };
+      })
+      .filter((l) => l.status !== "normal")
+      .sort((a, b) => a.diasRestantes - b.diasRestantes);
 
-  const lotes = lotesSnap.docs
-    .map((d) => {
-      const dados = d.data();
-      const produto = produtos[dados.produtoId] || { nome: "(produto removido)" };
-      const diasAlerta = produto.diasAlerta ?? diasAlertaPadrao;
-      const { diasRestantes, status } = calcularStatus(dados.dataVencimento, diasAlerta, dados.promocaoAtiva);
-      return { ...dados, produtoNome: produto.nome, diasRestantes, status };
-    })
-    .filter((l) => l.status !== "normal")
-    .sort((a, b) => a.diasRestantes - b.diasRestantes);
-
-  renderizarResumo(lotes);
-  renderizarLista(lotes);
+    renderizarResumo(lotes);
+    renderizarLista(lotes);
+  } catch (erro) {
+    console.error(erro);
+    mostrarErro("Não foi possível carregar os dados agora. Tente atualizar a página em instantes.");
+  }
 }
 
 // Cartão-resumo: uma frase e um número, pensados para leitura de 5 segundos
@@ -95,8 +101,10 @@ function renderizarLista(lotes) {
   });
 }
 
-function mostrarErro() {
-  document.getElementById("erro-token").hidden = false;
+function mostrarErro(mensagem) {
+  const el = document.getElementById("erro-token");
+  el.textContent = mensagem || "Link inválido ou expirado.";
+  el.hidden = false;
   document.getElementById("lista-lotes").innerHTML = "";
   document.getElementById("legenda-atualizacao").textContent = "";
 }

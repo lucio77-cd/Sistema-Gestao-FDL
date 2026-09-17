@@ -20,7 +20,7 @@ document.getElementById("link-sair").addEventListener("click", (e) => {
 
 let estabelecimentoAtual = null;
 let produtosCache = {};
-// { loteId: { input, valorOriginal, produtoId } }
+// { loteId: { input, valorOriginal, produtoId, produtoNome, precoCusto, local, dataVencimento, acaoZero } }
 let controlesQuantidade = {};
 
 protegerPagina(async ({ estabelecimento }) => {
@@ -101,9 +101,36 @@ async function carregarLotes() {
     .map((d) => ({ id: d.id, ...d.data() }))
     .sort((a, b) => a.dataVencimento.localeCompare(b.dataVencimento));
 
+  // Migração silenciosa: lotes criados antes desta versão não têm o nome do
+  // produto gravado no próprio lote. Isso é o que fazia a página da gerente
+  // depender de ler a coleção "produtos" (sem permissão pública) e travar em
+  // "Carregando…" para sempre. Aproveitamos que já temos o produto em cache
+  // aqui (tela autenticada) para completar o dado uma única vez.
+  const batchMigracao = writeBatch(db);
+  let precisaMigrar = false;
+
   lotes.forEach((l) => {
-    const produto = produtosCache[l.produtoId] || { nome: "(produto removido)" };
-    const diasAlerta = produto.diasAlerta ?? diasAlertaPadrao;
+    const produto = produtosCache[l.produtoId];
+    if (produto && (l.produtoNome === undefined || l.precoCusto === undefined)) {
+      l.produtoNome = produto.nome;
+      l.precoCusto = produto.precoCusto ?? 0;
+      if (l.diasAlerta === undefined) l.diasAlerta = produto.diasAlerta ?? null;
+      batchMigracao.update(doc(db, "lotes", l.id), {
+        produtoNome: produto.nome,
+        precoCusto: produto.precoCusto ?? 0,
+        diasAlerta: produto.diasAlerta ?? null,
+      });
+      precisaMigrar = true;
+    }
+  });
+
+  if (precisaMigrar) {
+    batchMigracao.commit().catch((erro) => console.error("Migração de lotes falhou:", erro));
+  }
+
+  lotes.forEach((l) => {
+    const produto = produtosCache[l.produtoId] || { nome: l.produtoNome || "(produto removido)" };
+    const diasAlerta = (l.diasAlerta ?? produto.diasAlerta) ?? diasAlertaPadrao;
     const { status } = calcularStatus(l.dataVencimento, diasAlerta, l.promocaoAtiva);
 
     const div = document.createElement("div");
@@ -112,6 +139,10 @@ async function carregarLotes() {
       <div class="lote-info">
         <div class="lote-produto">${produto.nome}</div>
         <div class="lote-meta">${l.local || "—"} · vence em ${formatarData(l.dataVencimento)}</div>
+        <div class="lote-acao-zero" hidden>
+          <button type="button" class="btn-texto btn-acao-zero" data-acao="vendido">Vendido — excluir</button>
+          <button type="button" class="btn-texto btn-acao-zero" data-acao="perda">Sobrou/venceu — registrar perda</button>
+        </div>
       </div>
       <div class="stepper" data-lote-id="${l.id}">
         <button type="button" class="btn-menos" aria-label="Diminuir quantidade de ${produto.nome}">−</button>
@@ -123,25 +154,51 @@ async function carregarLotes() {
 
     const stepper = div.querySelector(".stepper");
     const input = stepper.querySelector("input");
-    controlesQuantidade[l.id] = { input, valorOriginal: Number(l.quantidade), produtoId: l.produtoId };
+    const areaAcaoZero = div.querySelector(".lote-acao-zero");
 
-    function marcarSeAlterado() {
-      const alterou = Number(input.value) !== controlesQuantidade[l.id].valorOriginal;
+    controlesQuantidade[l.id] = {
+      input,
+      valorOriginal: Number(l.quantidade),
+      produtoId: l.produtoId,
+      produtoNome: produto.nome,
+      precoCusto: Number(l.precoCusto ?? produto.precoCusto ?? 0),
+      local: l.local || "",
+      dataVencimento: l.dataVencimento,
+      acaoZero: null,
+    };
+
+    function atualizarEstadoVisual() {
+      const valor = Number(input.value);
+      const alterou = valor !== controlesQuantidade[l.id].valorOriginal;
       stepper.classList.toggle("alterado", alterou);
+      areaAcaoZero.hidden = valor !== 0;
+      if (valor !== 0) controlesQuantidade[l.id].acaoZero = null;
     }
 
     stepper.querySelector(".btn-menos").addEventListener("click", () => {
       input.value = Math.max(0, Number(input.value) - 1);
-      marcarSeAlterado();
+      atualizarEstadoVisual();
     });
     stepper.querySelector(".btn-mais").addEventListener("click", () => {
       input.value = Number(input.value) + 1;
-      marcarSeAlterado();
+      atualizarEstadoVisual();
     });
     input.addEventListener("input", () => {
       if (Number(input.value) < 0) input.value = 0;
-      marcarSeAlterado();
+      atualizarEstadoVisual();
     });
+
+    areaAcaoZero.querySelectorAll(".btn-acao-zero").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        controlesQuantidade[l.id].acaoZero = btn.dataset.acao;
+        areaAcaoZero.querySelectorAll(".btn-acao-zero").forEach((b) => b.classList.remove("selecionado"));
+        btn.classList.add("selecionado");
+      });
+    });
+
+    // Se o lote já foi carregado com quantidade 0 (raro, mas possível), mostra
+    // a escolha desde já.
+    atualizarEstadoVisual();
   });
 }
 
@@ -149,12 +206,30 @@ async function carregarLotes() {
 
 document.getElementById("btn-salvar-vistoria").addEventListener("click", async () => {
   const botao = document.getElementById("btn-salvar-vistoria");
-  const idsAlterados = Object.entries(controlesQuantidade).filter(
+  const alterados = Object.entries(controlesQuantidade).filter(
     ([, c]) => Number(c.input.value) !== c.valorOriginal
   );
 
-  if (idsAlterados.length === 0) {
+  if (alterados.length === 0) {
     mostrarToast("Nenhuma quantidade foi alterada.", "ok");
+    return;
+  }
+
+  // Lotes zerados sem decisão ficam de fora deste salvamento — evita apagar
+  // ou perder dado sem uma escolha explícita do usuário.
+  const prontos = [];
+  const pendentes = [];
+  alterados.forEach(([loteId, c]) => {
+    const quantidadeNova = Number(c.input.value);
+    if (quantidadeNova === 0 && !c.acaoZero) {
+      pendentes.push(c.produtoNome);
+    } else {
+      prontos.push([loteId, c, quantidadeNova]);
+    }
+  });
+
+  if (prontos.length === 0) {
+    mostrarToast(`Escolha "Vendido" ou "Sobrou/venceu" para: ${pendentes.join(", ")}.`, "erro");
     return;
   }
 
@@ -166,14 +241,35 @@ document.getElementById("btn-salvar-vistoria").addEventListener("click", async (
     const batch = writeBatch(db);
     const itensHistorico = [];
 
-    idsAlterados.forEach(([loteId, c]) => {
-      const quantidadeNova = Number(c.input.value);
-      batch.update(doc(db, "lotes", loteId), { quantidade: quantidadeNova });
+    prontos.forEach(([loteId, c, quantidadeNova]) => {
+      const loteRef = doc(db, "lotes", loteId);
+
+      if (quantidadeNova > 0) {
+        batch.update(loteRef, { quantidade: quantidadeNova });
+      } else if (c.acaoZero === "vendido") {
+        batch.delete(loteRef);
+      } else if (c.acaoZero === "perda") {
+        batch.delete(loteRef);
+        const refPerda = doc(collection(db, "perdas"));
+        batch.set(refPerda, {
+          estabelecimentoId: estabelecimentoAtual.id,
+          produtoId: c.produtoId,
+          produtoNome: c.produtoNome,
+          quantidadePerdida: c.valorOriginal,
+          precoCusto: c.precoCusto,
+          valorPerdido: c.valorOriginal * c.precoCusto,
+          local: c.local,
+          dataVencimentoOriginal: c.dataVencimento,
+          registradoEm: serverTimestamp(),
+        });
+      }
+
       itensHistorico.push({
         loteId,
         produtoId: c.produtoId,
         quantidadeAnterior: c.valorOriginal,
         quantidadeNova,
+        acao: quantidadeNova === 0 ? c.acaoZero : "ajuste",
       });
     });
 
@@ -190,10 +286,13 @@ document.getElementById("btn-salvar-vistoria").addEventListener("click", async (
 
     await batch.commit();
 
-    idsAlterados.forEach(([, c]) => (c.valorOriginal = Number(c.input.value)));
-    document.querySelectorAll(".stepper.alterado").forEach((el) => el.classList.remove("alterado"));
+    if (pendentes.length > 0) {
+      mostrarToast(`Vistoria salva. Falta decidir: ${pendentes.join(", ")}.`, "erro");
+    } else {
+      mostrarToast("Vistoria salva com sucesso.", "ok");
+    }
 
-    mostrarToast("Vistoria salva com sucesso.", "ok");
+    await carregarLotes();
   } catch (erro) {
     console.error(erro);
     mostrarToast("Não salvou — verifique a conexão e tente de novo.", "erro");
@@ -239,6 +338,10 @@ document.getElementById("btn-salvar-produto").addEventListener("click", async ()
 });
 
 // ---------- Cadastro de lote ----------
+// O nome do produto e o preço de custo são gravados também no próprio lote
+// (denormalizado). Isso é o que permite a página da gerente (sem login) ler
+// os lotes sem precisar consultar a coleção "produtos" — que fica restrita
+// por conter preço de custo/venda.
 
 document.getElementById("form-novo-lote").addEventListener("submit", async (e) => {
   e.preventDefault();
@@ -246,7 +349,8 @@ document.getElementById("form-novo-lote").addEventListener("submit", async (e) =
   erro.hidden = true;
 
   const produtoId = document.getElementById("produto").value;
-  if (!produtoId) {
+  const produto = produtosCache[produtoId];
+  if (!produtoId || !produto) {
     erro.textContent = "Selecione um produto.";
     erro.hidden = false;
     return;
@@ -256,6 +360,9 @@ document.getElementById("form-novo-lote").addEventListener("submit", async (e) =
     await addDoc(collection(db, "lotes"), {
       estabelecimentoId: estabelecimentoAtual.id,
       produtoId,
+      produtoNome: produto.nome,
+      precoCusto: produto.precoCusto ?? 0,
+      diasAlerta: produto.diasAlerta ?? null,
       quantidade: Number(document.getElementById("quantidade").value),
       local: document.getElementById("local").value,
       dataVencimento: document.getElementById("vencimento").value,

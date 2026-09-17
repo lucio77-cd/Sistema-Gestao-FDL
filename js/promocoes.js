@@ -38,7 +38,7 @@ async function carregar() {
   const lotes = lotesSnap.docs
     .map((d) => {
       const dados = d.data();
-      const produto = produtos[dados.produtoId] || { nome: "(produto removido)" };
+      const produto = produtos[dados.produtoId] || { nome: dados.produtoNome || "(produto removido)" };
       const diasAlerta = produto.diasAlerta ?? diasAlertaPadrao;
       const { diasRestantes, status } = calcularStatus(dados.dataVencimento, diasAlerta, dados.promocaoAtiva);
       return { id: d.id, ...dados, produtoNome: produto.nome, diasRestantes, status };
