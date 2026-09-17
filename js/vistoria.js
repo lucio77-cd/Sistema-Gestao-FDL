@@ -34,21 +34,29 @@ protegerPagina(async ({ estabelecimento }) => {
 
 const segAtualizar = document.getElementById("seg-atualizar");
 const segAdicionar = document.getElementById("seg-adicionar");
+const segExcluidos = document.getElementById("seg-excluidos");
 const secaoAtualizar = document.getElementById("secao-atualizar");
 const secaoAdicionar = document.getElementById("secao-adicionar");
+const secaoExcluidos = document.getElementById("secao-excluidos");
 
 function mostrarSecao(nome) {
-  const ehAtualizar = nome === "atualizar";
-  secaoAtualizar.hidden = !ehAtualizar;
-  secaoAdicionar.hidden = ehAtualizar;
-  segAtualizar.classList.toggle("ativo", ehAtualizar);
-  segAtualizar.setAttribute("aria-selected", String(ehAtualizar));
-  segAdicionar.classList.toggle("ativo", !ehAtualizar);
-  segAdicionar.setAttribute("aria-selected", String(!ehAtualizar));
+  secaoAtualizar.hidden = nome !== "atualizar";
+  secaoAdicionar.hidden = nome !== "adicionar";
+  secaoExcluidos.hidden = nome !== "excluidos";
+
+  segAtualizar.classList.toggle("ativo", nome === "atualizar");
+  segAtualizar.setAttribute("aria-selected", String(nome === "atualizar"));
+  segAdicionar.classList.toggle("ativo", nome === "adicionar");
+  segAdicionar.setAttribute("aria-selected", String(nome === "adicionar"));
+  segExcluidos.classList.toggle("ativo", nome === "excluidos");
+  segExcluidos.setAttribute("aria-selected", String(nome === "excluidos"));
+
+  if (nome === "excluidos") carregarExcluidos();
 }
 
 segAtualizar.addEventListener("click", () => mostrarSecao("atualizar"));
 segAdicionar.addEventListener("click", () => mostrarSecao("adicionar"));
+segExcluidos.addEventListener("click", () => mostrarSecao("excluidos"));
 
 function irParaCadastroDeProduto() {
   mostrarSecao("adicionar");
@@ -202,6 +210,52 @@ async function carregarLotes() {
   });
 }
 
+// ---------- Lista de excluídos ----------
+// Itens marcados como "Vendido" ao zerar a quantidade não somem sem deixar
+// rastro: ficam registrados aqui como histórico simples de saída.
+
+async function carregarExcluidos() {
+  const container = document.getElementById("lista-excluidos");
+  container.innerHTML = '<p class="mensagem-vazio">Carregando…</p>';
+
+  const snap = await getDocs(
+    query(collection(db, "excluidos"), where("estabelecimentoId", "==", estabelecimentoAtual.id))
+  );
+
+  const itens = snap.docs
+    .map((d) => ({ id: d.id, ...d.data() }))
+    .sort((a, b) => {
+      const dataA = a.registradoEm?.toDate ? a.registradoEm.toDate() : new Date(0);
+      const dataB = b.registradoEm?.toDate ? b.registradoEm.toDate() : new Date(0);
+      return dataB - dataA;
+    });
+
+  container.innerHTML = "";
+
+  if (itens.length === 0) {
+    container.innerHTML = '<p class="mensagem-vazio">Nenhum item excluído ainda.</p>';
+    return;
+  }
+
+  itens.forEach((item) => {
+    const data = item.registradoEm?.toDate ? item.registradoEm.toDate() : null;
+    const dataTexto = data ? data.toLocaleDateString("pt-BR") : "—";
+
+    const div = document.createElement("div");
+    div.className = "lote lote--excluido";
+    div.innerHTML = `
+      <div class="lote-info">
+        <div class="lote-produto">${item.produtoNome}</div>
+        <div class="lote-meta">${item.local || "—"} · ${item.quantidadeVendida} un. · vencia em ${formatarData(item.dataVencimentoOriginal)}</div>
+      </div>
+      <div class="lote-dados">
+        <div class="lote-valor">Excluído em ${dataTexto}</div>
+      </div>
+    `;
+    container.appendChild(div);
+  });
+}
+
 // ---------- Salvar vistoria (escrita atômica + histórico) ----------
 
 document.getElementById("btn-salvar-vistoria").addEventListener("click", async () => {
@@ -248,6 +302,16 @@ document.getElementById("btn-salvar-vistoria").addEventListener("click", async (
         batch.update(loteRef, { quantidade: quantidadeNova });
       } else if (c.acaoZero === "vendido") {
         batch.delete(loteRef);
+        const refExcluido = doc(collection(db, "excluidos"));
+        batch.set(refExcluido, {
+          estabelecimentoId: estabelecimentoAtual.id,
+          produtoId: c.produtoId,
+          produtoNome: c.produtoNome,
+          quantidadeVendida: c.valorOriginal,
+          local: c.local,
+          dataVencimentoOriginal: c.dataVencimento,
+          registradoEm: serverTimestamp(),
+        });
       } else if (c.acaoZero === "perda") {
         batch.delete(loteRef);
         const refPerda = doc(collection(db, "perdas"));

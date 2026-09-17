@@ -43,6 +43,30 @@ function mostrarAba(nome) {
 segAcao.addEventListener("click", () => mostrarAba("acao"));
 segPanorama.addEventListener("click", () => mostrarAba("panorama"));
 
+// ---------- Filtro (status + local) ----------
+// Filtra em memória sobre o que já foi carregado — não faz nova consulta ao
+// Firestore a cada troca de filtro.
+
+const filtroStatus = document.getElementById("filtro-status");
+const filtroLocal = document.getElementById("filtro-local");
+
+function aplicarFiltros() {
+  const status = filtroStatus.value;
+  const local = filtroLocal.value;
+
+  const filtrados = lotesCarregados.filter((l) => {
+    if (l.status === "normal") return false;
+    if (status !== "todos" && l.status !== status) return false;
+    if (local !== "todos" && l.local !== local) return false;
+    return true;
+  });
+
+  renderizarTabela(filtrados);
+}
+
+filtroStatus.addEventListener("change", aplicarFiltros);
+filtroLocal.addEventListener("change", aplicarFiltros);
+
 // ---------- Carregamento ----------
 
 protegerPagina(async ({ estabelecimento }) => {
@@ -74,7 +98,7 @@ protegerPagina(async ({ estabelecimento }) => {
   lotesCarregados = lotes;
 
   renderizarLegendaAtualizacao(estabelecimento.ultimaVistoria);
-  renderizarTabela(lotes.filter((l) => l.status !== "normal"));
+  aplicarFiltros();
 });
 
 function renderizarLegendaAtualizacao(ultimaVistoria) {
@@ -132,7 +156,10 @@ function renderizarTabela(lotes) {
   container.innerHTML = "";
 
   if (lotes.length === 0) {
-    container.innerHTML = '<p class="mensagem-vazio">Nenhum lote em atenção ou vencido. 🎉</p>';
+    const filtroAtivo = filtroStatus.value !== "todos" || filtroLocal.value !== "todos";
+    container.innerHTML = filtroAtivo
+      ? '<p class="mensagem-vazio">Nenhum lote corresponde a este filtro.</p>'
+      : '<p class="mensagem-vazio">Nenhum lote em atenção ou vencido. 🎉</p>';
     return;
   }
 
