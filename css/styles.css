@@ -231,6 +231,27 @@ h2 {
   border-radius: 6px;
 }
 
+.lote-acao-zero {
+  display: flex;
+  gap: 0.6rem;
+  margin-top: 0.4rem;
+  flex-wrap: wrap;
+}
+
+.lote-acao-zero .btn-acao-zero {
+  border: 1px solid var(--steel-light);
+  border-radius: 4px;
+  padding: 0.3rem 0.55rem;
+  text-decoration: none;
+  font-weight: 600;
+}
+
+.lote-acao-zero .btn-acao-zero.selecionado {
+  background: var(--primary);
+  border-color: var(--primary);
+  color: #fff;
+}
+
 .stepper button {
   width: 44px;
   height: 44px;
