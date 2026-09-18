@@ -1,6 +1,6 @@
 import { db } from "./firebase-config.js";
 import { protegerPagina, sair } from "./auth-guard.js";
-import { calcularStatus, formatarDiasRestantes, agruparPorFaixa, seloHtml } from "./status.js";
+import { calcularStatus, formatarDiasRestantes, montarGraficoFaixas, seloHtml } from "./status.js";
 import {
   collection,
   query,
@@ -21,9 +21,10 @@ const segAcao = document.getElementById("seg-acao");
 const segPanorama = document.getElementById("seg-panorama");
 const secaoAcao = document.getElementById("secao-acao");
 const secaoPanorama = document.getElementById("secao-panorama");
+const filtroPeriodo = document.getElementById("filtro-periodo");
 
 let lotesCarregados = [];
-let graficoMontado = false;
+let graficoAtual = null;
 
 function mostrarAba(nome) {
   const ehAcao = nome === "acao";
@@ -34,14 +35,12 @@ function mostrarAba(nome) {
   segPanorama.classList.toggle("ativo", !ehAcao);
   segPanorama.setAttribute("aria-selected", String(!ehAcao));
 
-  if (!ehAcao && !graficoMontado) {
-    renderizarGrafico(lotesCarregados);
-    graficoMontado = true;
-  }
+  if (!ehAcao) renderizarGrafico();
 }
 
 segAcao.addEventListener("click", () => mostrarAba("acao"));
 segPanorama.addEventListener("click", () => mostrarAba("panorama"));
+filtroPeriodo.addEventListener("change", renderizarGrafico);
 
 // ---------- Filtro (status + local) ----------
 // Filtra em memória sobre o que já foi carregado — não faz nova consulta ao
@@ -98,6 +97,15 @@ protegerPagina(async ({ estabelecimento }) => {
   lotesCarregados = lotes;
 
   renderizarLegendaAtualizacao(estabelecimento.ultimaVistoria);
+
+  if (lotes.length === 0) {
+    document.getElementById("lista-lotes").innerHTML =
+      '<p class="mensagem-vazio">Nenhum dado encontrado. Cadastre um produto e um lote na Vistoria para começar.</p>';
+    document.getElementById("secao-panorama-conteudo").innerHTML =
+      '<p class="mensagem-vazio">Nenhum dado encontrado ainda.</p>';
+    return;
+  }
+
   aplicarFiltros();
 });
 
@@ -112,43 +120,30 @@ function renderizarLegendaAtualizacao(ultimaVistoria) {
 }
 
 // O gráfico soma o VALOR em risco (quantidade × custo) por faixa de urgência
-// — incluindo os já vencidos, que antes ficavam de fora do gráfico e só
-// apareciam na tabela — e agrupa em faixas de decisão em vez de 14 dias
-// individuais, que dão o mesmo peso visual a "vence hoje" e "vence em 9 dias".
-function renderizarGrafico(lotes) {
-  const { labels, cores, valores } = agruparPorFaixa(lotes);
+// dentro do período escolhido, com detalhe de produto/quantidade no tooltip
+// (passe o mouse ou toque na barra).
+function renderizarGrafico() {
+  const periodo = Number(filtroPeriodo.value);
+  const lotesNoPeriodo = lotesCarregados.filter((l) => l.status !== "normal" && l.diasRestantes <= periodo);
 
-  new Chart(document.getElementById("grafico-vencimentos"), {
-    type: "bar",
-    data: {
-      labels,
-      datasets: [
-        {
-          label: "Valor em risco (R$)",
-          data: valores,
-          backgroundColor: cores,
-          borderRadius: 4,
-        },
-      ],
-    },
-    options: {
-      responsive: true,
-      plugins: {
-        legend: { display: false },
-        tooltip: {
-          callbacks: {
-            label: (ctx) => `R$ ${ctx.parsed.y.toFixed(2)}`,
-          },
-        },
-      },
-      scales: {
-        y: {
-          beginAtZero: true,
-          ticks: { callback: (v) => `R$ ${v}` },
-        },
-      },
-    },
-  });
+  if (graficoAtual) {
+    graficoAtual.destroy();
+    graficoAtual = null;
+  }
+
+  const canvas = document.getElementById("grafico-vencimentos");
+  const semDados = document.getElementById("grafico-sem-dados");
+
+  if (lotesNoPeriodo.length === 0) {
+    canvas.hidden = true;
+    semDados.hidden = false;
+    semDados.textContent = "Nenhum dado neste período.";
+    return;
+  }
+
+  canvas.hidden = false;
+  semDados.hidden = true;
+  graficoAtual = montarGraficoFaixas(canvas, lotesNoPeriodo, periodo);
 }
 
 function renderizarTabela(lotes) {

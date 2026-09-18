@@ -218,9 +218,17 @@ async function carregarExcluidos() {
   const container = document.getElementById("lista-excluidos");
   container.innerHTML = '<p class="mensagem-vazio">Carregando…</p>';
 
-  const snap = await getDocs(
-    query(collection(db, "excluidos"), where("estabelecimentoId", "==", estabelecimentoAtual.id))
-  );
+  let snap;
+  try {
+    snap = await getDocs(
+      query(collection(db, "excluidos"), where("estabelecimentoId", "==", estabelecimentoAtual.id))
+    );
+  } catch (erro) {
+    console.error("Falha ao carregar excluídos:", erro);
+    container.innerHTML =
+      '<p class="mensagem-vazio">Não foi possível carregar. Confirme se as regras do Firestore foram publicadas (coleção "excluidos") e tente de novo.</p>';
+    return;
+  }
 
   const itens = snap.docs
     .map((d) => ({ id: d.id, ...d.data() }))
@@ -260,9 +268,17 @@ async function carregarExcluidos() {
 
 document.getElementById("btn-salvar-vistoria").addEventListener("click", async () => {
   const botao = document.getElementById("btn-salvar-vistoria");
-  const alterados = Object.entries(controlesQuantidade).filter(
-    ([, c]) => Number(c.input.value) !== c.valorOriginal
-  );
+  // Bug corrigido aqui: antes, um lote que já chegava com quantidade 0
+  // (ex: zerado numa vistoria anterior, antes de existir a decisão
+  // vendido/perda) nunca entrava neste filtro — porque o valor não mudou
+  // (0 !== 0 é falso) — então a decisão escolhida na tela nunca era salva,
+  // e o lote ficava "fantasma": zerado, mas nunca excluído de fato.
+  const alterados = Object.entries(controlesQuantidade).filter(([, c]) => {
+    const valorAtual = Number(c.input.value);
+    if (valorAtual !== c.valorOriginal) return true;
+    if (valorAtual === 0 && c.acaoZero) return true;
+    return false;
+  });
 
   if (alterados.length === 0) {
     mostrarToast("Nenhuma quantidade foi alterada.", "ok");
