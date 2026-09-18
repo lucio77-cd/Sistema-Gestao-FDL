@@ -1,6 +1,6 @@
 import { db } from "./firebase-config.js";
 import { protegerPagina, sair } from "./auth-guard.js";
-import { formatarMoeda, formatarData } from "./status.js";
+import { formatarMoeda, formatarData, formatarValorOuAviso } from "./status.js";
 import {
   collection,
   query,
@@ -69,7 +69,7 @@ async function carregar(estabelecimentoId) {
         <div class="lote-meta">${p.local || "—"} · ${p.quantidadePerdida} un. · vencia em ${formatarData(p.dataVencimentoOriginal)}</div>
       </div>
       <div class="lote-dados">
-        <div class="lote-dias lote-dias--vencido">${formatarMoeda(p.valorPerdido)}</div>
+        <div class="lote-dias lote-dias--vencido">${formatarValorOuAviso(p.quantidadePerdida, p.precoCusto)}</div>
         <div class="lote-valor">registrado em ${dataTexto}</div>
       </div>
     `;

@@ -1,6 +1,6 @@
 import { db } from "./firebase-config.js";
 import { protegerPagina, sair } from "./auth-guard.js";
-import { calcularStatus, formatarDiasRestantes, montarGraficoFaixas, seloHtml } from "./status.js";
+import { calcularStatus, formatarDiasRestantes, montarGraficoFaixas, seloHtml, formatarValorOuAviso } from "./status.js";
 import {
   collection,
   query,
@@ -141,9 +141,22 @@ function renderizarGrafico() {
     return;
   }
 
+  const { chart, total } = montarGraficoFaixas(canvas, lotesNoPeriodo, periodo);
+
+  if (total === 0) {
+    // Existe item no período, mas todo mundo deu R$0,00 — quase sempre é
+    // produto sem preço de custo cadastrado, não "nada acontecendo".
+    chart.destroy();
+    canvas.hidden = true;
+    semDados.hidden = false;
+    semDados.textContent = "Há itens neste período, mas sem valor calculado — verifique se os produtos têm preço de custo cadastrado.";
+    graficoAtual = null;
+    return;
+  }
+
   canvas.hidden = false;
   semDados.hidden = true;
-  graficoAtual = montarGraficoFaixas(canvas, lotesNoPeriodo, periodo);
+  graficoAtual = chart;
 }
 
 function renderizarTabela(lotes) {
@@ -159,7 +172,6 @@ function renderizarTabela(lotes) {
   }
 
   lotes.forEach((l) => {
-    const valorEmRisco = (Number(l.quantidade) || 0) * (Number(l.precoCusto) || 0);
     const div = document.createElement("div");
     div.className = `lote lote--${l.status}`;
     div.innerHTML = `
@@ -169,7 +181,7 @@ function renderizarTabela(lotes) {
       </div>
       <div class="lote-dados">
         <div class="lote-dias lote-dias--${l.status}">${formatarDiasRestantes(l.diasRestantes)}</div>
-        <div class="lote-valor">R$ ${valorEmRisco.toFixed(2)} em risco</div>
+        <div class="lote-valor">${formatarValorOuAviso(l.quantidade, l.precoCusto)} em risco</div>
       </div>
     `;
     container.appendChild(div);

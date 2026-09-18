@@ -147,7 +147,7 @@ async function carregarLotes() {
       <div class="lote-info">
         <div class="lote-produto">${produto.nome}</div>
         <div class="lote-meta">${l.local || "—"} · vence em ${formatarData(l.dataVencimento)}</div>
-        <div class="lote-acao-zero" hidden>
+        <div class="lote-acao-zero">
           <button type="button" class="btn-texto btn-acao-zero" data-acao="vendido">Vendido — excluir</button>
           <button type="button" class="btn-texto btn-acao-zero" data-acao="perda">Sobrou/venceu — registrar perda</button>
         </div>
@@ -173,40 +173,60 @@ async function carregarLotes() {
       local: l.local || "",
       dataVencimento: l.dataVencimento,
       acaoZero: null,
+      quantidadeParaAcao: null,
     };
 
-    function atualizarEstadoVisual() {
+    // Só reflete visualmente o destaque de "alterado" — nunca mexe na ação
+    // escolhida. Isso é separado de propósito do clique nos botões abaixo.
+    function atualizarClasseAlterado() {
       const valor = Number(input.value);
-      const alterou = valor !== controlesQuantidade[l.id].valorOriginal;
+      const alterou = valor !== controlesQuantidade[l.id].valorOriginal || !!controlesQuantidade[l.id].acaoZero;
       stepper.classList.toggle("alterado", alterou);
-      areaAcaoZero.hidden = valor !== 0;
-      if (valor !== 0) controlesQuantidade[l.id].acaoZero = null;
+    }
+
+    // Mexer no stepper manualmente depois de escolher uma ação cancela a
+    // escolha — evita salvar uma ação "perda" antiga com uma quantidade nova
+    // que o usuário decidiu digitar por cima.
+    function limparAcaoEscolhida() {
+      controlesQuantidade[l.id].acaoZero = null;
+      controlesQuantidade[l.id].quantidadeParaAcao = null;
+      areaAcaoZero.querySelectorAll(".btn-acao-zero").forEach((b) => b.classList.remove("selecionado"));
     }
 
     stepper.querySelector(".btn-menos").addEventListener("click", () => {
       input.value = Math.max(0, Number(input.value) - 1);
-      atualizarEstadoVisual();
+      limparAcaoEscolhida();
+      atualizarClasseAlterado();
     });
     stepper.querySelector(".btn-mais").addEventListener("click", () => {
       input.value = Number(input.value) + 1;
-      atualizarEstadoVisual();
+      limparAcaoEscolhida();
+      atualizarClasseAlterado();
     });
     input.addEventListener("input", () => {
       if (Number(input.value) < 0) input.value = 0;
-      atualizarEstadoVisual();
+      limparAcaoEscolhida();
+      atualizarClasseAlterado();
     });
 
+    // "Vendido"/"Sobrou-venceu" agora funcionam na quantidade que estiver no
+    // campo NESTE momento (não exigem zerar primeiro): guardamos essa
+    // quantidade e zeramos o campo, deixando visualmente claro que este lote
+    // será removido do estoque ativo ao salvar.
     areaAcaoZero.querySelectorAll(".btn-acao-zero").forEach((btn) => {
       btn.addEventListener("click", () => {
+        const quantidadeNoMomento = Number(input.value);
         controlesQuantidade[l.id].acaoZero = btn.dataset.acao;
+        controlesQuantidade[l.id].quantidadeParaAcao = quantidadeNoMomento;
+        input.value = 0;
+
         areaAcaoZero.querySelectorAll(".btn-acao-zero").forEach((b) => b.classList.remove("selecionado"));
         btn.classList.add("selecionado");
+        atualizarClasseAlterado();
       });
     });
 
-    // Se o lote já foi carregado com quantidade 0 (raro, mas possível), mostra
-    // a escolha desde já.
-    atualizarEstadoVisual();
+    atualizarClasseAlterado();
   });
 }
 
@@ -268,16 +288,13 @@ async function carregarExcluidos() {
 
 document.getElementById("btn-salvar-vistoria").addEventListener("click", async () => {
   const botao = document.getElementById("btn-salvar-vistoria");
-  // Bug corrigido aqui: antes, um lote que já chegava com quantidade 0
-  // (ex: zerado numa vistoria anterior, antes de existir a decisão
-  // vendido/perda) nunca entrava neste filtro — porque o valor não mudou
-  // (0 !== 0 é falso) — então a decisão escolhida na tela nunca era salva,
-  // e o lote ficava "fantasma": zerado, mas nunca excluído de fato.
+
+  // Um lote entra no salvamento se: (a) uma ação foi escolhida (Vendido ou
+  // Sobrou/venceu), não importa em que quantidade estava quando clicou; ou
+  // (b) a quantidade foi mesmo alterada pelo stepper, sem ação nenhuma.
   const alterados = Object.entries(controlesQuantidade).filter(([, c]) => {
-    const valorAtual = Number(c.input.value);
-    if (valorAtual !== c.valorOriginal) return true;
-    if (valorAtual === 0 && c.acaoZero) return true;
-    return false;
+    if (c.acaoZero) return true;
+    return Number(c.input.value) !== c.valorOriginal;
   });
 
   if (alterados.length === 0) {
@@ -285,8 +302,9 @@ document.getElementById("btn-salvar-vistoria").addEventListener("click", async (
     return;
   }
 
-  // Lotes zerados sem decisão ficam de fora deste salvamento — evita apagar
-  // ou perder dado sem uma escolha explícita do usuário.
+  // Só bloqueia quando alguém zera pelo stepper (− manual) sem clicar em
+  // nenhum dos dois botões — aí sim falta dizer o que houve. Quem usou um
+  // dos botões já resolveu isso, em qualquer quantidade.
   const prontos = [];
   const pendentes = [];
   alterados.forEach(([loteId, c]) => {
@@ -313,17 +331,19 @@ document.getElementById("btn-salvar-vistoria").addEventListener("click", async (
 
     prontos.forEach(([loteId, c, quantidadeNova]) => {
       const loteRef = doc(db, "lotes", loteId);
+      // A quantidade da ação é a que estava no campo NO MOMENTO do clique no
+      // botão — não a quantidade original do banco — para não perder o caso
+      // de alguém ajustar um pouco pelo stepper e só depois decidir a ação.
+      const quantidadeDaAcao = c.quantidadeParaAcao ?? c.valorOriginal;
 
-      if (quantidadeNova > 0) {
-        batch.update(loteRef, { quantidade: quantidadeNova });
-      } else if (c.acaoZero === "vendido") {
+      if (c.acaoZero === "vendido") {
         batch.delete(loteRef);
         const refExcluido = doc(collection(db, "excluidos"));
         batch.set(refExcluido, {
           estabelecimentoId: estabelecimentoAtual.id,
           produtoId: c.produtoId,
           produtoNome: c.produtoNome,
-          quantidadeVendida: c.valorOriginal,
+          quantidadeVendida: quantidadeDaAcao,
           local: c.local,
           dataVencimentoOriginal: c.dataVencimento,
           registradoEm: serverTimestamp(),
@@ -335,13 +355,15 @@ document.getElementById("btn-salvar-vistoria").addEventListener("click", async (
           estabelecimentoId: estabelecimentoAtual.id,
           produtoId: c.produtoId,
           produtoNome: c.produtoNome,
-          quantidadePerdida: c.valorOriginal,
+          quantidadePerdida: quantidadeDaAcao,
           precoCusto: c.precoCusto,
-          valorPerdido: c.valorOriginal * c.precoCusto,
+          valorPerdido: quantidadeDaAcao * c.precoCusto,
           local: c.local,
           dataVencimentoOriginal: c.dataVencimento,
           registradoEm: serverTimestamp(),
         });
+      } else {
+        batch.update(loteRef, { quantidade: quantidadeNova });
       }
 
       itensHistorico.push({
@@ -349,7 +371,7 @@ document.getElementById("btn-salvar-vistoria").addEventListener("click", async (
         produtoId: c.produtoId,
         quantidadeAnterior: c.valorOriginal,
         quantidadeNova,
-        acao: quantidadeNova === 0 ? c.acaoZero : "ajuste",
+        acao: c.acaoZero || "ajuste",
       });
     });
 

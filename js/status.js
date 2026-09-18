@@ -59,6 +59,18 @@ export function formatarMoeda(valor) {
   return `R$ ${(Number(valor) || 0).toFixed(2)}`;
 }
 
+/**
+ * Mostra o valor calculado normalmente, ou um aviso explícito quando o custo
+ * não foi cadastrado — em vez de deixar um "R$ 0,00" passar como se fosse um
+ * valor real (isso escondia produtos sem preço de custo, dando a impressão
+ * de que não havia risco/perda nenhum).
+ */
+export function formatarValorOuAviso(quantidade, precoCusto) {
+  const custo = Number(precoCusto) || 0;
+  if (custo === 0 && Number(quantidade) > 0) return "Custo não cadastrado";
+  return formatarMoeda((Number(quantidade) || 0) * custo);
+}
+
 /** Selo de status: ícone + texto, nunca só cor (reforço de acessibilidade). */
 export function seloHtml(status) {
   return `<span class="selo selo--${status}">${STATUS_ICONE[status]} ${STATUS_LABEL[status]}</span>`;
@@ -110,7 +122,7 @@ export function agruparPorFaixa(lotes, periodoDias = 14) {
     const valor = quantidade * (Number(l.precoCusto) || 0);
     valores[idx] += valor;
     quantidades[idx] += quantidade;
-    detalhes[idx].push({ produtoNome: l.produtoNome, quantidade, valor });
+    detalhes[idx].push({ produtoNome: l.produtoNome, quantidade, valor, precoCusto: Number(l.precoCusto) || 0 });
   });
 
   return {
@@ -127,11 +139,16 @@ export function agruparPorFaixa(lotes, periodoDias = 14) {
  * com tooltip detalhando produto/quantidade/valor de cada item da barra.
  * Reutilizado pelo dashboard e pela página da gerente para manter a mesma
  * leitura visual nos dois lugares.
+ *
+ * Retorna { chart, total } — o total serve para quem chama decidir entre
+ * "sem nenhum item no período" e "tem item, mas o valor deu zero" (custo não
+ * cadastrado), que precisam de mensagens diferentes.
  */
 export function montarGraficoFaixas(canvas, lotes, periodoDias) {
   const { labels, cores, valores, detalhes } = agruparPorFaixa(lotes, periodoDias);
+  const total = valores.reduce((soma, v) => soma + v, 0);
 
-  return new Chart(canvas, {
+  const chart = new Chart(canvas, {
     type: "bar",
     data: {
       labels,
@@ -156,7 +173,7 @@ export function montarGraficoFaixas(canvas, lotes, periodoDias) {
               if (!itens || itens.length === 0) return "Nenhum item nesta faixa";
               return itens
                 .slice(0, 8)
-                .map((it) => `${it.produtoNome}: ${it.quantidade} un. — ${formatarMoeda(it.valor)}`)
+                .map((it) => `${it.produtoNome}: ${it.quantidade} un. — ${formatarValorOuAviso(it.quantidade, it.precoCusto)}`)
                 .concat(itens.length > 8 ? [`+ ${itens.length - 8} outro(s)`] : []);
             },
           },
@@ -170,6 +187,8 @@ export function montarGraficoFaixas(canvas, lotes, periodoDias) {
       },
     },
   });
+
+  return { chart, total };
 }
 
 /**

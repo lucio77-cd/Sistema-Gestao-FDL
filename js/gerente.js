@@ -96,12 +96,24 @@ function renderizarGrafico() {
   if (lotesNoPeriodo.length === 0) {
     canvas.hidden = true;
     semDados.hidden = false;
+    semDados.textContent = "Nenhum dado neste período.";
+    return;
+  }
+
+  const { chart, total } = montarGraficoFaixas(canvas, lotesNoPeriodo, periodo);
+
+  if (total === 0) {
+    chart.destroy();
+    canvas.hidden = true;
+    semDados.hidden = false;
+    semDados.textContent = "Nenhum valor calculado para este período no momento.";
+    graficoAtual = null;
     return;
   }
 
   canvas.hidden = false;
   semDados.hidden = true;
-  graficoAtual = montarGraficoFaixas(canvas, lotesNoPeriodo, periodo);
+  graficoAtual = chart;
 }
 
 // Cartão-resumo: uma frase e um número, pensados para leitura de 5 segundos
