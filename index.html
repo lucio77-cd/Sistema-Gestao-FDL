@@ -51,10 +51,20 @@
     </section>
 
     <section id="secao-panorama" hidden>
-      <div class="painel">
-        <canvas id="grafico-vencimentos" height="200"></canvas>
+      <div id="secao-panorama-conteudo">
+        <div class="filtros">
+          <select id="filtro-periodo" aria-label="Período do gráfico">
+            <option value="7">Próximos 7 dias</option>
+            <option value="14" selected>Próximos 14 dias</option>
+            <option value="30">Próximos 30 dias</option>
+          </select>
+        </div>
+        <div class="painel">
+          <canvas id="grafico-vencimentos" height="200"></canvas>
+          <p class="mensagem-vazio" id="grafico-sem-dados" hidden>Nenhum dado neste período.</p>
+        </div>
+        <p class="legenda">Valor em risco (quantidade × custo) agrupado por faixa de urgência. Passe o mouse (ou toque) na barra para ver os produtos que a compõem.</p>
       </div>
-      <p class="legenda">Valor em risco (quantidade × custo) agrupado por faixa de urgência — não a contagem de unidades, que esconde diferença de preço entre produtos.</p>
     </section>
   </main>
 

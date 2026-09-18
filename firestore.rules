@@ -18,7 +18,12 @@ service cloud.firestore {
 
     match /lotes/{id} {
       allow read: if true;
-      allow write: if request.auth != null;
+      // A gerente (sem login) pode ajustar só o valor de venda promocional
+      // de um item que vai vencer — nunca quantidade, vencimento ou outro
+      // campo. Qualquer outra alteração continua exigindo login.
+      allow update: if request.auth != null ||
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(["precoPromocional", "promocaoAtiva"]);
+      allow create, delete: if request.auth != null;
     }
 
     // Produtos (tem preço de custo/venda), vistorias e perdas não têm

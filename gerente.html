@@ -20,12 +20,28 @@
     </div>
 
     <p class="legenda" id="legenda-atualizacao">—</p>
+
+    <div id="bloco-grafico" hidden>
+      <div class="filtros">
+        <select id="filtro-periodo" aria-label="Período do gráfico">
+          <option value="7">Próximos 7 dias</option>
+          <option value="14" selected>Próximos 14 dias</option>
+          <option value="30">Próximos 30 dias</option>
+        </select>
+      </div>
+      <div class="painel">
+        <canvas id="grafico-vencimentos" height="180"></canvas>
+        <p class="mensagem-vazio" id="grafico-sem-dados" hidden>Nenhum dado neste período.</p>
+      </div>
+    </div>
+
     <div id="lista-lotes">
       <p class="mensagem-vazio">Carregando…</p>
     </div>
     <p id="erro-token" class="aviso-erro" hidden>Link inválido ou expirado.</p>
   </main>
 
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
   <script type="module" src="js/gerente.js"></script>
 </body>
 </html>
