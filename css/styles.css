@@ -271,6 +271,31 @@ h2 {
   border-left-color: var(--steel);
 }
 
+/* ---------- Valor de venda editável (página da gerente) ---------- */
+
+.lote-preco-venda {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-top: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.lote-preco-venda label {
+  margin: 0;
+  font-size: 0.78rem;
+  color: var(--ink-soft);
+  white-space: nowrap;
+}
+
+.lote-preco-venda input {
+  width: 6.5rem;
+}
+
+.lote-preco-venda .btn {
+  margin-top: 0;
+}
+
 .stepper button {
   width: 44px;
   height: 44px;
