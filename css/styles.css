@@ -119,6 +119,7 @@ h2 {
   border-radius: 6px;
   padding: 1rem;
   margin-bottom: 1rem;
+  position: relative;
 }
 
 /* ---------- Segmentado (alternância de seção/aba) ---------- */
@@ -301,6 +302,40 @@ h2 {
 
 .lote-preco-venda .btn {
   margin-top: 0;
+}
+
+/* ---------- Tabela de Estoque (produto / quantidade / % do total) ---------- */
+
+.linha-estoque {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.6rem 0;
+  border-bottom: 1px solid var(--steel-light);
+}
+
+.linha-estoque:last-child {
+  border-bottom: none;
+}
+
+.linha-estoque-nome {
+  flex: 1;
+  font-weight: 600;
+  min-width: 0;
+}
+
+.linha-estoque-qtd {
+  font-family: var(--font-mono);
+  color: var(--ink-soft);
+  white-space: nowrap;
+}
+
+.linha-estoque-pct {
+  font-family: var(--font-mono);
+  font-weight: 700;
+  color: var(--primary);
+  width: 3.8rem;
+  text-align: right;
 }
 
 .stepper button {
