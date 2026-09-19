@@ -1,6 +1,6 @@
 import { db } from "./firebase-config.js";
 import { protegerPagina, sair } from "./auth-guard.js";
-import { calcularStatus, formatarDiasRestantes, montarGraficoFaixas, seloHtml, formatarValorOuAviso } from "./status.js";
+import { calcularStatus, formatarDiasRestantes, montarGraficoPorProduto, seloHtml, formatarValorOuAviso } from "./status.js";
 import {
   collection,
   query,
@@ -119,9 +119,10 @@ function renderizarLegendaAtualizacao(ultimaVistoria) {
   el.textContent = `Última vistoria: ${data.toLocaleDateString("pt-BR")} às ${data.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}`;
 }
 
-// O gráfico soma o VALOR em risco (quantidade × custo) por faixa de urgência
-// dentro do período escolhido, com detalhe de produto/quantidade no tooltip
-// (passe o mouse ou toque na barra).
+// Uma barra por lote, com o nome do produto escrito ao lado (não escondido
+// em tooltip) e comprimento = quantidade — não R$, porque quantidade não
+// depende de custo cadastrado, e é a pergunta que mais importa aqui: "qual
+// produto vai vencer".
 function renderizarGrafico() {
   const periodo = Number(filtroPeriodo.value);
   const lotesNoPeriodo = lotesCarregados.filter((l) => l.status !== "normal" && l.diasRestantes <= periodo);
@@ -141,15 +142,13 @@ function renderizarGrafico() {
     return;
   }
 
-  const { chart, total } = montarGraficoFaixas(canvas, lotesNoPeriodo, periodo);
+  const { chart, total } = montarGraficoPorProduto(canvas, lotesNoPeriodo);
 
   if (total === 0) {
-    // Existe item no período, mas todo mundo deu R$0,00 — quase sempre é
-    // produto sem preço de custo cadastrado, não "nada acontecendo".
     chart.destroy();
     canvas.hidden = true;
     semDados.hidden = false;
-    semDados.textContent = "Há itens neste período, mas sem valor calculado — verifique se os produtos têm preço de custo cadastrado.";
+    semDados.textContent = "Nenhum dado neste período.";
     graficoAtual = null;
     return;
   }

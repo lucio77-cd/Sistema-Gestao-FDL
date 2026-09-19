@@ -5,7 +5,8 @@ import {
   calcularResumoGerente,
   sugestaoAcao,
   STATUS_ICONE,
-  montarGraficoFaixas,
+  montarGraficoPorProduto,
+  calcularPercentuaisEstoque,
 } from "./status.js";
 import {
   collection,
@@ -19,14 +20,37 @@ import {
 import { mostrarToast } from "./toast.js";
 
 // Esta página não tem login (acesso via token na URL). Por isso ela nunca
-// consulta a coleção "produtos" (restrita, tem preço de custo) — o nome e a
-// antecedência de alerta de cada lote já vêm gravados no próprio documento
-// do lote (ver vistoria.js). Isso evita "permissão negada" travando a
-// página em "Carregando…" para sempre.
+// consulta a coleção "produtos" (restrita, tem preço de custo) — o nome de
+// cada lote já vem gravado no próprio documento do lote (ver vistoria.js).
 
-let lotesCarregados = [];
+let todosLotes = []; // TODOS os lotes ativos, para a aba Estoque
+let lotesUrgentes = []; // só os que precisam de atenção, para a aba Vencimentos
 let graficoAtual = null;
 const filtroPeriodo = document.getElementById("filtro-periodo");
+const filtroEstoqueLocal = document.getElementById("filtro-estoque-local");
+
+// ---------- Abas Vencimentos / Estoque ----------
+
+const segVencimentos = document.getElementById("seg-vencimentos");
+const segEstoque = document.getElementById("seg-estoque");
+const secaoVencimentos = document.getElementById("secao-vencimentos");
+const secaoEstoque = document.getElementById("secao-estoque");
+
+function mostrarAba(nome) {
+  const ehVencimentos = nome === "vencimentos";
+  secaoVencimentos.hidden = !ehVencimentos;
+  secaoEstoque.hidden = ehVencimentos;
+  segVencimentos.classList.toggle("ativo", ehVencimentos);
+  segVencimentos.setAttribute("aria-selected", String(ehVencimentos));
+  segEstoque.classList.toggle("ativo", !ehVencimentos);
+  segEstoque.setAttribute("aria-selected", String(!ehVencimentos));
+
+  if (!ehVencimentos) renderizarEstoque();
+}
+
+segVencimentos.addEventListener("click", () => mostrarAba("vencimentos"));
+segEstoque.addEventListener("click", () => mostrarAba("estoque"));
+filtroEstoqueLocal.addEventListener("change", renderizarEstoque);
 
 async function iniciar() {
   try {
@@ -51,26 +75,25 @@ async function iniciar() {
     if (lotesSnap.empty) {
       document.getElementById("lista-lotes").innerHTML =
         '<p class="mensagem-vazio">Nenhum dado encontrado ainda.</p>';
+      document.getElementById("tabela-estoque").innerHTML =
+        '<p class="mensagem-vazio">Nenhum dado encontrado ainda.</p>';
       document.getElementById("resumo").hidden = true;
       return;
     }
 
-    const lotes = lotesSnap.docs
-      .map((d) => {
-        const dados = d.data();
-        const diasAlerta = dados.diasAlerta ?? diasAlertaPadrao;
-        const { diasRestantes, status } = calcularStatus(dados.dataVencimento, diasAlerta, dados.promocaoAtiva);
-        return { id: d.id, ...dados, produtoNome: dados.produtoNome || "Produto", diasRestantes, status };
-      })
-      .filter((l) => l.status !== "normal")
-      .sort((a, b) => a.diasRestantes - b.diasRestantes);
+    todosLotes = lotesSnap.docs.map((d) => {
+      const dados = d.data();
+      const diasAlerta = dados.diasAlerta ?? diasAlertaPadrao;
+      const { diasRestantes, status } = calcularStatus(dados.dataVencimento, diasAlerta, dados.promocaoAtiva);
+      return { id: d.id, ...dados, produtoNome: dados.produtoNome || "Produto", diasRestantes, status };
+    });
 
-    lotesCarregados = lotes;
+    lotesUrgentes = todosLotes.filter((l) => l.status !== "normal").sort((a, b) => a.diasRestantes - b.diasRestantes);
 
-    renderizarResumo(lotes);
-    renderizarLista(lotes);
+    renderizarResumo(lotesUrgentes);
+    renderizarLista(lotesUrgentes);
 
-    if (lotes.length > 0) {
+    if (lotesUrgentes.length > 0) {
       document.getElementById("bloco-grafico").hidden = false;
       renderizarGrafico();
       filtroPeriodo.addEventListener("change", renderizarGrafico);
@@ -81,9 +104,10 @@ async function iniciar() {
   }
 }
 
+// Uma barra por lote, nome do produto ao lado, comprimento = quantidade.
 function renderizarGrafico() {
   const periodo = Number(filtroPeriodo.value);
-  const lotesNoPeriodo = lotesCarregados.filter((l) => l.diasRestantes <= periodo);
+  const lotesNoPeriodo = lotesUrgentes.filter((l) => l.diasRestantes <= periodo);
 
   if (graficoAtual) {
     graficoAtual.destroy();
@@ -100,20 +124,45 @@ function renderizarGrafico() {
     return;
   }
 
-  const { chart, total } = montarGraficoFaixas(canvas, lotesNoPeriodo, periodo);
+  canvas.hidden = false;
+  semDados.hidden = true;
+  const { chart } = montarGraficoPorProduto(canvas, lotesNoPeriodo);
+  graficoAtual = chart;
+}
 
-  if (total === 0) {
-    chart.destroy();
-    canvas.hidden = true;
-    semDados.hidden = false;
-    semDados.textContent = "Nenhum valor calculado para este período no momento.";
-    graficoAtual = null;
+// ---------- Aba Estoque: o que tem hoje, por produto, com % do total ----------
+// O total é sempre sobre TODOS os lotes (independente do filtro de local),
+// porque "15% de Sprite" é sobre o estoque inteiro, não sobre o que está
+// filtrado na tela no momento.
+
+function renderizarEstoque() {
+  const local = filtroEstoqueLocal.value;
+  const container = document.getElementById("tabela-estoque");
+
+  const percentuais = calcularPercentuaisEstoque(todosLotes);
+  const linhas =
+    local === "todos"
+      ? percentuais
+      : percentuais
+          .map((p) => ({ ...p, quantidade: p.local[local] || 0 }))
+          .filter((p) => p.quantidade > 0);
+
+  if (linhas.length === 0) {
+    container.innerHTML = '<p class="mensagem-vazio">Nada neste local no momento.</p>';
     return;
   }
 
-  canvas.hidden = false;
-  semDados.hidden = true;
-  graficoAtual = chart;
+  container.innerHTML = linhas
+    .map(
+      (p) => `
+        <div class="linha-estoque">
+          <div class="linha-estoque-nome">${p.produtoNome}</div>
+          <div class="linha-estoque-qtd">${p.quantidade} un.</div>
+          <div class="linha-estoque-pct">${p.percentual.toFixed(1)}%</div>
+        </div>
+      `
+    )
+    .join("");
 }
 
 // Cartão-resumo: uma frase e um número, pensados para leitura de 5 segundos

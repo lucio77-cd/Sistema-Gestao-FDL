@@ -43,6 +43,13 @@ export const STATUS_ICONE = {
   promocao: "🟣",
 };
 
+const STATUS_COR = {
+  normal: "#3e7a5b",
+  atencao: "#c2790a",
+  vencido: "#a83232",
+  promocao: "#5a3d7a",
+};
+
 export function formatarData(dataStr) {
   const [ano, mes, dia] = dataStr.split("-");
   return `${dia}/${mes}/${ano}`;
@@ -62,8 +69,7 @@ export function formatarMoeda(valor) {
 /**
  * Mostra o valor calculado normalmente, ou um aviso explícito quando o custo
  * não foi cadastrado — em vez de deixar um "R$ 0,00" passar como se fosse um
- * valor real (isso escondia produtos sem preço de custo, dando a impressão
- * de que não havia risco/perda nenhum).
+ * valor real.
  */
 export function formatarValorOuAviso(quantidade, precoCusto) {
   const custo = Number(precoCusto) || 0;
@@ -88,65 +94,30 @@ export function sugestaoAcao(status, diasRestantes) {
 }
 
 /**
- * Agrupa lotes em faixas de urgência para o gráfico, somando o VALOR em risco
- * (quantidade × custo) por faixa — a métrica que importa para decisão, não a
- * contagem de unidades, que esconde diferença de preço entre produtos.
- * Faixas pensadas para decisão, não para precisão de calendário: não faz
- * diferença prática entre "vence em 8" e "vence em 9" dias.
+ * Gráfico de barras horizontais — uma barra por lote, com o nome do produto
+ * escrito do lado (não escondido em tooltip) e comprimento = quantidade.
+ * Troca a ideia anterior (agrupar por faixa de dias, em R$) porque agrupar
+ * apagava a identidade do produto — a pergunta mais importante ("qual
+ * produto vai vencer") ficava sem resposta olhando só o gráfico. E usa
+ * quantidade, não valor, porque quantidade não depende de custo cadastrado.
  *
- * @param {number} periodoDias - janela máxima considerada (7, 14 ou 30).
- *   Controla quais faixas existem: períodos curtos escondem faixas distantes
- *   em vez de mostrá-las sempre vazias.
+ * @param {number} limite - máximo de barras exibidas (os mais urgentes primeiro)
  */
-export function agruparPorFaixa(lotes, periodoDias = 14) {
-  const faixas = [
-    { chave: "vencido", label: "Vencido", cor: "#a83232", min: -Infinity, max: -1 },
-    { chave: "hoje_amanha", label: "Hoje/Amanhã", cor: "#c2790a", min: 0, max: 1 },
-    { chave: "semana", label: "Esta semana", cor: "#d9a441", min: 2, max: 7 },
-  ];
-  if (periodoDias > 7) {
-    faixas.push({ chave: "proxima", label: "Próxima semana", cor: "#52707d", min: 8, max: 14 });
-  }
-  if (periodoDias > 14) {
-    faixas.push({ chave: "mais", label: "Depois de 2 semanas", cor: "#8a97a3", min: 15, max: periodoDias });
-  }
+export function montarGraficoPorProduto(canvas, lotes, limite = 20) {
+  const ordenados = [...lotes].sort((a, b) => a.diasRestantes - b.diasRestantes).slice(0, limite);
 
-  const valores = faixas.map(() => 0);
-  const quantidades = faixas.map(() => 0);
-  const detalhes = faixas.map(() => []); // itens que compõem cada barra, para o tooltip
+  const labels = ordenados.map((l) => `${l.produtoNome} (${l.local || "—"})`);
+  const valores = ordenados.map((l) => Number(l.quantidade) || 0);
+  const cores = ordenados.map((l) => STATUS_COR[l.status] || STATUS_COR.normal);
+  const detalhes = ordenados.map((l) => ({
+    produtoNome: l.produtoNome,
+    diasRestantes: l.diasRestantes,
+  }));
 
-  lotes.forEach((l) => {
-    const idx = faixas.findIndex((f) => l.diasRestantes >= f.min && l.diasRestantes <= f.max);
-    if (idx === -1) return; // fora da janela escolhida, não entra no gráfico
-    const quantidade = Number(l.quantidade) || 0;
-    const valor = quantidade * (Number(l.precoCusto) || 0);
-    valores[idx] += valor;
-    quantidades[idx] += quantidade;
-    detalhes[idx].push({ produtoNome: l.produtoNome, quantidade, valor, precoCusto: Number(l.precoCusto) || 0 });
-  });
-
-  return {
-    labels: faixas.map((f) => f.label),
-    cores: faixas.map((f) => f.cor),
-    valores,
-    quantidades,
-    detalhes,
-  };
-}
-
-/**
- * Monta um gráfico de barras (valor em risco por faixa) no canvas informado,
- * com tooltip detalhando produto/quantidade/valor de cada item da barra.
- * Reutilizado pelo dashboard e pela página da gerente para manter a mesma
- * leitura visual nos dois lugares.
- *
- * Retorna { chart, total } — o total serve para quem chama decidir entre
- * "sem nenhum item no período" e "tem item, mas o valor deu zero" (custo não
- * cadastrado), que precisam de mensagens diferentes.
- */
-export function montarGraficoFaixas(canvas, lotes, periodoDias) {
-  const { labels, cores, valores, detalhes } = agruparPorFaixa(lotes, periodoDias);
-  const total = valores.reduce((soma, v) => soma + v, 0);
+  // Altura pensada para cada barra ter espaço legível, sem depender de
+  // hover — o rótulo já mostra o produto direto no eixo.
+  canvas.parentElement.style.height = `${Math.max(200, ordenados.length * 34)}px`;
+  canvas.style.height = "100%";
 
   const chart = new Chart(canvas, {
     type: "bar",
@@ -154,7 +125,7 @@ export function montarGraficoFaixas(canvas, lotes, periodoDias) {
       labels,
       datasets: [
         {
-          label: "Valor em risco (R$)",
+          label: "Quantidade",
           data: valores,
           backgroundColor: cores,
           borderRadius: 4,
@@ -162,33 +133,25 @@ export function montarGraficoFaixas(canvas, lotes, periodoDias) {
       ],
     },
     options: {
+      indexAxis: "y",
       responsive: true,
+      maintainAspectRatio: false,
       plugins: {
         legend: { display: false },
         tooltip: {
           callbacks: {
-            label: (ctx) => `Total: ${formatarMoeda(ctx.parsed.y)}`,
-            afterLabel: (ctx) => {
-              const itens = detalhes[ctx.dataIndex];
-              if (!itens || itens.length === 0) return "Nenhum item nesta faixa";
-              return itens
-                .slice(0, 8)
-                .map((it) => `${it.produtoNome}: ${it.quantidade} un. — ${formatarValorOuAviso(it.quantidade, it.precoCusto)}`)
-                .concat(itens.length > 8 ? [`+ ${itens.length - 8} outro(s)`] : []);
-            },
+            label: (ctx) => `${ctx.parsed.x} unidade${ctx.parsed.x === 1 ? "" : "s"}`,
+            afterLabel: (ctx) => formatarDiasRestantes(detalhes[ctx.dataIndex].diasRestantes),
           },
         },
       },
       scales: {
-        y: {
-          beginAtZero: true,
-          ticks: { callback: (v) => `R$ ${v}` },
-        },
+        x: { beginAtZero: true, ticks: { precision: 0 } },
       },
     },
   });
 
-  return { chart, total };
+  return { chart, total: ordenados.length };
 }
 
 /**
@@ -214,4 +177,34 @@ export function calcularResumoGerente(lotes) {
     };
   }
   return { status: "ok", numero: null, texto: "Tudo em dia" };
+}
+
+/**
+ * Quanto cada produto representa do estoque total, em quantidade — não em
+ * valor, porque a pergunta ("tenho 15% de Sprite") é sobre volume físico
+ * pra decidir o que pedir, não sobre dinheiro. O total é sempre a soma de
+ * TODOS os lotes recebidos (independente do filtro de local aplicado na
+ * tela), porque "15% de tudo que eu tenho" não muda conforme você filtra.
+ */
+export function calcularPercentuaisEstoque(lotes) {
+  const porProduto = {};
+  let totalGeral = 0;
+
+  lotes.forEach((l) => {
+    const qtd = Number(l.quantidade) || 0;
+    totalGeral += qtd;
+    const chave = l.produtoNome;
+    if (!porProduto[chave]) {
+      porProduto[chave] = { produtoNome: chave, quantidade: 0, local: {} };
+    }
+    porProduto[chave].quantidade += qtd;
+    porProduto[chave].local[l.local || "—"] = (porProduto[chave].local[l.local || "—"] || 0) + qtd;
+  });
+
+  return Object.values(porProduto)
+    .map((p) => ({
+      ...p,
+      percentual: totalGeral > 0 ? (p.quantidade / totalGeral) * 100 : 0,
+    }))
+    .sort((a, b) => b.quantidade - a.quantidade);
 }

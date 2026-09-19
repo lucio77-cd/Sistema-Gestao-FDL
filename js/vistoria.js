@@ -1,6 +1,6 @@
 import { db } from "./firebase-config.js";
 import { protegerPagina, sair } from "./auth-guard.js";
-import { calcularStatus, formatarData } from "./status.js";
+import { calcularStatus, formatarData, formatarValorOuAviso } from "./status.js";
 import { mostrarToast } from "./toast.js";
 import {
   collection,
@@ -20,7 +20,7 @@ document.getElementById("link-sair").addEventListener("click", (e) => {
 
 let estabelecimentoAtual = null;
 let produtosCache = {};
-// { loteId: { input, valorOriginal, produtoId, produtoNome, precoCusto, local, dataVencimento, acaoZero } }
+// { loteId: { input, valorOriginal, produtoId, produtoNome, precoCusto, local, dataVencimento, acaoZero, quantidadeParaAcao } }
 let controlesQuantidade = {};
 
 protegerPagina(async ({ estabelecimento }) => {
@@ -30,33 +30,33 @@ protegerPagina(async ({ estabelecimento }) => {
   await carregarLotes();
 });
 
-// ---------- Alternância de seção (evita misturar tarefa rápida com rara) ----------
+// ---------- Alternância de seção principal (Atualizar / Adicionar / Saídas) ----------
 
 const segAtualizar = document.getElementById("seg-atualizar");
 const segAdicionar = document.getElementById("seg-adicionar");
-const segExcluidos = document.getElementById("seg-excluidos");
+const segSaidas = document.getElementById("seg-saidas");
 const secaoAtualizar = document.getElementById("secao-atualizar");
 const secaoAdicionar = document.getElementById("secao-adicionar");
-const secaoExcluidos = document.getElementById("secao-excluidos");
+const secaoSaidas = document.getElementById("secao-saidas");
 
 function mostrarSecao(nome) {
   secaoAtualizar.hidden = nome !== "atualizar";
   secaoAdicionar.hidden = nome !== "adicionar";
-  secaoExcluidos.hidden = nome !== "excluidos";
+  secaoSaidas.hidden = nome !== "saidas";
 
   segAtualizar.classList.toggle("ativo", nome === "atualizar");
   segAtualizar.setAttribute("aria-selected", String(nome === "atualizar"));
   segAdicionar.classList.toggle("ativo", nome === "adicionar");
   segAdicionar.setAttribute("aria-selected", String(nome === "adicionar"));
-  segExcluidos.classList.toggle("ativo", nome === "excluidos");
-  segExcluidos.setAttribute("aria-selected", String(nome === "excluidos"));
+  segSaidas.classList.toggle("ativo", nome === "saidas");
+  segSaidas.setAttribute("aria-selected", String(nome === "saidas"));
 
-  if (nome === "excluidos") carregarExcluidos();
+  if (nome === "saidas") mostrarSubSecaoSaida("vendidos");
 }
 
 segAtualizar.addEventListener("click", () => mostrarSecao("atualizar"));
 segAdicionar.addEventListener("click", () => mostrarSecao("adicionar"));
-segExcluidos.addEventListener("click", () => mostrarSecao("excluidos"));
+segSaidas.addEventListener("click", () => mostrarSecao("saidas"));
 
 function irParaCadastroDeProduto() {
   mostrarSecao("adicionar");
@@ -65,7 +65,32 @@ function irParaCadastroDeProduto() {
   campo.focus();
 }
 
-// ---------- Carregamento ----------
+// ---------- Sub-abas dentro de Saídas (Vendidos / Vencidos) ----------
+// "excluidos" e "perdas" viraram uma coleção só ("saidas"), com o campo
+// "motivo" distinguindo o caso — mais simples de manter do que duas
+// coleções quase idênticas.
+
+const segVendidos = document.getElementById("seg-vendidos");
+const segVencidos = document.getElementById("seg-vencidos");
+const secaoVendidos = document.getElementById("secao-vendidos");
+const secaoVencidos = document.getElementById("secao-vencidos");
+
+function mostrarSubSecaoSaida(nome) {
+  secaoVendidos.hidden = nome !== "vendidos";
+  secaoVencidos.hidden = nome !== "vencidos";
+  segVendidos.classList.toggle("ativo", nome === "vendidos");
+  segVendidos.setAttribute("aria-selected", String(nome === "vendidos"));
+  segVencidos.classList.toggle("ativo", nome === "vencidos");
+  segVencidos.setAttribute("aria-selected", String(nome === "vencidos"));
+
+  if (nome === "vendidos") carregarSaidas("vendido");
+  else carregarSaidas("vencido");
+}
+
+segVendidos.addEventListener("click", () => mostrarSubSecaoSaida("vendidos"));
+segVencidos.addEventListener("click", () => mostrarSubSecaoSaida("vencidos"));
+
+// ---------- Carregamento de produtos e lotes ----------
 
 async function carregarProdutos() {
   const snap = await getDocs(
@@ -110,10 +135,8 @@ async function carregarLotes() {
     .sort((a, b) => a.dataVencimento.localeCompare(b.dataVencimento));
 
   // Migração silenciosa: lotes criados antes desta versão não têm o nome do
-  // produto gravado no próprio lote. Isso é o que fazia a página da gerente
-  // depender de ler a coleção "produtos" (sem permissão pública) e travar em
-  // "Carregando…" para sempre. Aproveitamos que já temos o produto em cache
-  // aqui (tela autenticada) para completar o dado uma única vez.
+  // produto gravado no próprio lote — necessário pra página da gerente ler
+  // sem depender da coleção "produtos" (restrita).
   const batchMigracao = writeBatch(db);
   let precisaMigrar = false;
 
@@ -148,8 +171,8 @@ async function carregarLotes() {
         <div class="lote-produto">${produto.nome}</div>
         <div class="lote-meta">${l.local || "—"} · vence em ${formatarData(l.dataVencimento)}</div>
         <div class="lote-acao-zero">
-          <button type="button" class="btn-texto btn-acao-zero" data-acao="vendido">Vendido — excluir</button>
-          <button type="button" class="btn-texto btn-acao-zero" data-acao="perda">Sobrou/venceu — registrar perda</button>
+          <button type="button" class="btn-texto btn-acao-zero" data-acao="vendido">Vendido</button>
+          <button type="button" class="btn-texto btn-acao-zero" data-acao="vencido">Vencido</button>
         </div>
       </div>
       <div class="stepper" data-lote-id="${l.id}">
@@ -177,7 +200,7 @@ async function carregarLotes() {
     };
 
     // Só reflete visualmente o destaque de "alterado" — nunca mexe na ação
-    // escolhida. Isso é separado de propósito do clique nos botões abaixo.
+    // escolhida. Separado de propósito do clique nos botões abaixo.
     function atualizarClasseAlterado() {
       const valor = Number(input.value);
       const alterou = valor !== controlesQuantidade[l.id].valorOriginal || !!controlesQuantidade[l.id].acaoZero;
@@ -185,8 +208,8 @@ async function carregarLotes() {
     }
 
     // Mexer no stepper manualmente depois de escolher uma ação cancela a
-    // escolha — evita salvar uma ação "perda" antiga com uma quantidade nova
-    // que o usuário decidiu digitar por cima.
+    // escolha — evita salvar uma ação antiga com uma quantidade que o
+    // usuário decidiu digitar por cima.
     function limparAcaoEscolhida() {
       controlesQuantidade[l.id].acaoZero = null;
       controlesQuantidade[l.id].quantidadeParaAcao = null;
@@ -209,10 +232,10 @@ async function carregarLotes() {
       atualizarClasseAlterado();
     });
 
-    // "Vendido"/"Sobrou-venceu" agora funcionam na quantidade que estiver no
-    // campo NESTE momento (não exigem zerar primeiro): guardamos essa
-    // quantidade e zeramos o campo, deixando visualmente claro que este lote
-    // será removido do estoque ativo ao salvar.
+    // "Vendido"/"Vencido" funcionam na quantidade que estiver no campo NESTE
+    // momento (não exigem zerar primeiro): guardamos essa quantidade e
+    // zeramos o campo, deixando visualmente claro que este lote vai sair do
+    // estoque ativo ao salvar.
     areaAcaoZero.querySelectorAll(".btn-acao-zero").forEach((btn) => {
       btn.addEventListener("click", () => {
         const quantidadeNoMomento = Number(input.value);
@@ -230,23 +253,26 @@ async function carregarLotes() {
   });
 }
 
-// ---------- Lista de excluídos ----------
-// Itens marcados como "Vendido" ao zerar a quantidade não somem sem deixar
-// rastro: ficam registrados aqui como histórico simples de saída.
+// ---------- Lista de saídas (Vendidos / Vencidos) ----------
 
-async function carregarExcluidos() {
-  const container = document.getElementById("lista-excluidos");
+async function carregarSaidas(motivo) {
+  const containerId = motivo === "vendido" ? "lista-vendidos" : "lista-vencidos";
+  const container = document.getElementById(containerId);
   container.innerHTML = '<p class="mensagem-vazio">Carregando…</p>';
 
   let snap;
   try {
     snap = await getDocs(
-      query(collection(db, "excluidos"), where("estabelecimentoId", "==", estabelecimentoAtual.id))
+      query(
+        collection(db, "saidas"),
+        where("estabelecimentoId", "==", estabelecimentoAtual.id),
+        where("motivo", "==", motivo)
+      )
     );
   } catch (erro) {
-    console.error("Falha ao carregar excluídos:", erro);
+    console.error("Falha ao carregar saídas:", erro);
     container.innerHTML =
-      '<p class="mensagem-vazio">Não foi possível carregar. Confirme se as regras do Firestore foram publicadas (coleção "excluidos") e tente de novo.</p>';
+      '<p class="mensagem-vazio">Não foi possível carregar. Confirme se as regras do Firestore foram publicadas (coleção "saidas") e tente de novo.</p>';
     return;
   }
 
@@ -258,10 +284,15 @@ async function carregarExcluidos() {
       return dataB - dataA;
     });
 
+  if (motivo === "vencido") {
+    const total = itens.reduce((soma, it) => soma + (Number(it.valor) || 0), 0);
+    document.getElementById("total-vencido").textContent = `R$ ${total.toFixed(2)}`;
+  }
+
   container.innerHTML = "";
 
   if (itens.length === 0) {
-    container.innerHTML = '<p class="mensagem-vazio">Nenhum item excluído ainda.</p>';
+    container.innerHTML = `<p class="mensagem-vazio">Nenhum item ${motivo === "vendido" ? "vendido" : "vencido"} registrado ainda.</p>`;
     return;
   }
 
@@ -270,14 +301,15 @@ async function carregarExcluidos() {
     const dataTexto = data ? data.toLocaleDateString("pt-BR") : "—";
 
     const div = document.createElement("div");
-    div.className = "lote lote--excluido";
+    div.className = `lote lote--${motivo === "vencido" ? "vencido" : "excluido"}`;
     div.innerHTML = `
       <div class="lote-info">
         <div class="lote-produto">${item.produtoNome}</div>
-        <div class="lote-meta">${item.local || "—"} · ${item.quantidadeVendida} un. · vencia em ${formatarData(item.dataVencimentoOriginal)}</div>
+        <div class="lote-meta">${item.local || "—"} · ${item.quantidade} un. · vencia em ${formatarData(item.dataVencimentoOriginal)}</div>
       </div>
       <div class="lote-dados">
-        <div class="lote-valor">Excluído em ${dataTexto}</div>
+        ${motivo === "vencido" ? `<div class="lote-dias lote-dias--vencido">${formatarValorOuAviso(item.quantidade, item.precoCusto)}</div>` : ""}
+        <div class="lote-valor">Registrado em ${dataTexto}</div>
       </div>
     `;
     container.appendChild(div);
@@ -290,8 +322,8 @@ document.getElementById("btn-salvar-vistoria").addEventListener("click", async (
   const botao = document.getElementById("btn-salvar-vistoria");
 
   // Um lote entra no salvamento se: (a) uma ação foi escolhida (Vendido ou
-  // Sobrou/venceu), não importa em que quantidade estava quando clicou; ou
-  // (b) a quantidade foi mesmo alterada pelo stepper, sem ação nenhuma.
+  // Vencido), não importa em que quantidade estava quando clicou; ou (b) a
+  // quantidade foi mesmo alterada pelo stepper, sem ação nenhuma.
   const alterados = Object.entries(controlesQuantidade).filter(([, c]) => {
     if (c.acaoZero) return true;
     return Number(c.input.value) !== c.valorOriginal;
@@ -317,7 +349,7 @@ document.getElementById("btn-salvar-vistoria").addEventListener("click", async (
   });
 
   if (prontos.length === 0) {
-    mostrarToast(`Escolha "Vendido" ou "Sobrou/venceu" para: ${pendentes.join(", ")}.`, "erro");
+    mostrarToast(`Escolha "Vendido" ou "Vencido" para: ${pendentes.join(", ")}.`, "erro");
     return;
   }
 
@@ -332,34 +364,24 @@ document.getElementById("btn-salvar-vistoria").addEventListener("click", async (
     prontos.forEach(([loteId, c, quantidadeNova]) => {
       const loteRef = doc(db, "lotes", loteId);
       // A quantidade da ação é a que estava no campo NO MOMENTO do clique no
-      // botão — não a quantidade original do banco — para não perder o caso
-      // de alguém ajustar um pouco pelo stepper e só depois decidir a ação.
+      // botão — não a quantidade original do banco — pra não perder o caso de
+      // alguém ajustar um pouco pelo stepper e só depois decidir a ação.
       const quantidadeDaAcao = c.quantidadeParaAcao ?? c.valorOriginal;
 
-      if (c.acaoZero === "vendido") {
+      if (c.acaoZero === "vendido" || c.acaoZero === "vencido") {
         batch.delete(loteRef);
-        const refExcluido = doc(collection(db, "excluidos"));
-        batch.set(refExcluido, {
+        const refSaida = doc(collection(db, "saidas"));
+        batch.set(refSaida, {
           estabelecimentoId: estabelecimentoAtual.id,
           produtoId: c.produtoId,
           produtoNome: c.produtoNome,
-          quantidadeVendida: quantidadeDaAcao,
-          local: c.local,
-          dataVencimentoOriginal: c.dataVencimento,
-          registradoEm: serverTimestamp(),
-        });
-      } else if (c.acaoZero === "perda") {
-        batch.delete(loteRef);
-        const refPerda = doc(collection(db, "perdas"));
-        batch.set(refPerda, {
-          estabelecimentoId: estabelecimentoAtual.id,
-          produtoId: c.produtoId,
-          produtoNome: c.produtoNome,
-          quantidadePerdida: quantidadeDaAcao,
+          motivo: c.acaoZero,
+          quantidade: quantidadeDaAcao,
           precoCusto: c.precoCusto,
-          valorPerdido: quantidadeDaAcao * c.precoCusto,
+          valor: quantidadeDaAcao * c.precoCusto,
           local: c.local,
           dataVencimentoOriginal: c.dataVencimento,
+          origem: "vistoria",
           registradoEm: serverTimestamp(),
         });
       } else {
