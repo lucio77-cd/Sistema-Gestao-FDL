@@ -16,7 +16,8 @@
     <a href="index.html">Dashboard</a>
     <a href="vistoria.html" class="ativo">Vistoria</a>
     <a href="promocoes.html">Promoções</a>
-    <a href="perdas.html">Perdas</a>
+    <a href="produtos.html">Produtos</a>
+    <a href="caixa.html">Caixa</a>
     <a href="configuracoes.html">Configurações</a>
     <a href="#" id="link-sair">Sair</a>
   </nav>
@@ -27,11 +28,11 @@
     <div class="segmentado" role="tablist" aria-label="Seção da vistoria">
       <button type="button" id="seg-atualizar" class="ativo" role="tab" aria-selected="true">Atualizar quantidades</button>
       <button type="button" id="seg-adicionar" role="tab" aria-selected="false">Adicionar novo</button>
-      <button type="button" id="seg-excluidos" role="tab" aria-selected="false">Excluídos</button>
+      <button type="button" id="seg-saidas" role="tab" aria-selected="false">Saídas</button>
     </div>
 
     <section id="secao-atualizar">
-      <p class="legenda">Confira a geladeira/estoque e ajuste as quantidades. "Vendido" ou "Sobrou/venceu" funcionam na quantidade atual — não precisa zerar antes.</p>
+      <p class="legenda">Confira a geladeira/estoque e ajuste as quantidades. "Vendido" ou "Vencido" funcionam na quantidade atual — não precisa zerar antes.</p>
 
       <div id="lista-lotes-vistoria">
         <p class="mensagem-vazio">Carregando…</p>
@@ -40,11 +41,25 @@
       <button class="btn" id="btn-salvar-vistoria">Salvar vistoria</button>
     </section>
 
-    <section id="secao-excluidos" hidden>
-      <p class="legenda">Lotes marcados como "Vendido" ao zerar a quantidade — ficam aqui como histórico, em vez de simplesmente sumir.</p>
-      <div id="lista-excluidos">
-        <p class="mensagem-vazio">Carregando…</p>
+    <section id="secao-saidas" hidden>
+      <p class="legenda">Tudo que saiu do estoque ativo — vendido ou vencido — fica registrado aqui, em vez de simplesmente sumir.</p>
+
+      <div class="segmentado" role="tablist" aria-label="Tipo de saída">
+        <button type="button" id="seg-vendidos" class="ativo" role="tab" aria-selected="true">Vendidos</button>
+        <button type="button" id="seg-vencidos" role="tab" aria-selected="false">Vencidos</button>
       </div>
+
+      <section id="secao-vendidos">
+        <div id="lista-vendidos"><p class="mensagem-vazio">Carregando…</p></div>
+      </section>
+
+      <section id="secao-vencidos" hidden>
+        <div class="painel" id="painel-total-vencido">
+          <div class="lote-produto">Total perdido em vencidos</div>
+          <div class="resumo-numero" id="total-vencido" style="font-size:1.6rem; color:var(--vencido)">R$ 0,00</div>
+        </div>
+        <div id="lista-vencidos"><p class="mensagem-vazio">Carregando…</p></div>
+      </section>
     </section>
 
     <section id="secao-adicionar" hidden>

@@ -4,40 +4,62 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <meta name="robots" content="noindex, nofollow" />
-<title>Vencimentos — Bebidas</title>
+<title>Bebidas — Vencimentos e Estoque</title>
 <link rel="stylesheet" href="css/styles.css" />
 </head>
 <body>
   <header class="topo">
-    <div class="topo-marca">Vencimentos de bebidas</div>
+    <div class="topo-marca">Bebidas</div>
     <div class="topo-sub" id="nome-estabelecimento">Carregando…</div>
   </header>
 
   <main>
-    <div id="resumo" class="resumo" hidden>
-      <div class="resumo-numero" id="resumo-numero"></div>
-      <div class="resumo-texto" id="resumo-texto"></div>
+    <div class="segmentado" role="tablist" aria-label="Visão">
+      <button type="button" id="seg-vencimentos" class="ativo" role="tab" aria-selected="true">Vencimentos</button>
+      <button type="button" id="seg-estoque" role="tab" aria-selected="false">Estoque</button>
     </div>
 
-    <p class="legenda" id="legenda-atualizacao">—</p>
+    <section id="secao-vencimentos">
+      <div id="resumo" class="resumo" hidden>
+        <div class="resumo-numero" id="resumo-numero"></div>
+        <div class="resumo-texto" id="resumo-texto"></div>
+      </div>
 
-    <div id="bloco-grafico" hidden>
+      <p class="legenda" id="legenda-atualizacao">—</p>
+
+      <div id="bloco-grafico" hidden>
+        <div class="filtros">
+          <select id="filtro-periodo" aria-label="Período do gráfico">
+            <option value="7">Próximos 7 dias</option>
+            <option value="14" selected>Próximos 14 dias</option>
+            <option value="30">Próximos 30 dias</option>
+          </select>
+        </div>
+        <div class="painel">
+          <canvas id="grafico-vencimentos"></canvas>
+          <p class="mensagem-vazio" id="grafico-sem-dados" hidden>Nenhum dado neste período.</p>
+        </div>
+      </div>
+
+      <div id="lista-lotes">
+        <p class="mensagem-vazio">Carregando…</p>
+      </div>
+    </section>
+
+    <section id="secao-estoque" hidden>
+      <p class="legenda">Tudo que tem hoje, pra saber o que precisa pedir.</p>
       <div class="filtros">
-        <select id="filtro-periodo" aria-label="Período do gráfico">
-          <option value="7">Próximos 7 dias</option>
-          <option value="14" selected>Próximos 14 dias</option>
-          <option value="30">Próximos 30 dias</option>
+        <select id="filtro-estoque-local" aria-label="Filtrar por local">
+          <option value="todos">Todos os locais</option>
+          <option value="Geladeira">Geladeira</option>
+          <option value="Estoque seco">Estoque seco</option>
         </select>
       </div>
-      <div class="painel">
-        <canvas id="grafico-vencimentos" height="180"></canvas>
-        <p class="mensagem-vazio" id="grafico-sem-dados" hidden>Nenhum dado neste período.</p>
+      <div class="painel" id="tabela-estoque">
+        <p class="mensagem-vazio">Carregando…</p>
       </div>
-    </div>
+    </section>
 
-    <div id="lista-lotes">
-      <p class="mensagem-vazio">Carregando…</p>
-    </div>
     <p id="erro-token" class="aviso-erro" hidden>Link inválido ou expirado.</p>
   </main>
 

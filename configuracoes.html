@@ -16,7 +16,8 @@
     <a href="index.html">Dashboard</a>
     <a href="vistoria.html">Vistoria</a>
     <a href="promocoes.html">Promoções</a>
-    <a href="perdas.html">Perdas</a>
+    <a href="produtos.html">Produtos</a>
+    <a href="caixa.html">Caixa</a>
     <a href="configuracoes.html" class="ativo">Configurações</a>
     <a href="#" id="link-sair">Sair</a>
   </nav>
@@ -41,6 +42,15 @@
       <p class="legenda" style="margin-bottom:0.4rem">Link somente leitura, sem necessidade de login. Compartilhe apenas se quiser dar acesso.</p>
       <div class="rodape-token" id="link-gerente">—</div>
       <button class="btn-texto" id="btn-gerar-novo-link">Gerar novo link (invalida o anterior)</button>
+    </div>
+
+    <div class="painel">
+      <h2 style="margin-top:0">Baixa automática por código de barras (Caixa)</h2>
+      <p class="legenda" style="margin-bottom:0.4rem">Recurso experimental: liga a tela "Caixa", que diminui o estoque ao escanear um produto na hora da venda. Enquanto desativado, o sistema continua funcionando só pela Vistoria manual, como sempre.</p>
+      <label style="display:flex; align-items:center; gap:0.5rem; margin-top:0.6rem">
+        <input type="checkbox" id="toggle-caixa" style="width:auto" />
+        Ativar a tela Caixa
+      </label>
     </div>
   </main>
 
