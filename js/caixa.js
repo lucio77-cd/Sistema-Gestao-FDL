@@ -7,9 +7,7 @@ import {
   where,
   getDocs,
   doc,
-  updateDoc,
-  deleteDoc,
-  addDoc,
+  runTransaction,
   serverTimestamp,
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
@@ -44,7 +42,9 @@ document.getElementById("form-scanner").addEventListener("submit", async (e) => 
   await processarLeitura(codigo);
 });
 
-async function processarLeitura(codigo) {
+// tentativas: proteção contra loop infinito no caso raro de o lote
+// escolhido mudar de estado repetidamente entre a query e a transação.
+async function processarLeitura(codigo, tentativas = 0) {
   try {
     const produtosSnap = await getDocs(
       query(
@@ -61,10 +61,13 @@ async function processarLeitura(codigo) {
 
     const produto = { id: produtosSnap.docs[0].id, ...produtosSnap.docs[0].data() };
 
-    // Não dá pra saber de qual lote físico a venda saiu (o scanner só
-    // identifica o produto, não o lote) — por isso a baixa sai sempre do
-    // lote com MAIS quantidade daquele produto: reduz o risco de zerar à
-    // toa um lote pequeno que na real não foi o vendido.
+    // A escolha de QUAL lote sofre a baixa ainda é feita fora da transação
+    // (o Firestore não permite query dentro de uma transação) — por isso
+    // ainda existe uma janela pequena em que "o lote com mais quantidade"
+    // pode estar levemente desatualizado se dois scans do mesmo produto
+    // chegarem quase juntos. O que a transação abaixo elimina é o problema
+    // mais grave: duas leituras decrementando o MESMO documento ao mesmo
+    // tempo e uma sobrescrevendo silenciosamente a outra (lost update).
     const lotesSnap = await getDocs(
       query(
         collection(db, "lotes"),
@@ -73,28 +76,44 @@ async function processarLeitura(codigo) {
       )
     );
 
-    const lotes = lotesSnap.docs
+    const candidatos = lotesSnap.docs
       .map((d) => ({ id: d.id, ...d.data() }))
       .filter((l) => Number(l.quantidade) > 0)
       .sort((a, b) => Number(b.quantidade) - Number(a.quantidade));
 
-    if (lotes.length === 0) {
+    if (candidatos.length === 0) {
       registrarLeitura(produto.nome, "Sem estoque registrado para este produto.", "erro");
       return;
     }
 
-    const lote = lotes[0];
-    const quantidadeNova = Number(lote.quantidade) - 1;
+    const loteRef = doc(db, "lotes", candidatos[0].id);
 
-    if (quantidadeNova > 0) {
-      await updateDoc(doc(db, "lotes", lote.id), { quantidade: quantidadeNova });
-      registrarLeitura(produto.nome, `Baixa registrada — restam ${quantidadeNova} un.`, "ok");
-    } else {
-      // Chegou a zero na hora da venda: o motivo é inequívoco (foi vendido
-      // agora, no caixa), então arquiva direto, sem perguntar nada — não dá
-      // pra parar o fluxo do caixa pra decidir algo que já é óbvio aqui.
-      await deleteDoc(doc(db, "lotes", lote.id));
-      await addDoc(collection(db, "saidas"), {
+    const resultado = await runTransaction(db, async (tx) => {
+      const loteSnap = await tx.get(loteRef);
+
+      if (!loteSnap.exists()) {
+        // Outro scan/processo já encerrou este lote entre a query e agora.
+        return { status: "lote-mudou" };
+      }
+
+      const lote = loteSnap.data();
+      const quantidadeAtual = Number(lote.quantidade) || 0;
+
+      if (quantidadeAtual <= 0) {
+        return { status: "lote-mudou" };
+      }
+
+      const quantidadeNova = quantidadeAtual - 1;
+
+      if (quantidadeNova > 0) {
+        tx.update(loteRef, { quantidade: quantidadeNova });
+        return { status: "baixado", quantidadeNova };
+      }
+
+      // Chegou a zero na hora da venda: motivo inequívoco, arquiva direto.
+      const refSaida = doc(collection(db, "saidas"));
+      tx.delete(loteRef);
+      tx.set(refSaida, {
         estabelecimentoId: estabelecimentoAtual.id,
         produtoId: produto.id,
         produtoNome: produto.nome,
@@ -107,12 +126,28 @@ async function processarLeitura(codigo) {
         origem: "caixa",
         registradoEm: serverTimestamp(),
       });
+      return { status: "encerrado" };
+    });
+
+    if (resultado.status === "baixado") {
+      registrarLeitura(produto.nome, `Baixa registrada — restam ${resultado.quantidadeNova} un.`, "ok");
+    } else if (resultado.status === "encerrado") {
       registrarLeitura(produto.nome, "Baixa registrada — lote encerrado.", "ok");
+    } else if (tentativas < 3) {
+      await processarLeitura(codigo, tentativas + 1);
+    } else {
+      registrarLeitura(produto.nome, "Estoque mudou repetidamente durante a leitura — tente de novo.", "erro");
     }
   } catch (erro) {
     console.error(erro);
     registrarLeitura(null, "Erro ao processar. Tente ler de novo.", "erro");
   }
+}
+
+function escapeHtml(texto) {
+  const div = document.createElement("div");
+  div.textContent = texto ?? "";
+  return div.innerHTML;
 }
 
 function registrarLeitura(produtoNome, mensagem, tipo) {
@@ -126,8 +161,8 @@ function registrarLeitura(produtoNome, mensagem, tipo) {
   const hora = new Date().toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit", second: "2-digit" });
   div.innerHTML = `
     <div class="lote-info">
-      <div class="lote-produto">${produtoNome || "—"}</div>
-      <div class="lote-meta">${mensagem}</div>
+      <div class="lote-produto">${escapeHtml(produtoNome) || "—"}</div>
+      <div class="lote-meta">${escapeHtml(mensagem)}</div>
     </div>
     <div class="lote-dados">
       <div class="lote-valor">${hora}</div>
