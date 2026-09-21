@@ -1,6 +1,15 @@
 import { db } from "./firebase-config.js";
-import { protegerPagina, sair } from "./auth-guard.js";
-import { calcularStatus, formatarDiasRestantes, montarGraficoPorProduto, seloHtml, formatarValorOuAviso } from "./status.js";
+import { protegerPagina } from "./auth-guard.js";
+import { iniciarNavegacao } from "./nav.js";
+import {
+  calcularStatus,
+  formatarDiasRestantes,
+  formatarValorEmRisco,
+  montarGraficoPorProduto,
+  seloHtml,
+  STATUS_ICONE,
+  escapeHtml,
+} from "./status.js";
 import {
   collection,
   query,
@@ -8,14 +17,7 @@ import {
   getDocs,
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
-document.getElementById("link-sair").addEventListener("click", (e) => {
-  e.preventDefault();
-  sair();
-});
-
-// ---------- Abas Ação / Panorama ----------
-// O gráfico só é montado quando a aba "Panorama" é aberta pela primeira vez —
-// evita o custo de inicializar o Chart.js se a pessoa só olhar a tabela.
+iniciarNavegacao();
 
 const segAcao = document.getElementById("seg-acao");
 const segPanorama = document.getElementById("seg-panorama");
@@ -42,10 +44,6 @@ segAcao.addEventListener("click", () => mostrarAba("acao"));
 segPanorama.addEventListener("click", () => mostrarAba("panorama"));
 filtroPeriodo.addEventListener("change", renderizarGrafico);
 
-// ---------- Filtro (status + local) ----------
-// Filtra em memória sobre o que já foi carregado — não faz nova consulta ao
-// Firestore a cada troca de filtro.
-
 const filtroStatus = document.getElementById("filtro-status");
 const filtroLocal = document.getElementById("filtro-local");
 
@@ -65,8 +63,6 @@ function aplicarFiltros() {
 
 filtroStatus.addEventListener("change", aplicarFiltros);
 filtroLocal.addEventListener("change", aplicarFiltros);
-
-// ---------- Carregamento ----------
 
 protegerPagina(async ({ estabelecimento }) => {
   document.getElementById("nome-estabelecimento").textContent = estabelecimento.nome;
@@ -119,10 +115,6 @@ function renderizarLegendaAtualizacao(ultimaVistoria) {
   el.textContent = `Última vistoria: ${data.toLocaleDateString("pt-BR")} às ${data.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}`;
 }
 
-// Uma barra por lote, com o nome do produto escrito ao lado (não escondido
-// em tooltip) e comprimento = quantidade — não R$, porque quantidade não
-// depende de custo cadastrado, e é a pergunta que mais importa aqui: "qual
-// produto vai vencer".
 function renderizarGrafico() {
   const periodo = Number(filtroPeriodo.value);
   const lotesNoPeriodo = lotesCarregados.filter((l) => l.status !== "normal" && l.diasRestantes <= periodo);
@@ -175,12 +167,12 @@ function renderizarTabela(lotes) {
     div.className = `lote lote--${l.status}`;
     div.innerHTML = `
       <div class="lote-info">
-        <div class="lote-produto">${l.produtoNome}${l.status === "promocao" ? seloHtml("promocao") : ""}</div>
-        <div class="lote-meta">${l.local || "—"} · ${l.quantidade} un.</div>
+        <div class="lote-produto">${STATUS_ICONE[l.status]} ${escapeHtml(l.produtoNome)}${l.status === "promocao" ? seloHtml("promocao") : ""}</div>
+        <div class="lote-meta">${escapeHtml(l.local || "—")} · ${l.quantidade} un.</div>
       </div>
       <div class="lote-dados">
         <div class="lote-dias lote-dias--${l.status}">${formatarDiasRestantes(l.diasRestantes)}</div>
-        <div class="lote-valor">${formatarValorOuAviso(l.quantidade, l.precoCusto)} em risco</div>
+        <div class="lote-valor">${formatarValorEmRisco(l.quantidade, l.precoCusto)}</div>
       </div>
     `;
     container.appendChild(div);
