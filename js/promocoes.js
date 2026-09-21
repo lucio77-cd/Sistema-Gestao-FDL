@@ -1,7 +1,9 @@
 import { db } from "./firebase-config.js";
-import { protegerPagina, sair } from "./auth-guard.js";
-import { calcularStatus, formatarDiasRestantes } from "./status.js";
+import { protegerPagina } from "./auth-guard.js";
+import { iniciarNavegacao } from "./nav.js";
+import { calcularStatus, formatarDiasRestantes, STATUS_ICONE, escapeHtml } from "./status.js";
 import { mostrarToast } from "./toast.js";
+import { skeletonLotes } from "./skeleton.js";
 import {
   collection,
   query,
@@ -11,10 +13,7 @@ import {
   updateDoc,
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
-document.getElementById("link-sair").addEventListener("click", (e) => {
-  e.preventDefault();
-  sair();
-});
+iniciarNavegacao();
 
 let estabelecimentoAtual = null;
 
@@ -25,6 +24,9 @@ protegerPagina(async ({ estabelecimento }) => {
 });
 
 async function carregar() {
+  const container = document.getElementById("lista-promocoes");
+  container.innerHTML = skeletonLotes(3);
+
   const diasAlertaPadrao = estabelecimentoAtual.diasAlertaPadrao ?? 3;
 
   const [produtosSnap, lotesSnap] = await Promise.all([
@@ -49,6 +51,11 @@ async function carregar() {
   renderizar(lotes);
 }
 
+// Antes cada item vinha embrulhado num .painel com o .lote interno tendo
+// "border:none" — isso apagava a barra colorida de status (o principal
+// sinal visual usado em todo o resto do sistema). Agora o .lote é o
+// cartão de primeiro nível, igual às outras telas: mantém a cor, o ícone
+// e ainda ganha os controles de promoção dentro dele.
 function renderizar(lotes) {
   const container = document.getElementById("lista-promocoes");
   container.innerHTML = "";
@@ -60,24 +67,24 @@ function renderizar(lotes) {
 
   lotes.forEach((l) => {
     const div = document.createElement("div");
-    div.className = "painel";
+    div.className = `lote lote--${l.status}`;
     div.innerHTML = `
-      <div class="lote lote--${l.status}" style="border:none; padding:0; margin-bottom:0.6rem">
-        <div class="lote-info">
-          <div class="lote-produto">${l.produtoNome}</div>
-          <div class="lote-meta">${l.local || "—"} · ${l.quantidade} un.</div>
-        </div>
-        <div class="lote-dados">
-          <div class="lote-dias lote-dias--${l.status}">${formatarDiasRestantes(l.diasRestantes)}</div>
+      <div class="lote-info">
+        <div class="lote-produto">${STATUS_ICONE[l.status]} ${escapeHtml(l.produtoNome)}</div>
+        <div class="lote-meta">${escapeHtml(l.local || "—")} · ${l.quantidade} un.</div>
+        <div class="lote-preco-venda">
+          <label class="switch">
+            <input type="checkbox" data-id="${l.id}" class="chk-promo" ${l.promocaoAtiva ? "checked" : ""} />
+            <span class="switch-trilho" aria-hidden="true"></span>
+            <span class="switch-rotulo">Promoção</span>
+          </label>
+          <input type="number" step="0.01" min="0" class="input-preco-promo" data-id="${l.id}" placeholder="Preço promo. (R$)" value="${l.precoPromocional ?? ""}" />
+          <button type="button" class="btn-secundario btn-salvar-promo" data-id="${l.id}">Salvar</button>
         </div>
       </div>
-      <label>
-        <input type="checkbox" data-id="${l.id}" class="chk-promo" ${l.promocaoAtiva ? "checked" : ""} style="width:auto; display:inline-block; margin-right:0.4rem" />
-        Marcar como promoção
-      </label>
-      <label>Preço promocional (R$)</label>
-      <input type="number" step="0.01" min="0" class="input-preco-promo" data-id="${l.id}" value="${l.precoPromocional ?? ""}" />
-      <button class="btn btn-secundario btn-salvar-promo" data-id="${l.id}">Salvar</button>
+      <div class="lote-dados">
+        <div class="lote-dias lote-dias--${l.status}">${formatarDiasRestantes(l.diasRestantes)}</div>
+      </div>
     `;
     container.appendChild(div);
   });
