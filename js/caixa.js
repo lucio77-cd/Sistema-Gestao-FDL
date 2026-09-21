@@ -1,5 +1,7 @@
 import { db } from "./firebase-config.js";
-import { protegerPagina, sair } from "./auth-guard.js";
+import { protegerPagina } from "./auth-guard.js";
+import { iniciarNavegacao } from "./nav.js";
+import { escapeHtml } from "./status.js";
 import { mostrarToast } from "./toast.js";
 import {
   collection,
@@ -11,10 +13,7 @@ import {
   serverTimestamp,
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
-document.getElementById("link-sair").addEventListener("click", (e) => {
-  e.preventDefault();
-  sair();
-});
+iniciarNavegacao();
 
 let estabelecimentoAtual = null;
 const campoCodigo = document.getElementById("campo-codigo");
@@ -42,8 +41,6 @@ document.getElementById("form-scanner").addEventListener("submit", async (e) => 
   await processarLeitura(codigo);
 });
 
-// tentativas: proteção contra loop infinito no caso raro de o lote
-// escolhido mudar de estado repetidamente entre a query e a transação.
 async function processarLeitura(codigo, tentativas = 0) {
   try {
     const produtosSnap = await getDocs(
@@ -61,13 +58,6 @@ async function processarLeitura(codigo, tentativas = 0) {
 
     const produto = { id: produtosSnap.docs[0].id, ...produtosSnap.docs[0].data() };
 
-    // A escolha de QUAL lote sofre a baixa ainda é feita fora da transação
-    // (o Firestore não permite query dentro de uma transação) — por isso
-    // ainda existe uma janela pequena em que "o lote com mais quantidade"
-    // pode estar levemente desatualizado se dois scans do mesmo produto
-    // chegarem quase juntos. O que a transação abaixo elimina é o problema
-    // mais grave: duas leituras decrementando o MESMO documento ao mesmo
-    // tempo e uma sobrescrevendo silenciosamente a outra (lost update).
     const lotesSnap = await getDocs(
       query(
         collection(db, "lotes"),
@@ -92,7 +82,6 @@ async function processarLeitura(codigo, tentativas = 0) {
       const loteSnap = await tx.get(loteRef);
 
       if (!loteSnap.exists()) {
-        // Outro scan/processo já encerrou este lote entre a query e agora.
         return { status: "lote-mudou" };
       }
 
@@ -110,7 +99,6 @@ async function processarLeitura(codigo, tentativas = 0) {
         return { status: "baixado", quantidadeNova };
       }
 
-      // Chegou a zero na hora da venda: motivo inequívoco, arquiva direto.
       const refSaida = doc(collection(db, "saidas"));
       tx.delete(loteRef);
       tx.set(refSaida, {
@@ -142,12 +130,6 @@ async function processarLeitura(codigo, tentativas = 0) {
     console.error(erro);
     registrarLeitura(null, "Erro ao processar. Tente ler de novo.", "erro");
   }
-}
-
-function escapeHtml(texto) {
-  const div = document.createElement("div");
-  div.textContent = texto ?? "";
-  return div.innerHTML;
 }
 
 function registrarLeitura(produtoNome, mensagem, tipo) {
