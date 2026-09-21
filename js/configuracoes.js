@@ -1,12 +1,11 @@
 import { db } from "./firebase-config.js";
-import { protegerPagina, sair } from "./auth-guard.js";
+import { protegerPagina } from "./auth-guard.js";
+import { iniciarNavegacao } from "./nav.js";
 import { mostrarToast } from "./toast.js";
+import { confirmarAcao } from "./modal.js";
 import { doc, updateDoc } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
-document.getElementById("link-sair").addEventListener("click", (e) => {
-  e.preventDefault();
-  sair();
-});
+iniciarNavegacao();
 
 function gerarToken() {
   return Array.from(crypto.getRandomValues(new Uint8Array(16)))
@@ -60,13 +59,29 @@ document.getElementById("btn-salvar-config").addEventListener("click", async () 
   }
 });
 
-// Ação irreversível: o link antigo para de funcionar assim que este é salvo.
-// Se a gerente estiver com o link antigo aberto/salvo, ele quebra sem aviso —
-// por isso a confirmação explícita antes de seguir.
+// Copiar o link sem exigir seleção manual do texto — no celular, selecionar
+// um token de ~90 caracteres quebrado em duas linhas era tedioso.
+document.getElementById("btn-copiar-link").addEventListener("click", async () => {
+  const texto = document.getElementById("link-gerente").textContent;
+  try {
+    await navigator.clipboard.writeText(texto);
+    mostrarToast("Link copiado.", "ok");
+  } catch (erro) {
+    console.error(erro);
+    mostrarToast("Não foi possível copiar. Selecione o texto manualmente.", "erro");
+  }
+});
+
+// Ação irreversível — antes usava window.confirm() nativo, que quebra a
+// identidade visual do app; agora usa o modal estilizado do sistema.
 document.getElementById("btn-gerar-novo-link").addEventListener("click", async () => {
-  const confirmar = window.confirm(
-    "Isso invalida o link atual imediatamente. Se a gerente já tiver o link salvo, ele vai parar de funcionar. Continuar?"
-  );
+  const confirmar = await confirmarAcao({
+    titulo: "Gerar novo link?",
+    mensagem: "Isso invalida o link atual imediatamente. Se a gerente já tiver o link salvo, ele vai parar de funcionar.",
+    textoConfirmar: "Gerar novo link",
+    textoCancelar: "Cancelar",
+    perigo: true,
+  });
   if (!confirmar) return;
 
   try {
