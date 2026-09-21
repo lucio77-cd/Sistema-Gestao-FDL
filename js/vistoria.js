@@ -1,7 +1,9 @@
 import { db } from "./firebase-config.js";
-import { protegerPagina, sair } from "./auth-guard.js";
-import { calcularStatus, formatarData, formatarValorOuAviso } from "./status.js";
+import { protegerPagina } from "./auth-guard.js";
+import { iniciarNavegacao } from "./nav.js";
+import { calcularStatus, formatarData, formatarValorOuAviso, STATUS_ICONE, escapeHtml } from "./status.js";
 import { mostrarToast } from "./toast.js";
+import { skeletonLotes } from "./skeleton.js";
 import {
   collection,
   query,
@@ -13,14 +15,10 @@ import {
   serverTimestamp,
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
-document.getElementById("link-sair").addEventListener("click", (e) => {
-  e.preventDefault();
-  sair();
-});
+iniciarNavegacao();
 
 let estabelecimentoAtual = null;
 let produtosCache = {};
-// { loteId: { input, valorOriginal, produtoId, produtoNome, precoCusto, local, dataVencimento, acaoZero, quantidadeParaAcao } }
 let controlesQuantidade = {};
 
 protegerPagina(async ({ estabelecimento }) => {
@@ -30,7 +28,7 @@ protegerPagina(async ({ estabelecimento }) => {
   await carregarLotes();
 });
 
-// ---------- Alternância de seção principal (Atualizar / Adicionar / Saídas) ----------
+// ---------- Alternância de seção principal ----------
 
 const segAtualizar = document.getElementById("seg-atualizar");
 const segAdicionar = document.getElementById("seg-adicionar");
@@ -65,10 +63,7 @@ function irParaCadastroDeProduto() {
   campo.focus();
 }
 
-// ---------- Sub-abas dentro de Saídas (Vendidos / Vencidos) ----------
-// "excluidos" e "perdas" viraram uma coleção só ("saidas"), com o campo
-// "motivo" distinguindo o caso — mais simples de manter do que duas
-// coleções quase idênticas.
+// ---------- Sub-abas dentro de Saídas ----------
 
 const segVendidos = document.getElementById("seg-vendidos");
 const segVencidos = document.getElementById("seg-vencidos");
@@ -110,6 +105,8 @@ async function carregarProdutos() {
 
 async function carregarLotes() {
   const container = document.getElementById("lista-lotes-vistoria");
+  container.innerHTML = skeletonLotes(4);
+
   const snap = await getDocs(
     query(collection(db, "lotes"), where("estabelecimentoId", "==", estabelecimentoAtual.id))
   );
@@ -134,9 +131,6 @@ async function carregarLotes() {
     .map((d) => ({ id: d.id, ...d.data() }))
     .sort((a, b) => a.dataVencimento.localeCompare(b.dataVencimento));
 
-  // Migração silenciosa: lotes criados antes desta versão não têm o nome do
-  // produto gravado no próprio lote — necessário pra página da gerente ler
-  // sem depender da coleção "produtos" (restrita).
   const batchMigracao = writeBatch(db);
   let precisaMigrar = false;
 
@@ -168,17 +162,17 @@ async function carregarLotes() {
     div.className = `lote lote--${status}`;
     div.innerHTML = `
       <div class="lote-info">
-        <div class="lote-produto">${produto.nome}</div>
-        <div class="lote-meta">${l.local || "—"} · vence em ${formatarData(l.dataVencimento)}</div>
+        <div class="lote-produto">${STATUS_ICONE[status]} ${escapeHtml(produto.nome)}</div>
+        <div class="lote-meta">${escapeHtml(l.local || "—")} · vence em ${formatarData(l.dataVencimento)}</div>
         <div class="lote-acao-zero">
           <button type="button" class="btn-texto btn-acao-zero" data-acao="vendido">Vendido</button>
           <button type="button" class="btn-texto btn-acao-zero" data-acao="vencido">Vencido</button>
         </div>
       </div>
       <div class="stepper" data-lote-id="${l.id}">
-        <button type="button" class="btn-menos" aria-label="Diminuir quantidade de ${produto.nome}">−</button>
-        <input type="number" min="0" value="${l.quantidade}" inputmode="numeric" aria-label="Quantidade de ${produto.nome}" />
-        <button type="button" class="btn-mais" aria-label="Aumentar quantidade de ${produto.nome}">+</button>
+        <button type="button" class="btn-menos" aria-label="Diminuir quantidade de ${escapeHtml(produto.nome)}">−</button>
+        <input type="number" min="0" value="${l.quantidade}" inputmode="numeric" aria-label="Quantidade de ${escapeHtml(produto.nome)}" />
+        <button type="button" class="btn-mais" aria-label="Aumentar quantidade de ${escapeHtml(produto.nome)}">+</button>
       </div>
     `;
     container.appendChild(div);
@@ -199,17 +193,12 @@ async function carregarLotes() {
       quantidadeParaAcao: null,
     };
 
-    // Só reflete visualmente o destaque de "alterado" — nunca mexe na ação
-    // escolhida. Separado de propósito do clique nos botões abaixo.
     function atualizarClasseAlterado() {
       const valor = Number(input.value);
       const alterou = valor !== controlesQuantidade[l.id].valorOriginal || !!controlesQuantidade[l.id].acaoZero;
       stepper.classList.toggle("alterado", alterou);
     }
 
-    // Mexer no stepper manualmente depois de escolher uma ação cancela a
-    // escolha — evita salvar uma ação antiga com uma quantidade que o
-    // usuário decidiu digitar por cima.
     function limparAcaoEscolhida() {
       controlesQuantidade[l.id].acaoZero = null;
       controlesQuantidade[l.id].quantidadeParaAcao = null;
@@ -232,10 +221,6 @@ async function carregarLotes() {
       atualizarClasseAlterado();
     });
 
-    // "Vendido"/"Vencido" funcionam na quantidade que estiver no campo NESTE
-    // momento (não exigem zerar primeiro): guardamos essa quantidade e
-    // zeramos o campo, deixando visualmente claro que este lote vai sair do
-    // estoque ativo ao salvar.
     areaAcaoZero.querySelectorAll(".btn-acao-zero").forEach((btn) => {
       btn.addEventListener("click", () => {
         const quantidadeNoMomento = Number(input.value);
@@ -253,12 +238,12 @@ async function carregarLotes() {
   });
 }
 
-// ---------- Lista de saídas (Vendidos / Vencidos) ----------
+// ---------- Lista de saídas ----------
 
 async function carregarSaidas(motivo) {
   const containerId = motivo === "vendido" ? "lista-vendidos" : "lista-vencidos";
   const container = document.getElementById(containerId);
-  container.innerHTML = '<p class="mensagem-vazio">Carregando…</p>';
+  container.innerHTML = skeletonLotes(3);
 
   let snap;
   try {
@@ -304,8 +289,8 @@ async function carregarSaidas(motivo) {
     div.className = `lote lote--${motivo === "vencido" ? "vencido" : "excluido"}`;
     div.innerHTML = `
       <div class="lote-info">
-        <div class="lote-produto">${item.produtoNome}</div>
-        <div class="lote-meta">${item.local || "—"} · ${item.quantidade} un. · vencia em ${formatarData(item.dataVencimentoOriginal)}</div>
+        <div class="lote-produto">${escapeHtml(item.produtoNome)}</div>
+        <div class="lote-meta">${escapeHtml(item.local || "—")} · ${item.quantidade} un. · vencia em ${formatarData(item.dataVencimentoOriginal)}</div>
       </div>
       <div class="lote-dados">
         ${motivo === "vencido" ? `<div class="lote-dias lote-dias--vencido">${formatarValorOuAviso(item.quantidade, item.precoCusto)}</div>` : ""}
@@ -316,14 +301,11 @@ async function carregarSaidas(motivo) {
   });
 }
 
-// ---------- Salvar vistoria (escrita atômica + histórico) ----------
+// ---------- Salvar vistoria ----------
 
 document.getElementById("btn-salvar-vistoria").addEventListener("click", async () => {
   const botao = document.getElementById("btn-salvar-vistoria");
 
-  // Um lote entra no salvamento se: (a) uma ação foi escolhida (Vendido ou
-  // Vencido), não importa em que quantidade estava quando clicou; ou (b) a
-  // quantidade foi mesmo alterada pelo stepper, sem ação nenhuma.
   const alterados = Object.entries(controlesQuantidade).filter(([, c]) => {
     if (c.acaoZero) return true;
     return Number(c.input.value) !== c.valorOriginal;
@@ -334,9 +316,6 @@ document.getElementById("btn-salvar-vistoria").addEventListener("click", async (
     return;
   }
 
-  // Só bloqueia quando alguém zera pelo stepper (− manual) sem clicar em
-  // nenhum dos dois botões — aí sim falta dizer o que houve. Quem usou um
-  // dos botões já resolveu isso, em qualquer quantidade.
   const prontos = [];
   const pendentes = [];
   alterados.forEach(([loteId, c]) => {
@@ -363,9 +342,6 @@ document.getElementById("btn-salvar-vistoria").addEventListener("click", async (
 
     prontos.forEach(([loteId, c, quantidadeNova]) => {
       const loteRef = doc(db, "lotes", loteId);
-      // A quantidade da ação é a que estava no campo NO MOMENTO do clique no
-      // botão — não a quantidade original do banco — pra não perder o caso de
-      // alguém ajustar um pouco pelo stepper e só depois decidir a ação.
       const quantidadeDaAcao = c.quantidadeParaAcao ?? c.valorOriginal;
 
       if (c.acaoZero === "vendido" || c.acaoZero === "vencido") {
@@ -462,10 +438,6 @@ document.getElementById("btn-salvar-produto").addEventListener("click", async ()
 });
 
 // ---------- Cadastro de lote ----------
-// O nome do produto e o preço de custo são gravados também no próprio lote
-// (denormalizado). Isso é o que permite a página da gerente (sem login) ler
-// os lotes sem precisar consultar a coleção "produtos" — que fica restrita
-// por conter preço de custo/venda.
 
 document.getElementById("form-novo-lote").addEventListener("submit", async (e) => {
   e.preventDefault();
