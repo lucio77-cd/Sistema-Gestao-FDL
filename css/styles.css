@@ -22,9 +22,6 @@
   box-sizing: border-box;
 }
 
-/* Garante que o atributo hidden sempre vença qualquer display de classe —
-   foi exatamente essa disputa que deixava os botões de ação sempre visíveis
-   mesmo quando deveriam estar escondidos. */
 [hidden] {
   display: none !important;
 }
@@ -37,11 +34,15 @@ body {
   line-height: 1.5;
 }
 
+body.modal-aberto {
+  overflow: hidden;
+}
+
 a {
   color: inherit;
 }
 
-/* ---------- Cabeçalho / navegação ---------- */
+/* ---------- Cabeçalho ---------- */
 
 .topo {
   background: var(--primary-dark);
@@ -64,28 +65,101 @@ a {
   margin-top: 0.1rem;
 }
 
-.nav {
+/* ---------- Navegação inferior (barra de abas) ---------- */
+/* Substitui a antiga faixa horizontal de texto no topo — em celular ela
+   exigia scroll horizontal sem nenhuma pista visual de que havia mais
+   itens fora da tela. Uma barra fixa embaixo, com ícone + rótulo, é o
+   padrão dos apps mobile-first de referência (polegar alcança sem esforço,
+   sempre visível, no máx. 5 destinos). */
+
+.tabbar {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
   display: flex;
-  gap: 0.25rem;
-  overflow-x: auto;
-  background: var(--primary);
-  padding: 0 0.5rem;
+  background: var(--surface);
+  border-top: 1px solid var(--steel-light);
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+  z-index: 20;
 }
 
-.nav a {
-  display: block;
-  padding: 0.7rem 0.8rem;
+.tabbar-item {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.15rem;
+  padding: 0.5rem 0.2rem 0.4rem;
+  border: none;
+  background: none;
+  color: var(--ink-soft);
+  font-family: var(--font-body);
+  font-size: 0.68rem;
+  font-weight: 600;
   text-decoration: none;
-  color: #d9ebf1;
-  font-weight: 500;
-  font-size: 0.88rem;
-  white-space: nowrap;
-  border-bottom: 3px solid transparent;
+  cursor: pointer;
+  position: relative;
 }
 
-.nav a.ativo {
-  color: #fff;
-  border-bottom-color: #fff;
+.tabbar-item.ativo {
+  color: var(--primary);
+}
+
+.tabbar-item.ativo::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 28px;
+  height: 3px;
+  background: var(--primary);
+  border-radius: 0 0 3px 3px;
+}
+
+.menu-mais {
+  position: fixed;
+  right: 0.6rem;
+  bottom: calc(64px + env(safe-area-inset-bottom, 0px) + 0.4rem);
+  background: var(--surface);
+  border: 1px solid var(--steel-light);
+  border-radius: 8px;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.18);
+  min-width: 180px;
+  overflow: hidden;
+  z-index: 21;
+}
+
+.menu-mais a,
+.menu-mais button {
+  display: block;
+  width: 100%;
+  text-align: left;
+  padding: 0.75rem 1rem;
+  color: var(--ink);
+  text-decoration: none;
+  font-weight: 500;
+  font-size: 0.9rem;
+  font-family: var(--font-body);
+  border: none;
+  background: none;
+  cursor: pointer;
+}
+
+.menu-mais a:not(:last-child),
+.menu-mais button:not(:last-child) {
+  border-bottom: 1px solid var(--steel-light);
+}
+
+.menu-mais a:hover,
+.menu-mais button:hover {
+  background: var(--bg);
+}
+
+.menu-mais a.ativo {
+  color: var(--primary);
+  font-weight: 700;
 }
 
 /* ---------- Layout geral ---------- */
@@ -93,7 +167,7 @@ a {
 main {
   max-width: 720px;
   margin: 0 auto;
-  padding: 1.1rem 1rem 4.5rem;
+  padding: 1.1rem 1rem calc(5.6rem + env(safe-area-inset-bottom, 0px));
 }
 
 h1 {
@@ -260,7 +334,7 @@ h2 {
   color: #fff;
 }
 
-/* ---------- Filtros do dashboard ---------- */
+/* ---------- Filtros ---------- */
 
 .filtros {
   display: flex;
@@ -279,17 +353,17 @@ h2 {
   border-left-color: var(--steel);
 }
 
-/* ---------- Valor de venda editável (página da gerente) ---------- */
+/* ---------- Valor de venda / promoção editável ---------- */
 
 .lote-preco-venda {
   display: flex;
   align-items: center;
-  gap: 0.5rem;
+  gap: 0.6rem;
   margin-top: 0.5rem;
   flex-wrap: wrap;
 }
 
-.lote-preco-venda label {
+.lote-preco-venda label:not(.switch) {
   margin: 0;
   font-size: 0.78rem;
   color: var(--ink-soft);
@@ -300,11 +374,12 @@ h2 {
   width: 6.5rem;
 }
 
-.lote-preco-venda .btn {
+.lote-preco-venda .btn,
+.lote-preco-venda .btn-secundario {
   margin-top: 0;
 }
 
-/* ---------- Tabela de Estoque (produto / quantidade / % do total) ---------- */
+/* ---------- Tabela de Estoque ---------- */
 
 .linha-estoque {
   display: flex;
@@ -403,7 +478,112 @@ h2 {
   margin-top: 0.8rem;
 }
 
-/* ---------- Formulários ---------- */
+/* ---------- Skeleton de carregamento ---------- */
+/* Usado no lugar de um "Carregando…" solto — dá uma pista do formato do
+   conteúdo e melhora a percepção de velocidade em telas de lista. */
+
+.skeleton-lote {
+  background: var(--surface);
+  border: 1px solid var(--steel-light);
+  border-left-width: 5px;
+  border-left-color: var(--steel-light);
+  border-radius: 4px;
+  padding: 0.9rem 0.8rem;
+  margin-bottom: 0.55rem;
+}
+
+.skeleton-linha {
+  height: 0.9rem;
+  border-radius: 4px;
+  background: linear-gradient(90deg, var(--steel-light) 25%, #e4ebe9 37%, var(--steel-light) 63%);
+  background-size: 400% 100%;
+  animation: skeleton-pulso 1.4s ease-in-out infinite;
+}
+
+.skeleton-linha--titulo {
+  width: 55%;
+  margin-bottom: 0.5rem;
+}
+
+.skeleton-linha--meta {
+  width: 35%;
+  height: 0.7rem;
+}
+
+@keyframes skeleton-pulso {
+  0% { background-position: 100% 50%; }
+  100% { background-position: 0 50%; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .skeleton-linha { animation: none; }
+}
+
+/* ---------- Switch (toggle) ---------- */
+/* Antes era um checkbox nativo minúsculo pra representar "ligar um
+   recurso" — checkbox comunica seleção, switch comunica estado
+   ligado/desligado, que é o que "Ativar a tela Caixa" e "Marcar como
+   promoção" realmente são. */
+
+.switch {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.6rem;
+  cursor: pointer;
+  user-select: none;
+}
+
+.switch input {
+  position: absolute;
+  opacity: 0;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+}
+
+.switch-trilho {
+  width: 44px;
+  height: 26px;
+  flex-shrink: 0;
+  background: var(--steel-light);
+  border-radius: 999px;
+  position: relative;
+  transition: background 0.15s ease;
+}
+
+.switch-trilho::after {
+  content: "";
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 22px;
+  height: 22px;
+  background: #fff;
+  border-radius: 50%;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+  transition: transform 0.15s ease;
+}
+
+.switch input:checked + .switch-trilho {
+  background: var(--primary);
+}
+
+.switch input:checked + .switch-trilho::after {
+  transform: translateX(18px);
+}
+
+.switch input:focus-visible + .switch-trilho {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}
+
+.switch-rotulo {
+  font-weight: 500;
+  font-size: 0.95rem;
+  white-space: nowrap;
+}
+
+/* ---------- Botões ---------- */
 
 label {
   display: block;
@@ -454,9 +634,20 @@ input:focus, select:focus, button:focus, a:focus {
 }
 
 .btn-secundario {
+  display: inline-block;
   background: transparent;
   color: var(--primary);
   border: 1px solid var(--primary);
+  padding: 0.65rem 1.1rem;
+  border-radius: 4px;
+  font-weight: 600;
+  cursor: pointer;
+  margin-top: 0.9rem;
+}
+
+.btn-secundario:hover {
+  background: var(--primary);
+  color: #fff;
 }
 
 .btn-texto {
@@ -467,6 +658,27 @@ input:focus, select:focus, button:focus, a:focus {
   padding: 0.3rem 0;
   cursor: pointer;
   text-decoration: underline;
+}
+
+/* Peso visual próprio pra ações destrutivas/irreversíveis — antes elas
+   usavam o mesmo estilo de link comum (.btn-texto), sem nenhum sinal de
+   risco maior que "abrir uma página". */
+.btn.btn-perigo {
+  background: var(--vencido);
+}
+
+.btn.btn-perigo:hover {
+  background: #8a2828;
+}
+
+.btn-secundario.btn-perigo {
+  color: var(--vencido);
+  border-color: var(--vencido);
+}
+
+.btn-secundario.btn-perigo:hover {
+  background: var(--vencido);
+  color: #fff;
 }
 
 .linha-form {
@@ -513,12 +725,132 @@ input:focus, select:focus, button:focus, a:focus {
   margin-top: 0.4rem;
 }
 
-/* ---------- Toast de confirmação ---------- */
+.acoes-link-gerente {
+  display: flex;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+  margin-top: 0.6rem;
+}
+
+.acoes-link-gerente button {
+  margin-top: 0;
+}
+
+/* ---------- Produtos: cartão colapsável + busca ---------- */
+/* Antes cada produto era um formulário inteiro sempre aberto — com um
+   catálogo grande isso vira uma rolagem infinita de formulários. Agora só
+   nome + preço ficam visíveis; o resto abre ao tocar. */
+
+.busca-produto-wrap {
+  margin-bottom: 1rem;
+}
+
+.produto-item {
+  background: var(--surface);
+  border: 1px solid var(--steel-light);
+  border-radius: 6px;
+  margin-bottom: 0.6rem;
+  overflow: hidden;
+}
+
+.produto-item summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.6rem;
+  padding: 0.85rem 1rem;
+  cursor: pointer;
+  font-weight: 600;
+  list-style: none;
+}
+
+.produto-item summary::-webkit-details-marker {
+  display: none;
+}
+
+.produto-item summary::after {
+  content: "▾";
+  color: var(--steel);
+  font-size: 0.8rem;
+  margin-left: 0.4rem;
+  transition: transform 0.15s ease;
+}
+
+.produto-item[open] summary::after {
+  transform: rotate(180deg);
+}
+
+.produto-resumo-dados {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-family: var(--font-mono);
+  font-weight: 600;
+  color: var(--ink-soft);
+  white-space: nowrap;
+}
+
+.produto-aviso {
+  color: var(--atencao);
+  font-size: 0.7rem;
+}
+
+.produto-form {
+  padding: 0 1rem 1rem;
+  border-top: 1px solid var(--steel-light);
+}
+
+/* ---------- Modal de confirmação ---------- */
+
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(22, 35, 43, 0.55);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+  z-index: 100;
+}
+
+.modal {
+  background: var(--surface);
+  border-radius: 8px;
+  padding: 1.3rem;
+  max-width: 380px;
+  width: 100%;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.28);
+}
+
+.modal h2 {
+  margin: 0 0 0.5rem;
+  font-size: 1.05rem;
+}
+
+.modal p {
+  margin: 0 0 1.1rem;
+  color: var(--ink-soft);
+  font-size: 0.9rem;
+}
+
+.modal-acoes {
+  display: flex;
+  gap: 0.6rem;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+}
+
+.modal-acoes .btn,
+.modal-acoes .btn-secundario {
+  margin-top: 0;
+}
+
+/* ---------- Toast ---------- */
 
 #toast-global {
   position: fixed;
   left: 50%;
-  bottom: 1.2rem;
+  bottom: calc(1.2rem + 64px + env(safe-area-inset-bottom, 0px));
   transform: translateX(-50%) translateY(120%);
   background: var(--ink);
   color: #fff;
