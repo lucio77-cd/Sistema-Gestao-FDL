@@ -51,11 +51,6 @@ async function carregar() {
   renderizar(lotes);
 }
 
-// Antes cada item vinha embrulhado num .painel com o .lote interno tendo
-// "border:none" — isso apagava a barra colorida de status (o principal
-// sinal visual usado em todo o resto do sistema). Agora o .lote é o
-// cartão de primeiro nível, igual às outras telas: mantém a cor, o ícone
-// e ainda ganha os controles de promoção dentro dele.
 function renderizar(lotes) {
   const container = document.getElementById("lista-promocoes");
   container.innerHTML = "";
