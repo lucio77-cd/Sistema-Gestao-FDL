@@ -1,61 +1,29 @@
-import { auth, db } from "./firebase-config.js";
-import { onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
-import {
-  collection,
-  query,
-  where,
-  limit,
-  getDocs,
-  addDoc,
-} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
-
-function gerarToken() {
-  return Array.from(crypto.getRandomValues(new Uint8Array(16)))
-    .map((b) => b.toString(16).padStart(2, "0"))
-    .join("");
-}
-
-/**
- * Garante que existe um estabelecimento para este usuário. Cria um com
- * valores padrão na primeira vez que ele loga.
- */
-async function obterOuCriarEstabelecimento(uid) {
-  const ref = collection(db, "estabelecimentos");
-  const q = query(ref, where("ownerId", "==", uid), limit(1));
-  const snap = await getDocs(q);
-
-  if (!snap.empty) {
-    const doc = snap.docs[0];
-    return { id: doc.id, ...doc.data() };
-  }
-
-  const novo = {
-    ownerId: uid,
-    nome: "Meu estabelecimento",
-    diasAlertaPadrao: 3,
-    linkToken: gerarToken(),
-    ultimaVistoria: null,
-  };
-  const criado = await addDoc(ref, novo);
-  return { id: criado.id, ...novo };
-}
-
-/**
- * Chame no topo de cada página administrativa. Redireciona para login.html
- * se não houver usuário autenticado, e devolve { user, estabelecimento }.
- */
 export function protegerPagina(callback) {
   onAuthStateChanged(auth, async (user) => {
     if (!user) {
       window.location.href = "login.html";
       return;
     }
-    const estabelecimento = await obterOuCriarEstabelecimento(user.uid);
-    callback({ user, estabelecimento });
+    try {
+      const estabelecimento = await obterOuCriarEstabelecimento(user.uid);
+      await callback({ user, estabelecimento });
+    } catch (erro) {
+      console.error("Falha ao carregar a página:", erro);
+      mostrarErroCarregamento(erro);
+    }
   });
 }
 
-export async function sair() {
-  await signOut(auth);
-  window.location.href = "login.html";
+function mostrarErroCarregamento(erro) {
+  const main = document.querySelector("main");
+  if (!main) return;
+  const div = document.createElement("div");
+  div.className = "painel";
+  div.style.borderColor = "var(--vencido)";
+  div.innerHTML = `
+    <h2 style="margin-top:0; color:var(--vencido)">Não foi possível carregar</h2>
+    <p class="legenda" style="margin-bottom:0.4rem">Detalhe técnico (pra copiar e me mandar):</p>
+    <div class="rodape-token">${(erro && erro.message) || String(erro)}</div>
+  `;
+  main.prepend(div);
 }
