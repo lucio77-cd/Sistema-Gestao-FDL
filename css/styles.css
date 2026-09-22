@@ -65,12 +65,7 @@ a {
   margin-top: 0.1rem;
 }
 
-/* ---------- Navegação inferior (barra de abas) ---------- */
-/* Substitui a antiga faixa horizontal de texto no topo — em celular ela
-   exigia scroll horizontal sem nenhuma pista visual de que havia mais
-   itens fora da tela. Uma barra fixa embaixo, com ícone + rótulo, é o
-   padrão dos apps mobile-first de referência (polegar alcança sem esforço,
-   sempre visível, no máx. 5 destinos). */
+/* ---------- Navegação inferior ---------- */
 
 .tabbar {
   position: fixed;
@@ -196,7 +191,7 @@ h2 {
   position: relative;
 }
 
-/* ---------- Segmentado (alternância de seção/aba) ---------- */
+/* ---------- Segmentado ---------- */
 
 .segmentado {
   display: flex;
@@ -222,7 +217,7 @@ h2 {
   color: #fff;
 }
 
-/* ---------- Lista tipo "etiqueta de prateleira" ---------- */
+/* ---------- Cartão de lote ---------- */
 
 .lote {
   display: flex;
@@ -299,7 +294,7 @@ h2 {
 .selo--vencido { background: #f6dede; color: var(--vencido); }
 .selo--promocao { background: #ece3f2; color: var(--promocao); }
 
-/* ---------- Stepper de quantidade ---------- */
+/* ---------- Stepper ---------- */
 
 .stepper {
   display: flex;
@@ -347,13 +342,11 @@ h2 {
   flex: 1;
 }
 
-/* ---------- Lista de excluídos (vistoria) ---------- */
-
 .lote--excluido {
   border-left-color: var(--steel);
 }
 
-/* ---------- Valor de venda / promoção editável ---------- */
+/* ---------- Preço/promoção editável ---------- */
 
 .lote-preco-venda {
   display: flex;
@@ -439,7 +432,7 @@ h2 {
   font-weight: 600;
 }
 
-/* ---------- Cartão-resumo (página da gerente) ---------- */
+/* ---------- Cartão-resumo (gerente) ---------- */
 
 .resumo {
   border-radius: 8px;
@@ -465,7 +458,7 @@ h2 {
   margin-top: 0.35rem;
 }
 
-/* ---------- Estado vazio orientado ---------- */
+/* ---------- Estado vazio ---------- */
 
 .estado-vazio {
   color: var(--ink-soft);
@@ -479,8 +472,6 @@ h2 {
 }
 
 /* ---------- Skeleton de carregamento ---------- */
-/* Usado no lugar de um "Carregando…" solto — dá uma pista do formato do
-   conteúdo e melhora a percepção de velocidade em telas de lista. */
 
 .skeleton-lote {
   background: var(--surface);
@@ -519,18 +510,48 @@ h2 {
   .skeleton-linha { animation: none; }
 }
 
-/* ---------- Switch (toggle) ---------- */
-/* Antes era um checkbox nativo minúsculo pra representar "ligar um
-   recurso" — checkbox comunica seleção, switch comunica estado
-   ligado/desligado, que é o que "Ativar a tela Caixa" e "Marcar como
-   promoção" realmente são. */
+/* ---------- Formulários / labels genéricos ---------- */
 
-.switch {
+label {
+  display: block;
+  font-size: 0.85rem;
+  font-weight: 500;
+  margin: 0.7rem 0 0.25rem;
+}
+
+input, select, button {
+  font-family: var(--font-body);
+  font-size: 0.95rem;
+}
+
+input, select {
+  width: 100%;
+  padding: 0.55rem 0.65rem;
+  border: 1px solid var(--steel-light);
+  border-radius: 4px;
+  background: var(--surface);
+  color: var(--ink);
+}
+
+input:focus, select:focus, button:focus, a:focus {
+  outline: 2px solid var(--primary);
+  outline-offset: 1px;
+}
+
+/* ---------- Switch (toggle) ---------- */
+/* Vem DEPOIS da regra genérica `label` acima de propósito, e usa o
+   seletor "label.switch" (não só ".switch") — assim tem mais
+   especificidade que a regra `label` genérica e sempre vence,
+   independente da ordem no arquivo. Sem isso, o switch aparecia
+   esticado/quebrado, com o espaçamento do flexbox ignorado. */
+
+label.switch {
   display: inline-flex;
   align-items: center;
   gap: 0.6rem;
   cursor: pointer;
   user-select: none;
+  margin: 0;
 }
 
 .switch input {
@@ -585,32 +606,6 @@ h2 {
 
 /* ---------- Botões ---------- */
 
-label {
-  display: block;
-  font-size: 0.85rem;
-  font-weight: 500;
-  margin: 0.7rem 0 0.25rem;
-}
-
-input, select, button {
-  font-family: var(--font-body);
-  font-size: 0.95rem;
-}
-
-input, select {
-  width: 100%;
-  padding: 0.55rem 0.65rem;
-  border: 1px solid var(--steel-light);
-  border-radius: 4px;
-  background: var(--surface);
-  color: var(--ink);
-}
-
-input:focus, select:focus, button:focus, a:focus {
-  outline: 2px solid var(--primary);
-  outline-offset: 1px;
-}
-
 .btn {
   display: inline-block;
   background: var(--primary);
@@ -660,9 +655,6 @@ input:focus, select:focus, button:focus, a:focus {
   text-decoration: underline;
 }
 
-/* Peso visual próprio pra ações destrutivas/irreversíveis — antes elas
-   usavam o mesmo estilo de link comum (.btn-texto), sem nenhum sinal de
-   risco maior que "abrir uma página". */
 .btn.btn-perigo {
   background: var(--vencido);
 }
@@ -737,9 +729,6 @@ input:focus, select:focus, button:focus, a:focus {
 }
 
 /* ---------- Produtos: cartão colapsável + busca ---------- */
-/* Antes cada produto era um formulário inteiro sempre aberto — com um
-   catálogo grande isso vira uma rolagem infinita de formulários. Agora só
-   nome + preço ficam visíveis; o resto abre ao tocar. */
 
 .busca-produto-wrap {
   margin-bottom: 1rem;
@@ -871,4 +860,4 @@ input:focus, select:focus, button:focus, a:focus {
 
 #toast-global.toast--erro {
   background: var(--vencido);
-}
+  }
