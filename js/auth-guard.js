@@ -15,10 +15,6 @@ function gerarToken() {
     .join("");
 }
 
-/**
- * Garante que existe um estabelecimento para este usuário. Cria um com
- * valores padrão na primeira vez que ele loga.
- */
 async function obterOuCriarEstabelecimento(uid) {
   const ref = collection(db, "estabelecimentos");
   const q = query(ref, where("ownerId", "==", uid), limit(1));
@@ -40,13 +36,6 @@ async function obterOuCriarEstabelecimento(uid) {
   return { id: criado.id, ...novo };
 }
 
-/**
- * Chame no topo de cada página administrativa. Redireciona para login.html
- * se não houver usuário autenticado, e devolve { user, estabelecimento }.
- * Qualquer falha (rede, permissão do Firestore, erro no callback da
- * página) é capturada aqui e mostrada na própria tela — antes ficava presa
- * no "Carregando…" sem nenhuma pista do que deu errado.
- */
 export function protegerPagina(callback) {
   onAuthStateChanged(auth, async (user) => {
     if (!user) {
