@@ -1,9 +1,5 @@
 import { sair } from "./auth-guard.js";
 
-// Navegação inferior (mobile-first), compartilhada por todas as páginas
-// administrativas. Cada página define `data-pagina-atual` no <body> pra
-// esta função saber qual aba/menu destacar como ativo — evita repetir a
-// lógica de "aba ativa" em cada arquivo JS separado.
 export function iniciarNavegacao() {
   const paginaAtual = document.body.dataset.paginaAtual;
 
@@ -16,8 +12,6 @@ export function iniciarNavegacao() {
   const btnMais = document.getElementById("btn-mais");
   const menuMais = document.getElementById("menu-mais");
 
-  // Páginas que moram dentro do menu "Mais" (Caixa, Configurações) também
-  // acendem o botão "Mais" — assim sempre existe uma aba marcada como atual.
   if (btnMais && ["caixa", "configuracoes"].includes(paginaAtual)) {
     btnMais.classList.add("ativo");
   }
