@@ -1,8 +1,5 @@
 import { escapeHtml } from "./status.js";
 
-// Substitui window.confirm() por um modal estilizado — o confirm nativo do
-// navegador quebra a identidade visual do app (fonte/botões do sistema) e
-// fica particularmente feio em iOS/Android. Uso: `if (await confirmarAcao({...})) { ... }`
 export function confirmarAcao({
   titulo,
   mensagem,
