@@ -59,8 +59,6 @@ document.getElementById("btn-salvar-config").addEventListener("click", async () 
   }
 });
 
-// Copiar o link sem exigir seleção manual do texto — no celular, selecionar
-// um token de ~90 caracteres quebrado em duas linhas era tedioso.
 document.getElementById("btn-copiar-link").addEventListener("click", async () => {
   const texto = document.getElementById("link-gerente").textContent;
   try {
@@ -72,8 +70,6 @@ document.getElementById("btn-copiar-link").addEventListener("click", async () =>
   }
 });
 
-// Ação irreversível — antes usava window.confirm() nativo, que quebra a
-// identidade visual do app; agora usa o modal estilizado do sistema.
 document.getElementById("btn-gerar-novo-link").addEventListener("click", async () => {
   const confirmar = await confirmarAcao({
     titulo: "Gerar novo link?",
