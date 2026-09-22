@@ -28,8 +28,6 @@ protegerPagina(async ({ estabelecimento }) => {
   await carregarLotes();
 });
 
-// ---------- Alternância de seção principal ----------
-
 const segAtualizar = document.getElementById("seg-atualizar");
 const segAdicionar = document.getElementById("seg-adicionar");
 const segSaidas = document.getElementById("seg-saidas");
@@ -63,8 +61,6 @@ function irParaCadastroDeProduto() {
   campo.focus();
 }
 
-// ---------- Sub-abas dentro de Saídas ----------
-
 const segVendidos = document.getElementById("seg-vendidos");
 const segVencidos = document.getElementById("seg-vencidos");
 const secaoVendidos = document.getElementById("secao-vendidos");
@@ -84,8 +80,6 @@ function mostrarSubSecaoSaida(nome) {
 
 segVendidos.addEventListener("click", () => mostrarSubSecaoSaida("vendidos"));
 segVencidos.addEventListener("click", () => mostrarSubSecaoSaida("vencidos"));
-
-// ---------- Carregamento de produtos e lotes ----------
 
 async function carregarProdutos() {
   const snap = await getDocs(
@@ -238,8 +232,6 @@ async function carregarLotes() {
   });
 }
 
-// ---------- Lista de saídas ----------
-
 async function carregarSaidas(motivo) {
   const containerId = motivo === "vendido" ? "lista-vendidos" : "lista-vencidos";
   const container = document.getElementById(containerId);
@@ -300,8 +292,6 @@ async function carregarSaidas(motivo) {
     container.appendChild(div);
   });
 }
-
-// ---------- Salvar vistoria ----------
 
 document.getElementById("btn-salvar-vistoria").addEventListener("click", async () => {
   const botao = document.getElementById("btn-salvar-vistoria");
@@ -402,8 +392,6 @@ document.getElementById("btn-salvar-vistoria").addEventListener("click", async (
   }
 });
 
-// ---------- Cadastro de produto ----------
-
 document.getElementById("btn-salvar-produto").addEventListener("click", async () => {
   const nomeInput = document.getElementById("np-nome");
   const nome = nomeInput.value.trim();
@@ -436,8 +424,6 @@ document.getElementById("btn-salvar-produto").addEventListener("click", async ()
     mostrarToast("Não foi possível salvar o produto.", "erro");
   }
 });
-
-// ---------- Cadastro de lote ----------
 
 document.getElementById("form-novo-lote").addEventListener("submit", async (e) => {
   e.preventDefault();
