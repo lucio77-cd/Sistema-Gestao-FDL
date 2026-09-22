@@ -7,6 +7,7 @@ import {
   STATUS_ICONE,
   montarGraficoPorProduto,
   calcularPercentuaisEstoque,
+  escapeHtml,
 } from "./status.js";
 import {
   collection,
@@ -19,17 +20,11 @@ import {
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 import { mostrarToast } from "./toast.js";
 
-// Esta página não tem login (acesso via token na URL). Por isso ela nunca
-// consulta a coleção "produtos" (restrita, tem preço de custo) — o nome de
-// cada lote já vem gravado no próprio documento do lote (ver vistoria.js).
-
-let todosLotes = []; // TODOS os lotes ativos, para a aba Estoque
-let lotesUrgentes = []; // só os que precisam de atenção, para a aba Vencimentos
+let todosLotes = [];
+let lotesUrgentes = [];
 let graficoAtual = null;
 const filtroPeriodo = document.getElementById("filtro-periodo");
 const filtroEstoqueLocal = document.getElementById("filtro-estoque-local");
-
-// ---------- Abas Vencimentos / Estoque ----------
 
 const segVencimentos = document.getElementById("seg-vencimentos");
 const segEstoque = document.getElementById("seg-estoque");
@@ -104,7 +99,6 @@ async function iniciar() {
   }
 }
 
-// Uma barra por lote, nome do produto ao lado, comprimento = quantidade.
 function renderizarGrafico() {
   const periodo = Number(filtroPeriodo.value);
   const lotesNoPeriodo = lotesUrgentes.filter((l) => l.diasRestantes <= periodo);
@@ -130,11 +124,6 @@ function renderizarGrafico() {
   graficoAtual = chart;
 }
 
-// ---------- Aba Estoque: o que tem hoje, por produto, com % do total ----------
-// O total é sempre sobre TODOS os lotes (independente do filtro de local),
-// porque "15% de Sprite" é sobre o estoque inteiro, não sobre o que está
-// filtrado na tela no momento.
-
 function renderizarEstoque() {
   const local = filtroEstoqueLocal.value;
   const container = document.getElementById("tabela-estoque");
@@ -156,7 +145,7 @@ function renderizarEstoque() {
     .map(
       (p) => `
         <div class="linha-estoque">
-          <div class="linha-estoque-nome">${p.produtoNome}</div>
+          <div class="linha-estoque-nome">${escapeHtml(p.produtoNome)}</div>
           <div class="linha-estoque-qtd">${p.quantidade} un.</div>
           <div class="linha-estoque-pct">${p.percentual.toFixed(1)}%</div>
         </div>
@@ -165,9 +154,6 @@ function renderizarEstoque() {
     .join("");
 }
 
-// Cartão-resumo: uma frase e um número, pensados para leitura de 5 segundos
-// sem precisar interpretar tabela — a decisão certa para quem não tem
-// contexto do sistema e pode nem chegar a abrir esta página com frequência.
 function renderizarResumo(lotes) {
   const resumo = calcularResumoGerente(lotes);
   const el = document.getElementById("resumo");
@@ -202,8 +188,8 @@ function renderizarLista(lotes) {
     div.className = `lote lote--${l.status}`;
     div.innerHTML = `
       <div class="lote-info">
-        <div class="lote-produto">${STATUS_ICONE[l.status]} ${l.produtoNome}</div>
-        <div class="lote-meta">${l.local || "—"} · ${l.quantidade} un.</div>
+        <div class="lote-produto">${STATUS_ICONE[l.status]} ${escapeHtml(l.produtoNome)}</div>
+        <div class="lote-meta">${escapeHtml(l.local || "—")} · ${l.quantidade} un.</div>
         <div class="lote-instrucao lote-dias--${l.status}">${sugestaoAcao(l.status, l.diasRestantes)}</div>
         <div class="lote-preco-venda">
           <label>Valor de venda (R$)</label>
