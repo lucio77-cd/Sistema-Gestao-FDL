@@ -150,6 +150,9 @@ function renderizarGrafico() {
   graficoAtual = chart;
 }
 
+// Se o status for "promocao", o selo já traz o ícone 🟣 embutido — por
+// isso não repetimos o ícone solto na frente do nome nesse caso, senão
+// aparecia duplicado ("🟣 Nome 🟣 Em promoção").
 function renderizarTabela(lotes) {
   const container = document.getElementById("lista-lotes");
   container.innerHTML = "";
@@ -165,9 +168,11 @@ function renderizarTabela(lotes) {
   lotes.forEach((l) => {
     const div = document.createElement("div");
     div.className = `lote lote--${l.status}`;
+    const prefixoIcone = l.status === "promocao" ? "" : `${STATUS_ICONE[l.status]} `;
+    const selo = l.status === "promocao" ? seloHtml("promocao") : "";
     div.innerHTML = `
       <div class="lote-info">
-        <div class="lote-produto">${STATUS_ICONE[l.status]} ${escapeHtml(l.produtoNome)}${l.status === "promocao" ? seloHtml("promocao") : ""}</div>
+        <div class="lote-produto">${prefixoIcone}${escapeHtml(l.produtoNome)}${selo}</div>
         <div class="lote-meta">${escapeHtml(l.local || "—")} · ${l.quantidade} un.</div>
       </div>
       <div class="lote-dados">
