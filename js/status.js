@@ -101,4 +101,84 @@ export function montarGraficoPorProduto(canvas, lotes, limite = 20) {
     diasRestantes: l.diasRestantes,
   }));
 
-  canvas.parentElement.style.height = `${Math.max(200, ordenados.length * 34
+  canvas.parentElement.style.height = `${Math.max(200, ordenados.length * 34)}px`;
+  canvas.style.height = "100%";
+
+  const chart = new Chart(canvas, {
+    type: "bar",
+    data: {
+      labels,
+      datasets: [
+        {
+          label: "Quantidade",
+          data: valores,
+          backgroundColor: cores,
+          borderRadius: 4,
+        },
+      ],
+    },
+    options: {
+      indexAxis: "y",
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          callbacks: {
+            label: (ctx) => `${ctx.parsed.x} unidade${ctx.parsed.x === 1 ? "" : "s"}`,
+            afterLabel: (ctx) => formatarDiasRestantes(detalhes[ctx.dataIndex].diasRestantes),
+          },
+        },
+      },
+      scales: {
+        x: { beginAtZero: true, ticks: { precision: 0 } },
+      },
+    },
+  });
+
+  return { chart, total: ordenados.length };
+}
+
+export function calcularResumoGerente(lotes) {
+  const vencidos = lotes.filter((l) => l.status === "vencido").length;
+  const atencao = lotes.filter((l) => l.status === "atencao" || l.status === "promocao").length;
+
+  if (vencidos > 0) {
+    return {
+      status: "vencido",
+      numero: vencidos,
+      texto: vencidos === 1 ? "produto vencido" : "produtos vencidos",
+    };
+  }
+  if (atencao > 0) {
+    return {
+      status: "atencao",
+      numero: atencao,
+      texto: atencao === 1 ? "produto vencendo esta semana" : "produtos vencendo esta semana",
+    };
+  }
+  return { status: "ok", numero: null, texto: "Tudo em dia" };
+}
+
+export function calcularPercentuaisEstoque(lotes) {
+  const porProduto = {};
+  let totalGeral = 0;
+
+  lotes.forEach((l) => {
+    const qtd = Number(l.quantidade) || 0;
+    totalGeral += qtd;
+    const chave = l.produtoNome;
+    if (!porProduto[chave]) {
+      porProduto[chave] = { produtoNome: chave, quantidade: 0, local: {} };
+    }
+    porProduto[chave].quantidade += qtd;
+    porProduto[chave].local[l.local || "—"] = (porProduto[chave].local[l.local || "—"] || 0) + qtd;
+  });
+
+  return Object.values(porProduto)
+    .map((p) => ({
+      ...p,
+      percentual: totalGeral > 0 ? (p.quantidade / totalGeral) * 100 : 0,
+    }))
+    .sort((a, b) => b.quantidade - a.quantidade);
+}
