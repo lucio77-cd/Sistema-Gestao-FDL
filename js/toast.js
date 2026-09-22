@@ -1,6 +1,3 @@
-// Toast simples, reutilizado em todas as telas administrativas.
-// Usa aria-live para leitores de tela anunciarem sem precisar de foco manual.
-
 export function mostrarToast(mensagem, tipo = "ok") {
   let toast = document.getElementById("toast-global");
   if (!toast) {
