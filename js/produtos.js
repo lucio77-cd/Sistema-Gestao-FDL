@@ -25,9 +25,6 @@ protegerPagina(async ({ estabelecimento }) => {
   await carregarProdutos();
 });
 
-// A busca filtra os cartões já renderizados — evita nova consulta ao
-// Firestore a cada tecla e continua funcionando depois de qualquer
-// re-render, porque relê os elementos do DOM no momento do filtro.
 campoBusca.addEventListener("input", () => {
   const termo = campoBusca.value.trim().toLowerCase();
   container.querySelectorAll(".produto-item").forEach((item) => {
