@@ -23,6 +23,78 @@ let produtosCache = {};
 // { loteId: { input, valorOriginal, produtoId, produtoNome, precoCusto, local, dataVencimento, acaoZero, quantidadeParaAcao } }
 let controlesQuantidade = {};
 
+// Lote que veio na URL (?lote=ID, vindo do Dashboard) — tratado uma única vez,
+// na primeira carga da lista.
+let loteAlvoPendente = new URLSearchParams(window.location.search).get("lote");
+
+// ---------- Ordenação da lista ----------
+// Só REORDENA os cartões que já estão na tela (sem recarregar do banco), para
+// não perder quantidades que você mexeu e ainda não salvou.
+
+const CHAVE_ORDEM = "vistoria:ordenacao";
+const seletorOrdem = document.getElementById("ordenar-por");
+
+try {
+  const salvo = localStorage.getItem(CHAVE_ORDEM);
+  if (salvo && [...seletorOrdem.options].some((o) => o.value === salvo)) seletorOrdem.value = salvo;
+} catch (e) {
+  /* sem localStorage: segue com a ordenação padrão */
+}
+
+function compararNomes(a, b) {
+  return a.localeCompare(b, "pt-BR", { sensitivity: "base" });
+}
+
+function aplicarOrdenacao() {
+  const modo = seletorOrdem.value;
+  const container = document.getElementById("lista-lotes-vistoria");
+  const linhas = [...container.querySelectorAll(".lote[data-lote-id]")];
+
+  linhas.sort((linhaA, linhaB) => {
+    const a = controlesQuantidade[linhaA.dataset.loteId];
+    const b = controlesQuantidade[linhaB.dataset.loteId];
+    const porNome = compararNomes(a.produtoNome, b.produtoNome);
+    const porData = (a.dataVencimento || "9999-12-31").localeCompare(b.dataVencimento || "9999-12-31");
+
+    if (modo === "alfabetica") return porNome || porData;
+    if (modo === "quantidade-asc") return Number(a.input.value) - Number(b.input.value) || porNome;
+    if (modo === "quantidade-desc") return Number(b.input.value) - Number(a.input.value) || porNome;
+    return porData || porNome; // "data": sem validade fica no fim
+  });
+
+  linhas.forEach((linha) => container.appendChild(linha));
+}
+
+seletorOrdem.addEventListener("change", () => {
+  try {
+    localStorage.setItem(CHAVE_ORDEM, seletorOrdem.value);
+  } catch (e) {
+    /* ignora */
+  }
+  aplicarOrdenacao();
+});
+
+// ---------- Destaque do lote vindo do Dashboard ----------
+
+function destacarLoteDaUrl() {
+  if (!loteAlvoPendente) return;
+  const alvo = loteAlvoPendente;
+  loteAlvoPendente = null;
+
+  // Limpa o parâmetro da URL para um refresh não repetir o destaque.
+  window.history.replaceState({}, "", window.location.pathname);
+
+  const linha = document.querySelector(`.lote[data-lote-id="${CSS.escape(alvo)}"]`);
+  if (!linha) {
+    mostrarToast("Esse lote não está mais na lista (já foi vendido, vencido ou excluído).", "erro");
+    return;
+  }
+
+  linha.scrollIntoView({ behavior: "smooth", block: "center" });
+  linha.classList.add("lote--destaque");
+  setTimeout(() => linha.classList.remove("lote--destaque"), 3200);
+}
+
 protegerPagina(async ({ estabelecimento }) => {
   estabelecimentoAtual = estabelecimento;
   document.getElementById("nome-estabelecimento").textContent = estabelecimento.nome;
@@ -166,6 +238,7 @@ async function carregarLotes() {
 
     const div = document.createElement("div");
     div.className = `lote lote--${status}`;
+    div.dataset.loteId = l.id;
     div.innerHTML = `
       <div class="lote-info">
         <div class="lote-produto">${produto.nome}</div>
@@ -252,6 +325,9 @@ async function carregarLotes() {
 
     atualizarClasseAlterado();
   });
+
+  aplicarOrdenacao();
+  destacarLoteDaUrl();
 }
 
 // ---------- Lista de saídas (Vendidos / Vencidos) ----------
