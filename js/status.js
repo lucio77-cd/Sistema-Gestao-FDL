@@ -6,7 +6,20 @@ export function hojeSemHora() {
   return h;
 }
 
+/**
+ * Calcula quantos dias faltam para o vencimento e em qual status o lote se encontra.
+ * @param {string} dataVencimento - formato "AAAA-MM-DD"
+ * @param {number} diasAlerta - antecedência configurada para avisar
+ * @param {boolean} promocaoAtiva
+ */
 export function calcularStatus(dataVencimento, diasAlerta, promocaoAtiva) {
+  // Lote sem data (ex: contagem de estoque seco onde a validade não é
+  // controlada) nunca entra em alerta de vencimento — só existe pra contar
+  // quantidade.
+  if (!dataVencimento) {
+    return { diasRestantes: null, status: "sem-validade" };
+  }
+
   const hoje = hojeSemHora();
   const vencimento = new Date(dataVencimento + "T00:00:00");
   const diffMs = vencimento - hoje;
@@ -26,13 +39,17 @@ export const STATUS_LABEL = {
   atencao: "Atenção",
   vencido: "Vencido",
   promocao: "Em promoção",
+  "sem-validade": "Sem validade",
 };
 
+// Ícone redundante à cor, para quem não decodifica bem cor sozinha
+// (a página da gerente, principalmente).
 export const STATUS_ICONE = {
   normal: "🟢",
   atencao: "🟡",
   vencido: "🔴",
   promocao: "🟣",
+  "sem-validade": "⚪",
 };
 
 const STATUS_COR = {
@@ -40,14 +57,17 @@ const STATUS_COR = {
   atencao: "#c2790a",
   vencido: "#a83232",
   promocao: "#5a3d7a",
+  "sem-validade": "#52707d",
 };
 
 export function formatarData(dataStr) {
+  if (!dataStr) return "sem validade cadastrada";
   const [ano, mes, dia] = dataStr.split("-");
   return `${dia}/${mes}/${ano}`;
 }
 
 export function formatarDiasRestantes(dias) {
+  if (dias === null || dias === undefined) return "Sem validade cadastrada";
   if (dias < 0) return `Venceu há ${Math.abs(dias)} dia${Math.abs(dias) === 1 ? "" : "s"}`;
   if (dias === 0) return "Vence hoje";
   if (dias === 1) return "Vence amanhã";
@@ -58,31 +78,26 @@ export function formatarMoeda(valor) {
   return `R$ ${(Number(valor) || 0).toFixed(2)}`;
 }
 
+/**
+ * Mostra o valor calculado normalmente, ou um aviso explícito quando o custo
+ * não foi cadastrado — em vez de deixar um "R$ 0,00" passar como se fosse um
+ * valor real.
+ */
 export function formatarValorOuAviso(quantidade, precoCusto) {
   const custo = Number(precoCusto) || 0;
   if (custo === 0 && Number(quantidade) > 0) return "Custo não cadastrado";
   return formatarMoeda((Number(quantidade) || 0) * custo);
 }
 
-export function formatarValorEmRisco(quantidade, precoCusto) {
-  const custo = Number(precoCusto) || 0;
-  if (custo === 0 && Number(quantidade) > 0) return "Custo não cadastrado";
-  return `${formatarMoeda((Number(quantidade) || 0) * custo)} em risco`;
-}
-
-export function escapeHtml(texto) {
-  return String(texto ?? "")
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;")
-    .replace(/'/g, "&#39;");
-}
-
+/** Selo de status: ícone + texto, nunca só cor (reforço de acessibilidade). */
 export function seloHtml(status) {
   return `<span class="selo selo--${status}">${STATUS_ICONE[status]} ${STATUS_LABEL[status]}</span>`;
 }
 
+/**
+ * Sugestão de ação em linguagem natural — pensada para quem não tem contexto
+ * do sistema (a página da gerente): transforma o dado cru em instrução.
+ */
 export function sugestaoAcao(status, diasRestantes) {
   if (status === "vencido") return "Já venceu — retirar da prateleira/geladeira.";
   if (status === "promocao") return `Em promoção — ${formatarDiasRestantes(diasRestantes).toLowerCase()}.`;
@@ -90,8 +105,22 @@ export function sugestaoAcao(status, diasRestantes) {
   return "";
 }
 
-export function montarGraficoPorProduto(canvas, lotes, limite = 20) {
-  const ordenados = [...lotes].sort((a, b) => a.diasRestantes - b.diasRestantes).slice(0, limite);
+/**
+ * Gráfico de barras horizontais — uma barra por lote, com o nome do produto
+ * escrito do lado (não escondido em tooltip) e comprimento = quantidade.
+ * Troca a ideia anterior (agrupar por faixa de dias, em R$) porque agrupar
+ * apagava a identidade do produto — a pergunta mais importante ("qual
+ * produto vai vencer") ficava sem resposta olhando só o gráfico. E usa
+ * quantidade, não valor, porque quantidade não depende de custo cadastrado.
+ *
+ * @param {number} limite - máximo de barras exibidas (os mais urgentes primeiro)
+ * @param {Function|null} aoClicar - opcional: recebe o lote da barra clicada
+ *   (o dashboard usa para abrir o lote na Vistoria; a página da gerente não passa nada)
+ */
+export function montarGraficoPorProduto(canvas, lotes, limite = 20, aoClicar = null) {
+  const ordenados = [...lotes]
+    .sort((a, b) => (a.diasRestantes ?? 99999) - (b.diasRestantes ?? 99999))
+    .slice(0, limite);
 
   const labels = ordenados.map((l) => `${l.produtoNome} (${l.local || "—"})`);
   const valores = ordenados.map((l) => Number(l.quantidade) || 0);
@@ -101,6 +130,8 @@ export function montarGraficoPorProduto(canvas, lotes, limite = 20) {
     diasRestantes: l.diasRestantes,
   }));
 
+  // Altura pensada para cada barra ter espaço legível, sem depender de
+  // hover — o rótulo já mostra o produto direto no eixo.
   canvas.parentElement.style.height = `${Math.max(200, ordenados.length * 34)}px`;
   canvas.style.height = "100%";
 
@@ -121,6 +152,14 @@ export function montarGraficoPorProduto(canvas, lotes, limite = 20) {
       indexAxis: "y",
       responsive: true,
       maintainAspectRatio: false,
+      onClick: (evento, elementos) => {
+        if (!aoClicar || elementos.length === 0) return;
+        aoClicar(ordenados[elementos[0].index]);
+      },
+      onHover: (evento, elementos) => {
+        if (!aoClicar) return;
+        evento.native.target.style.cursor = elementos.length > 0 ? "pointer" : "default";
+      },
       plugins: {
         legend: { display: false },
         tooltip: {
@@ -139,6 +178,10 @@ export function montarGraficoPorProduto(canvas, lotes, limite = 20) {
   return { chart, total: ordenados.length };
 }
 
+/**
+ * Resumo de uma frase + status geral, para o cartão de destaque da página da
+ * gerente — leitura de 5 segundos, sem precisar interpretar tabela/gráfico.
+ */
 export function calcularResumoGerente(lotes) {
   const vencidos = lotes.filter((l) => l.status === "vencido").length;
   const atencao = lotes.filter((l) => l.status === "atencao" || l.status === "promocao").length;
@@ -160,6 +203,13 @@ export function calcularResumoGerente(lotes) {
   return { status: "ok", numero: null, texto: "Tudo em dia" };
 }
 
+/**
+ * Quanto cada produto representa do estoque total, em quantidade — não em
+ * valor, porque a pergunta ("tenho 15% de Sprite") é sobre volume físico
+ * pra decidir o que pedir, não sobre dinheiro. O total é sempre a soma de
+ * TODOS os lotes recebidos (independente do filtro de local aplicado na
+ * tela), porque "15% de tudo que eu tenho" não muda conforme você filtra.
+ */
 export function calcularPercentuaisEstoque(lotes) {
   const porProduto = {};
   let totalGeral = 0;
