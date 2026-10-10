@@ -861,3 +861,62 @@ label.switch {
 #toast-global.toast--erro {
   background: var(--vencido);
   }
+
+/* ---------- Dashboard → Vistoria (linhas clicáveis) ---------- */
+
+.lote-link {
+  text-decoration: none;
+  color: inherit;
+  cursor: pointer;
+}
+
+.lote-link:hover {
+  background: #f6f9f9;
+}
+
+.lote-ir {
+  margin-top: 0.25rem;
+  font-family: var(--font-body);
+  font-size: 0.74rem;
+  color: var(--steel);
+  text-decoration: underline;
+}
+
+/* ---------- Ordenação da Vistoria ---------- */
+
+.barra-ordenacao {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  margin-bottom: 1rem;
+}
+
+.barra-ordenacao label {
+  margin: 0;
+  white-space: nowrap;
+}
+
+.barra-ordenacao select {
+  flex: 1;
+  width: auto;
+  min-width: 0;
+}
+
+/* ---------- Destaque do lote aberto pelo Dashboard ---------- */
+
+@keyframes pulsar-destaque {
+  0% { background: #dcebf2; box-shadow: 0 0 0 0 rgba(35, 85, 113, 0.5); }
+  70% { box-shadow: 0 0 0 10px rgba(35, 85, 113, 0); }
+  100% { background: var(--surface); box-shadow: 0 0 0 0 rgba(35, 85, 113, 0); }
+}
+
+.lote--destaque {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+  animation: pulsar-destaque 2.4s ease-out 1;
+}
+
+/* Lote sem data de vencimento (contagem de estoque) */
+.lote--sem-validade {
+  border-left-color: var(--steel-light);
+}
