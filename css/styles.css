@@ -920,3 +920,93 @@ label.switch {
 .lote--sem-validade {
   border-left-color: var(--steel-light);
 }
+
+/* ---------- Página Estoque ---------- */
+
+.barra-busca {
+  margin-bottom: 1rem;
+}
+
+.ea {
+  background: var(--surface);
+  border: 1px solid var(--steel-light);
+  border-left: 5px solid var(--steel-light);
+  border-radius: 4px;
+  padding: 0.8rem;
+  margin-bottom: 0.6rem;
+}
+
+.ea--negativo { border-left-color: var(--vencido); }
+.ea--baixo { border-left-color: var(--atencao); }
+
+.ea-topo {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.8rem;
+}
+
+.ea-nome {
+  font-weight: 600;
+  min-width: 0;
+}
+
+.ea-numero {
+  font-family: var(--font-mono);
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: var(--primary);
+}
+
+.ea--negativo .ea-numero {
+  color: var(--vencido);
+}
+
+.ea-meta {
+  color: var(--ink-soft);
+  font-size: 0.82rem;
+  margin-top: 0.2rem;
+}
+
+.ea-avisos {
+  display: flex;
+  gap: 0.4rem;
+  flex-wrap: wrap;
+}
+
+.ea-avisos .selo {
+  margin-left: 0;
+  margin-top: 0.4rem;
+}
+
+.ea-acoes {
+  display: flex;
+  gap: 0.6rem;
+  margin-top: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.ea-acoes .ea-btn {
+  border: 1px solid var(--steel-light);
+  border-radius: 4px;
+  padding: 0.4rem 0.7rem;
+  text-decoration: none;
+  font-weight: 600;
+}
+
+.ea-form {
+  margin-top: 0.6rem;
+  padding-top: 0.6rem;
+  border-top: 1px dashed var(--steel-light);
+}
+
+.ea-form-botoes {
+  display: flex;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+}
+
+.selo--sem-validade {
+  background: #eef3f2;
+  color: var(--ink-soft);
+}
