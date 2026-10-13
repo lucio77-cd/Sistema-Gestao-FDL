@@ -10,6 +10,7 @@ import {
   addDoc,
   doc,
   writeBatch,
+  increment,
   serverTimestamp,
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
@@ -20,12 +21,26 @@ document.getElementById("link-sair").addEventListener("click", (e) => {
 
 let estabelecimentoAtual = null;
 let produtosCache = {};
+// Produtos que já têm contagem na aba Estoque (só esses sofrem o desconto
+// quando um lote é marcado como "Vencido").
+let produtosComEstoque = new Set();
 // { loteId: { input, valorOriginal, produtoId, produtoNome, precoCusto, local, dataVencimento, acaoZero, quantidadeParaAcao } }
 let controlesQuantidade = {};
 
 // Lote que veio na URL (?lote=ID, vindo do Dashboard) — tratado uma única vez,
 // na primeira carga da lista.
 let loteAlvoPendente = new URLSearchParams(window.location.search).get("lote");
+
+function campoEstoqueDoLocal(local) {
+  return local === "Geladeira" ? "geladeira" : "seco";
+}
+
+async function carregarProdutosComEstoque() {
+  const snap = await getDocs(
+    query(collection(db, "estoque"), where("estabelecimentoId", "==", estabelecimentoAtual.id))
+  );
+  produtosComEstoque = new Set(snap.docs.map((d) => d.id));
+}
 
 // ---------- Ordenação da lista ----------
 // Só REORDENA os cartões que já estão na tela (sem recarregar do banco), para
@@ -99,6 +114,13 @@ protegerPagina(async ({ estabelecimento }) => {
   estabelecimentoAtual = estabelecimento;
   document.getElementById("nome-estabelecimento").textContent = estabelecimento.nome;
   await carregarProdutos();
+  try {
+    await carregarProdutosComEstoque();
+  } catch (erro) {
+    // Sem a regra de "estoque" publicada, a vistoria continua funcionando —
+    // só não desconta o estoque ao marcar "Vencido".
+    console.error("Não foi possível ler o estoque:", erro);
+  }
   await carregarLotes();
 });
 
@@ -188,7 +210,7 @@ async function carregarLotes() {
 
   controlesQuantidade = {};
 
-  if (snap.empty) {
+  if (snap.empty || snap.docs.every((d) => d.data().importadoParaEstoque)) {
     container.innerHTML = `
       <div class="estado-vazio">
         <p>Nenhum lote cadastrado ainda. Comece cadastrando seu primeiro produto.</p>
@@ -202,8 +224,11 @@ async function carregarLotes() {
   const diasAlertaPadrao = estabelecimentoAtual.diasAlertaPadrao ?? 3;
   container.innerHTML = "";
 
+  // Lotes sem data já importados para o Estoque ficam fora desta lista (não
+  // são apagados) — assim o mesmo produto não aparece com duas contagens.
   const lotes = snap.docs
     .map((d) => ({ id: d.id, ...d.data() }))
+    .filter((l) => !l.importadoParaEstoque)
     .sort((a, b) => (a.dataVencimento || "9999-12-31").localeCompare(b.dataVencimento || "9999-12-31"));
 
   // Migração silenciosa: lotes criados antes desta versão não têm o nome do
@@ -474,6 +499,28 @@ document.getElementById("btn-salvar-vistoria").addEventListener("click", async (
           origem: "vistoria",
           registradoEm: serverTimestamp(),
         });
+
+        // "Vencido" também desconta do estoque (no local do lote) — mas só se
+        // o produto já foi contado na aba Estoque, para não criar número
+        // negativo sem motivo. "Vendido" não desconta: isso é papel do Caixa.
+        if (c.acaoZero === "vencido" && quantidadeDaAcao > 0 && produtosComEstoque.has(c.produtoId)) {
+          const campo = campoEstoqueDoLocal(c.local);
+          batch.set(
+            doc(db, "estoque", c.produtoId),
+            { [campo]: increment(-quantidadeDaAcao), atualizadoEm: serverTimestamp() },
+            { merge: true }
+          );
+          batch.set(doc(collection(db, "movimentosEstoque")), {
+            estabelecimentoId: estabelecimentoAtual.id,
+            produtoId: c.produtoId,
+            produtoNome: c.produtoNome,
+            local: campo,
+            tipo: "vencido",
+            delta: -quantidadeDaAcao,
+            origem: "vistoria",
+            registradoEm: serverTimestamp(),
+          });
+        }
       } else {
         batch.update(loteRef, { quantidade: quantidadeNova });
       }
