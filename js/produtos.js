@@ -1,9 +1,6 @@
 import { db } from "./firebase-config.js";
-import { protegerPagina } from "./auth-guard.js";
-import { iniciarNavegacao } from "./nav.js";
-import { escapeHtml } from "./status.js";
+import { protegerPagina, sair } from "./auth-guard.js";
 import { mostrarToast } from "./toast.js";
-import { skeletonLotes } from "./skeleton.js";
 import {
   collection,
   query,
@@ -13,11 +10,12 @@ import {
   updateDoc,
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
-iniciarNavegacao();
+document.getElementById("link-sair").addEventListener("click", (e) => {
+  e.preventDefault();
+  sair();
+});
 
 let estabelecimentoAtual = null;
-const container = document.getElementById("lista-produtos");
-const campoBusca = document.getElementById("busca-produto");
 
 protegerPagina(async ({ estabelecimento }) => {
   estabelecimentoAtual = estabelecimento;
@@ -25,16 +23,9 @@ protegerPagina(async ({ estabelecimento }) => {
   await carregarProdutos();
 });
 
-campoBusca.addEventListener("input", () => {
-  const termo = campoBusca.value.trim().toLowerCase();
-  container.querySelectorAll(".produto-item").forEach((item) => {
-    const nome = item.querySelector(".produto-nome").textContent.toLowerCase();
-    item.hidden = termo !== "" && !nome.includes(termo);
-  });
-});
-
 async function carregarProdutos() {
-  container.innerHTML = skeletonLotes(4);
+  const container = document.getElementById("lista-produtos");
+  container.innerHTML = '<p class="mensagem-vazio">Carregando…</p>';
 
   const snap = await getDocs(
     query(collection(db, "produtos"), where("estabelecimentoId", "==", estabelecimentoAtual.id))
@@ -53,68 +44,60 @@ async function carregarProdutos() {
   container.innerHTML = "";
 
   produtos.forEach((p) => {
-    const semCodigo = !p.codigoBarras;
-    const precoVenda = (Number(p.precoVenda) || 0).toFixed(2);
+    const div = document.createElement("div");
+    div.className = "painel";
+    div.innerHTML = `
+      <label>Nome</label>
+      <input type="text" class="pe-nome" value="${p.nome || ""}" />
 
-    const details = document.createElement("details");
-    details.className = "produto-item";
-    details.innerHTML = `
-      <summary>
-        <span class="produto-nome">${escapeHtml(p.nome)}</span>
-        <span class="produto-resumo-dados">
-          ${semCodigo ? '<span class="produto-aviso" title="Sem código de barras cadastrado">● sem código</span>' : ""}
-          <span>R$ ${precoVenda}</span>
-        </span>
-      </summary>
-      <div class="produto-form">
-        <label>Nome</label>
-        <input type="text" class="pe-nome" value="${escapeHtml(p.nome)}" />
+      <label>Categoria</label>
+      <input type="text" class="pe-categoria" value="${p.categoria || ""}" />
 
-        <label>Categoria</label>
-        <input type="text" class="pe-categoria" value="${escapeHtml(p.categoria || "")}" />
-
-        <div class="linha-form">
-          <div>
-            <label>Preço de custo (R$)</label>
-            <input type="number" step="0.01" min="0" class="pe-custo" value="${p.precoCusto ?? ""}" />
-          </div>
-          <div>
-            <label>Preço de venda (R$)</label>
-            <input type="number" step="0.01" min="0" class="pe-venda" value="${p.precoVenda ?? ""}" />
-          </div>
+      <div class="linha-form">
+        <div>
+          <label>Preço de custo (R$)</label>
+          <input type="number" step="0.01" min="0" class="pe-custo" value="${p.precoCusto ?? ""}" />
         </div>
-
-        <label>Antecedência de alerta específica (opcional)</label>
-        <input type="number" min="0" class="pe-dias-alerta" value="${p.diasAlerta ?? ""}" placeholder="Deixe em branco para usar o padrão" />
-
-        <label>Código de barras (para o Caixa)</label>
-        <input type="text" class="pe-codigo" value="${escapeHtml(p.codigoBarras || "")}" placeholder="Escaneie ou digite o código" />
-
-        <button type="button" class="btn btn-salvar-produto" data-id="${p.id}">Salvar alterações</button>
+        <div>
+          <label>Preço de venda (R$)</label>
+          <input type="number" step="0.01" min="0" class="pe-venda" value="${p.precoVenda ?? ""}" />
+        </div>
       </div>
+
+      <label>Antecedência de alerta específica (opcional)</label>
+      <input type="number" min="0" class="pe-dias-alerta" value="${p.diasAlerta ?? ""}" placeholder="Deixe em branco para usar o padrão" />
+
+      <label>Estoque mínimo (opcional — usado no relatório de pedidos)</label>
+      <input type="number" min="0" class="pe-minimo" value="${p.estoqueMinimo ?? ""}" placeholder="Ex: 12" />
+
+      <label>Código de barras (para o Caixa)</label>
+      <input type="text" class="pe-codigo" value="${p.codigoBarras || ""}" placeholder="Escaneie ou digite o código" />
+
+      <button type="button" class="btn btn-salvar-produto" data-id="${p.id}">Salvar alterações</button>
     `;
-    container.appendChild(details);
+    container.appendChild(div);
   });
 
   container.querySelectorAll(".btn-salvar-produto").forEach((btn) => {
     btn.addEventListener("click", async () => {
-      const form = btn.closest(".produto-form");
-      const details = btn.closest(".produto-item");
-      const nome = form.querySelector(".pe-nome").value.trim();
+      const painel = btn.closest(".painel");
+      const nome = painel.querySelector(".pe-nome").value.trim();
 
       if (!nome) {
         mostrarToast("O nome não pode ficar vazio.", "erro");
         return;
       }
 
-      const diasAlertaValor = form.querySelector(".pe-dias-alerta").value;
+      const diasAlertaValor = painel.querySelector(".pe-dias-alerta").value;
+      const minimoValor = painel.querySelector(".pe-minimo").value;
       const dados = {
         nome,
-        categoria: form.querySelector(".pe-categoria").value.trim(),
-        precoCusto: Number(form.querySelector(".pe-custo").value) || 0,
-        precoVenda: Number(form.querySelector(".pe-venda").value) || 0,
-        codigoBarras: form.querySelector(".pe-codigo").value.trim(),
+        categoria: painel.querySelector(".pe-categoria").value.trim(),
+        precoCusto: Number(painel.querySelector(".pe-custo").value) || 0,
+        precoVenda: Number(painel.querySelector(".pe-venda").value) || 0,
+        codigoBarras: painel.querySelector(".pe-codigo").value.trim(),
         diasAlerta: diasAlertaValor === "" ? null : Number(diasAlertaValor),
+        estoqueMinimo: minimoValor === "" ? null : Number(minimoValor),
       };
 
       btn.disabled = true;
@@ -123,8 +106,14 @@ async function carregarProdutos() {
 
       try {
         await updateDoc(doc(db, "produtos", btn.dataset.id), dados);
-        details.querySelector(".produto-nome").textContent = nome;
-        details.querySelector(".produto-resumo-dados span:last-child").textContent = `R$ ${dados.precoVenda.toFixed(2)}`;
+        // Se o produto já foi contado no Estoque, mantém o nome igual lá
+        // (a página da gerente lê o nome direto do documento de estoque).
+        // Se ainda não existe contagem, não há nada para atualizar.
+        try {
+          await updateDoc(doc(db, "estoque", btn.dataset.id), { produtoNome: nome });
+        } catch (e) {
+          /* produto ainda sem estoque contado */
+        }
         mostrarToast(`"${nome}" atualizado.`, "ok");
       } catch (erro) {
         console.error(erro);
