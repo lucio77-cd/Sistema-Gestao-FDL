@@ -47,22 +47,27 @@ service cloud.firestore {
         && podeAcessarDados(request.resource.data);
     }
 
-    // Lotes podem ser removidos quando vendidos, vencidos ou cadastrados por engano.
+    // Permite get autenticado de documento inexistente para tratar concorrência
+    // (por exemplo, um lote removido entre a consulta e a transação). Documentos
+    // existentes continuam restritos ao dono do estabelecimento.
     match /lotes/{id} {
-      allow read, delete: if podeAcessarDados(resource.data);
-
+      allow get: if autenticado()
+        && (resource == null || podeAcessarDados(resource.data));
+      allow list: if podeAcessarDados(resource.data);
+      allow delete: if podeAcessarDados(resource.data);
       allow create: if podeAcessarDados(request.resource.data);
-
       allow update: if podeAcessarDados(resource.data)
         && podeAcessarDados(request.resource.data);
     }
 
-    // Saldo atual do estoque: o dono pode ler, criar, ajustar e remover o documento.
+    // O Caixa lê o documento de saldo mesmo quando ainda não existe; isso não
+    // revela dados de outro estabelecimento porque só libera get de inexistente.
     match /estoque/{id} {
-      allow read, delete: if podeAcessarDados(resource.data);
-
+      allow get: if autenticado()
+        && (resource == null || podeAcessarDados(resource.data));
+      allow list: if podeAcessarDados(resource.data);
+      allow delete: if podeAcessarDados(resource.data);
       allow create: if podeAcessarDados(request.resource.data);
-
       allow update: if podeAcessarDados(resource.data)
         && podeAcessarDados(request.resource.data);
     }
@@ -70,27 +75,21 @@ service cloud.firestore {
     // Histórico de vistorias: leitura e criação; sem edição ou exclusão pelo cliente.
     match /vistorias/{id} {
       allow read: if podeAcessarDados(resource.data);
-
       allow create: if podeAcessarDados(request.resource.data);
-
       allow update, delete: if false;
     }
 
     // Histórico de movimentações: leitura e criação; sem edição ou exclusão pelo cliente.
     match /movimentosEstoque/{id} {
       allow read: if podeAcessarDados(resource.data);
-
       allow create: if podeAcessarDados(request.resource.data);
-
       allow update, delete: if false;
     }
 
     // Saídas (vendidos e vencidos): histórico imutável pelo cliente.
     match /saidas/{id} {
       allow read: if podeAcessarDados(resource.data);
-
       allow create: if podeAcessarDados(request.resource.data);
-
       allow update, delete: if false;
     }
   }
