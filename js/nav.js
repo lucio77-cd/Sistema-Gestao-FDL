@@ -12,7 +12,7 @@ export function iniciarNavegacao() {
   const btnMais = document.getElementById("btn-mais");
   const menuMais = document.getElementById("menu-mais");
 
-  if (btnMais && ["caixa", "configuracoes"].includes(paginaAtual)) {
+  if (btnMais && ["estoque", "caixa", "configuracoes"].includes(paginaAtual)) {
     btnMais.classList.add("ativo");
   }
 
@@ -43,7 +43,13 @@ export function iniciarNavegacao() {
   if (linkSair) {
     linkSair.addEventListener("click", (e) => {
       e.preventDefault();
-      sair();
+      linkSair.setAttribute("aria-disabled", "true");
+      linkSair.textContent = "Saindo…";
+      sair().catch((erro) => {
+        console.error("Falha ao sair:", erro);
+        linkSair.removeAttribute("aria-disabled");
+        linkSair.textContent = "Sair";
+      });
     });
   }
 }
