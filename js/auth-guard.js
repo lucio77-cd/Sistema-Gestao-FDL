@@ -39,7 +39,8 @@ async function obterOuCriarEstabelecimento(uid) {
 export function protegerPagina(callback) {
   onAuthStateChanged(auth, async (user) => {
     if (!user) {
-      window.location.href = "login.html";
+      const destino = `${window.location.pathname}${window.location.search}`;
+      window.location.href = `login.html?returnTo=${encodeURIComponent(destino)}`;
       return;
     }
     try {
