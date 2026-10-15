@@ -1,4 +1,5 @@
 import { db } from "./firebase-config.js";
+import { protegerPagina } from "./auth-guard.js";
 import {
   calcularStatus,
   formatarDiasRestantes,
@@ -12,26 +13,13 @@ import {
   collection,
   query,
   where,
-  limit,
   getDocs,
   doc,
   updateDoc,
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 import { mostrarToast } from "./toast.js";
 
-// Esta página não tem login (acesso via token na URL). Por isso ela nunca
-// consulta a coleção "produtos" (restrita, tem preço de custo) — o nome de
-// cada lote já vem gravado no próprio documento do lote (ver vistoria.js).
-
-let itensEstoque = []; // linhas planas { produtoNome, quantidade, local } vindas da coleção "estoque"
-let estoqueCarregado = false;
-let todosLotes = []; // TODOS os lotes ativos (para calcular os que precisam de atenção)
-let lotesUrgentes = []; // só os que precisam de atenção, para a aba Vencimentos
-let graficoAtual = null;
-const filtroPeriodo = document.getElementById("filtro-periodo");
-const filtroEstoqueLocal = document.getElementById("filtro-estoque-local");
-
-// ---------- Abas Vencimentos / Estoque ----------
+// A gerente precisa entrar com e-mail e senha; os dados são limitados ao estabelecimento autenticado.\n\nlet itensEstoque = []; // linhas planas { produtoNome, quantidade, local } vindas da coleção "estoque"\nlet estoqueCarregado = false;\nlet todosLotes = []; // TODOS os lotes ativos (para calcular os que precisam de atenção)\nlet lotesUrgentes = []; // só os que precisam de atenção, para a aba Vencimentos\nlet graficoAtual = null;\nconst filtroPeriodo = document.getElementById("filtro-periodo");\nconst filtroEstoqueLocal = document.getElementById("filtro-estoque-local");\n\n// ---------- Abas Vencimentos / Estoque ----------
 
 const segVencimentos = document.getElementById("seg-vencimentos");
 const segEstoque = document.getElementById("seg-estoque");
@@ -54,17 +42,8 @@ segVencimentos.addEventListener("click", () => mostrarAba("vencimentos"));
 segEstoque.addEventListener("click", () => mostrarAba("estoque"));
 filtroEstoqueLocal.addEventListener("change", renderizarEstoque);
 
-async function iniciar() {
+protegerPagina(async ({ estabelecimento }) => {
   try {
-    const token = new URLSearchParams(window.location.search).get("token");
-    if (!token) return mostrarErro();
-
-    const snapEstab = await getDocs(
-      query(collection(db, "estabelecimentos"), where("linkToken", "==", token), limit(1))
-    );
-    if (snapEstab.empty) return mostrarErro();
-
-    const estabelecimento = { id: snapEstab.docs[0].id, ...snapEstab.docs[0].data() };
     document.getElementById("nome-estabelecimento").textContent = estabelecimento.nome;
     renderizarAtualizacao(estabelecimento.ultimaVistoria);
 
@@ -115,9 +94,9 @@ async function iniciar() {
     }
   } catch (erro) {
     console.error(erro);
-    mostrarErro("Não foi possível carregar os dados agora. Tente atualizar a página em instantes.");
+    mostrarErro("Não foi possível carregar os dados agora. Verifique as regras do Firestore e tente novamente.");
   }
-}
+});
 
 // Uma barra por lote, nome do produto ao lado, comprimento = quantidade.
 function renderizarGrafico() {
@@ -276,4 +255,3 @@ function mostrarErro(mensagem) {
   document.getElementById("legenda-atualizacao").textContent = "";
 }
 
-iniciar();
