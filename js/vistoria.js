@@ -3,6 +3,7 @@ import { protegerPagina } from "./auth-guard.js";
 import { iniciarNavegacao } from "./nav.js";
 import { calcularStatus, formatarData, formatarValorOuAviso } from "./status.js";
 import { mostrarToast } from "./toast.js";
+import { calcularBaixaPorVencimento } from "./vistoria-stock.js";
 import {
   collection,
   query,
@@ -11,7 +12,7 @@ import {
   addDoc,
   doc,
   writeBatch,
-  increment,
+  runTransaction,
   serverTimestamp,
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
@@ -19,9 +20,6 @@ iniciarNavegacao();
 
 let estabelecimentoAtual = null;
 let produtosCache = {};
-// Produtos que já têm contagem na aba Estoque (só esses sofrem o desconto
-// quando um lote é marcado como "Vencido").
-let produtosComEstoque = new Set();
 // { loteId: { input, valorOriginal, produtoId, produtoNome, precoCusto, local, dataVencimento, acaoZero, quantidadeParaAcao } }
 let controlesQuantidade = {};
 
@@ -31,13 +29,6 @@ let loteAlvoPendente = new URLSearchParams(window.location.search).get("lote");
 
 function campoEstoqueDoLocal(local) {
   return local === "Geladeira" ? "geladeira" : "seco";
-}
-
-async function carregarProdutosComEstoque() {
-  const snap = await getDocs(
-    query(collection(db, "estoque"), where("estabelecimentoId", "==", estabelecimentoAtual.id))
-  );
-  produtosComEstoque = new Set(snap.docs.map((d) => d.id));
 }
 
 // ---------- Ordenação da lista ----------
@@ -112,13 +103,6 @@ protegerPagina(async ({ estabelecimento }) => {
   estabelecimentoAtual = estabelecimento;
   document.getElementById("nome-estabelecimento").textContent = estabelecimento.nome;
   await carregarProdutos();
-  try {
-    await carregarProdutosComEstoque();
-  } catch (erro) {
-    // Sem a regra de "estoque" publicada, a vistoria continua funcionando —
-    // só não desconta o estoque ao marcar "Vencido".
-    console.error("Não foi possível ler o estoque:", erro);
-  }
   await carregarLotes();
 });
 
@@ -468,84 +452,125 @@ document.getElementById("btn-salvar-vistoria").addEventListener("click", async (
   botao.textContent = "Salvando…";
 
   try {
-    const batch = writeBatch(db);
-    const itensHistorico = [];
+    const loteRefs = prontos.map(([loteId]) => doc(db, "lotes", loteId));
+    const produtosVencidos = [...new Set(prontos
+      .filter(([, c]) => c.acaoZero === "vencido" && (c.quantidadeParaAcao ?? c.valorOriginal) > 0)
+      .map(([, c]) => c.produtoId))];
+    const estoqueRefs = produtosVencidos.map((produtoId) => doc(db, "estoque", produtoId));
 
-    prontos.forEach(([loteId, c, quantidadeNova]) => {
-      const loteRef = doc(db, "lotes", loteId);
-      // A quantidade da ação é a que estava no campo NO MOMENTO do clique no
-      // botão — não a quantidade original do banco — pra não perder o caso de
-      // alguém ajustar um pouco pelo stepper e só depois decidir a ação.
-      const quantidadeDaAcao = c.quantidadeParaAcao ?? c.valorOriginal;
+    const divergencias = await runTransaction(db, async (tx) => {
+      // Todas as leituras ocorrem antes de qualquer escrita. A transação
+      // protege a baixa do estoque contra vendas/ajustes concorrentes.
+      const loteSnaps = await Promise.all(loteRefs.map((ref) => tx.get(ref)));
+      const estoqueSnaps = await Promise.all(estoqueRefs.map((ref) => tx.get(ref)));
+      const lotesAtuais = new Map(loteSnaps.map((snap) => [snap.id, snap]));
+      const estoqueAtual = new Map(estoqueSnaps.map((snap) => [snap.id, snap]));
+      const saldosTrabalho = new Map();
+      const atualizacoesEstoque = new Map();
+      const divergenciasTransacao = [];
+      const itensHistoricoTransacao = [];
 
-      if (c.acaoZero === "excluir") {
-        // Só apaga o lote: sem registro em "saidas".
-        batch.delete(loteRef);
-      } else if (c.acaoZero === "vendido" || c.acaoZero === "vencido") {
-        batch.delete(loteRef);
-        const refSaida = doc(collection(db, "saidas"));
-        batch.set(refSaida, {
-          estabelecimentoId: estabelecimentoAtual.id,
-          produtoId: c.produtoId,
-          produtoNome: c.produtoNome,
-          motivo: c.acaoZero,
-          quantidade: quantidadeDaAcao,
-          precoCusto: c.precoCusto,
-          valor: quantidadeDaAcao * c.precoCusto,
-          local: c.local,
-          dataVencimentoOriginal: c.dataVencimento,
-          origem: "vistoria",
-          registradoEm: serverTimestamp(),
-        });
+      for (let i = 0; i < prontos.length; i += 1) {
+        const [loteId, c] = prontos[i];
+        const snap = lotesAtuais.get(loteId);
+        if (!snap?.exists()) throw new Error("Um dos lotes foi removido. Atualize a página e tente novamente.");
+        const lote = snap.data();
+        if (lote.estabelecimentoId !== estabelecimentoAtual.id ||
+            Number(lote.quantidade) !== Number(c.valorOriginal)) {
+          throw new Error("Um dos lotes mudou desde que a página foi carregada. Atualize a página e tente novamente.");
+        }
+      }
 
-        // "Vencido" também desconta do estoque (no local do lote) — mas só se
-        // o produto já foi contado na aba Estoque, para não criar número
-        // negativo sem motivo. "Vendido" não desconta: isso é papel do Caixa.
-        if (c.acaoZero === "vencido" && quantidadeDaAcao > 0 && produtosComEstoque.has(c.produtoId)) {
-          const campo = campoEstoqueDoLocal(c.local);
-          batch.set(
-            doc(db, "estoque", c.produtoId),
-            { [campo]: increment(-quantidadeDaAcao), atualizadoEm: serverTimestamp() },
-            { merge: true }
-          );
-          batch.set(doc(collection(db, "movimentosEstoque")), {
+      prontos.forEach(([loteId, c, quantidadeNova]) => {
+        const loteRef = doc(db, "lotes", loteId);
+        const quantidadeDaAcao = c.quantidadeParaAcao ?? c.valorOriginal;
+
+        if (c.acaoZero === "excluir") {
+          tx.delete(loteRef);
+        } else if (c.acaoZero === "vendido" || c.acaoZero === "vencido") {
+          tx.delete(loteRef);
+          const refSaida = doc(collection(db, "saidas"));
+          tx.set(refSaida, {
             estabelecimentoId: estabelecimentoAtual.id,
             produtoId: c.produtoId,
             produtoNome: c.produtoNome,
-            local: campo,
-            tipo: "vencido",
-            delta: -quantidadeDaAcao,
+            motivo: c.acaoZero,
+            quantidade: quantidadeDaAcao,
+            precoCusto: c.precoCusto,
+            valor: quantidadeDaAcao * c.precoCusto,
+            local: c.local,
+            dataVencimentoOriginal: c.dataVencimento,
             origem: "vistoria",
             registradoEm: serverTimestamp(),
           });
+
+          if (c.acaoZero === "vencido" && quantidadeDaAcao > 0) {
+            const campo = campoEstoqueDoLocal(c.local);
+            const saldoSnap = estoqueAtual.get(c.produtoId);
+            const existeSaldo = !!saldoSnap?.exists();
+            const chaveSaldo = `${c.produtoId}:${campo}`;
+            const saldoInicial = existeSaldo ? saldoSnap.data()[campo] : null;
+            const saldo = saldosTrabalho.has(chaveSaldo) ? saldosTrabalho.get(chaveSaldo) : saldoInicial;
+            const baixa = calcularBaixaPorVencimento(saldo, quantidadeDaAcao, existeSaldo);
+            if (existeSaldo) saldosTrabalho.set(chaveSaldo, baixa.depois);
+
+            if (baixa.atualizar) {
+              const atualizacao = atualizacoesEstoque.get(c.produtoId) || {};
+              atualizacao[campo] = baixa.depois;
+              atualizacao.atualizadoEm = serverTimestamp();
+              atualizacoesEstoque.set(c.produtoId, atualizacao);
+            }
+            if (baixa.divergencia) divergenciasTransacao.push(c.produtoNome);
+
+            tx.set(doc(collection(db, "movimentosEstoque")), {
+              estabelecimentoId: estabelecimentoAtual.id,
+              produtoId: c.produtoId,
+              produtoNome: c.produtoNome,
+              local: campo,
+              tipo: "vencido",
+              delta: baixa.delta,
+              quantidadeSolicitada: quantidadeDaAcao,
+              antes: baixa.antes,
+              depois: baixa.depois,
+              saldoAtualizado: baixa.atualizar,
+              divergenciaSaldo: baixa.divergencia,
+              origem: "vistoria",
+              registradoEm: serverTimestamp(),
+            });
+          }
+        } else {
+          tx.update(loteRef, { quantidade: quantidadeNova });
         }
-      } else {
-        batch.update(loteRef, { quantidade: quantidadeNova });
+
+        itensHistoricoTransacao.push({
+          loteId,
+          produtoId: c.produtoId,
+          quantidadeAnterior: c.valorOriginal,
+          quantidadeNova,
+          acao: c.acaoZero || "ajuste",
+        });
+      });
+
+      for (const [produtoId, atualizacao] of atualizacoesEstoque) {
+        tx.update(doc(db, "estoque", produtoId), atualizacao);
       }
 
-      itensHistorico.push({
-        loteId,
-        produtoId: c.produtoId,
-        quantidadeAnterior: c.valorOriginal,
-        quantidadeNova,
-        acao: c.acaoZero || "ajuste",
+      tx.set(doc(collection(db, "vistorias")), {
+        estabelecimentoId: estabelecimentoAtual.id,
+        data: serverTimestamp(),
+        itens: itensHistoricoTransacao,
       });
+
+      tx.update(doc(db, "estabelecimentos", estabelecimentoAtual.id), {
+        ultimaVistoria: serverTimestamp(),
+      });
+
+      return [...new Set(divergenciasTransacao)];
     });
 
-    const refVistoria = doc(collection(db, "vistorias"));
-    batch.set(refVistoria, {
-      estabelecimentoId: estabelecimentoAtual.id,
-      data: serverTimestamp(),
-      itens: itensHistorico,
-    });
-
-    batch.update(doc(db, "estabelecimentos", estabelecimentoAtual.id), {
-      ultimaVistoria: serverTimestamp(),
-    });
-
-    await batch.commit();
-
-    if (pendentes.length > 0) {
+    if (divergencias.length > 0) {
+      mostrarToast(`Vistoria salva, mas o saldo geral era insuficiente para: ${[...new Set(divergencias)].join(", ")}. Saldo preservado em zero; confira o estoque físico.`, "erro");
+    } else if (pendentes.length > 0) {
       mostrarToast(`Vistoria salva. Falta decidir: ${pendentes.join(", ")}.`, "erro");
     } else {
       mostrarToast("Vistoria salva com sucesso.", "ok");

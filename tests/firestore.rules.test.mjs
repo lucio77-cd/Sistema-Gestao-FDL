@@ -119,3 +119,27 @@ test("dono pode criar saída no próprio estabelecimento, mas não no de outro",
     estabelecimentoId: "loja-b", motivo: "vendido", quantidade: 1
   }));
 });
+
+test("vistoria pode gravar saída e movimento no próprio estabelecimento", async () => {
+  const dbA = testEnv.authenticatedContext("uid-a").firestore();
+  await assertSucceeds(setDoc(doc(dbA, "vistorias", "vistoria-nova"), {
+    estabelecimentoId: "loja-a", itens: [], data: new Date()
+  }));
+  await assertSucceeds(setDoc(doc(dbA, "movimentosEstoque", "movimento-vencido"), {
+    estabelecimentoId: "loja-a", produtoId: "produto-a", tipo: "vencido",
+    antes: 2, depois: 0, delta: -2, divergenciaSaldo: true
+  }));
+  await assertFails(setDoc(doc(dbA, "movimentosEstoque", "movimento-outra-loja"), {
+    estabelecimentoId: "loja-b", produtoId: "produto-b", tipo: "vencido"
+  }));
+});
+
+test("gerente autenticada do estabelecimento pode atualizar promoção, mas não acessar outra loja", async () => {
+  const dbA = testEnv.authenticatedContext("uid-a").firestore();
+  await assertSucceeds(updateDoc(doc(dbA, "lotes", "lote-a"), {
+    promocaoAtiva: true, precoPromocional: 2.5
+  }));
+  await assertFails(updateDoc(doc(dbA, "lotes", "lote-b"), {
+    promocaoAtiva: true, precoPromocional: 2.5
+  }));
+});
