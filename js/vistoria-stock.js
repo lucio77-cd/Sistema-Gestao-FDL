@@ -6,5 +6,5 @@ export function calcularBaixaPorVencimento(saldoAtual, quantidadeSolicitada, doc
   const solicitada = Number(quantidadeSolicitada);
   const quantidade = Number.isFinite(solicitada) ? Math.max(0, Math.floor(solicitada)) : 0;
   const depois = Math.max(0, antes - quantidade);
-  return { atualizar: depois !== antes, antes, depois, delta: depois - antes, divergencia: quantidade > antes };
+  return { atualizar: !Number.isFinite(saldo) || saldo !== depois, antes, depois, delta: depois - antes, divergencia: quantidade > antes };
 }
