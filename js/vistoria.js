@@ -1,5 +1,6 @@
 import { db } from "./firebase-config.js";
-import { protegerPagina, sair } from "./auth-guard.js";
+import { protegerPagina } from "./auth-guard.js";
+import { iniciarNavegacao } from "./nav.js";
 import { calcularStatus, formatarData, formatarValorOuAviso } from "./status.js";
 import { mostrarToast } from "./toast.js";
 import {
@@ -14,10 +15,7 @@ import {
   serverTimestamp,
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
-document.getElementById("link-sair").addEventListener("click", (e) => {
-  e.preventDefault();
-  sair();
-});
+iniciarNavegacao();
 
 let estabelecimentoAtual = null;
 let produtosCache = {};
