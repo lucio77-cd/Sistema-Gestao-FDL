@@ -77,9 +77,12 @@ async function processarLeitura(codigo, tentativas = 0) {
     }
 
     const loteRef = doc(db, "lotes", candidatos[0].id);
+    const estoqueRef = doc(db, "estoque", produto.id);
 
     const resultado = await runTransaction(db, async (tx) => {
+      // Todas as leituras acontecem antes de qualquer escrita na transação.
       const loteSnap = await tx.get(loteRef);
+      const estoqueSnap = await tx.get(estoqueRef);
 
       if (!loteSnap.exists()) {
         return { status: "lote-mudou" };
@@ -88,39 +91,95 @@ async function processarLeitura(codigo, tentativas = 0) {
       const lote = loteSnap.data();
       const quantidadeAtual = Number(lote.quantidade) || 0;
 
-      if (quantidadeAtual <= 0) {
+      // Revalida o vínculo, pois a lista de candidatos foi consultada antes
+      // da transação e pode ter ficado desatualizada.
+      if (
+        lote.estabelecimentoId !== estabelecimentoAtual.id ||
+        lote.produtoId !== produto.id ||
+        quantidadeAtual <= 0
+      ) {
         return { status: "lote-mudou" };
       }
 
       const quantidadeNova = quantidadeAtual - 1;
+      const refSaida = doc(collection(db, "saidas"));
+      const refMovimento = doc(collection(db, "movimentosEstoque"));
+      const precoCusto = Number(lote.precoCusto ?? produto.precoCusto) || 0;
 
+      // Cada leitura válida gera uma saída, não apenas a última unidade do lote.
       if (quantidadeNova > 0) {
         tx.update(loteRef, { quantidade: quantidadeNova });
-        return { status: "baixado", quantidadeNova };
+      } else {
+        tx.delete(loteRef);
       }
 
-      const refSaida = doc(collection(db, "saidas"));
-      tx.delete(loteRef);
       tx.set(refSaida, {
         estabelecimentoId: estabelecimentoAtual.id,
         produtoId: produto.id,
         produtoNome: produto.nome,
         motivo: "vendido",
         quantidade: 1,
-        precoCusto: lote.precoCusto ?? produto.precoCusto ?? 0,
-        valor: (lote.precoCusto ?? produto.precoCusto ?? 0) * 1,
+        precoCusto,
+        valor: precoCusto,
         local: lote.local || "",
-        dataVencimentoOriginal: lote.dataVencimento,
+        dataVencimentoOriginal: lote.dataVencimento ?? null,
         origem: "caixa",
         registradoEm: serverTimestamp(),
       });
-      return { status: "encerrado" };
+
+      // O saldo geral é uma contagem independente. Se já existe um documento
+      // de estoque, a venda baixa o campo correspondente na mesma transação.
+      // Se nunca foi contado, não inventamos um saldo inicial negativo: o
+      // movimento fica registrado com saldoAtualizado=false para reconciliação.
+      let localEstoque = null;
+      if (lote.local === "Geladeira") localEstoque = "geladeira";
+      else if (lote.local === "Estoque seco" || lote.local === "Seco") localEstoque = "seco";
+
+      const saldoExiste = estoqueSnap.exists() && localEstoque !== null;
+      let antes = null;
+      let depois = null;
+
+      if (saldoExiste) {
+        const estoque = estoqueSnap.data();
+        antes = Number(estoque[localEstoque]) || 0;
+        depois = antes - 1;
+
+        tx.update(estoqueRef, {
+          [localEstoque]: depois,
+          atualizadoEm: serverTimestamp(),
+        });
+      }
+
+      tx.set(refMovimento, {
+        estabelecimentoId: estabelecimentoAtual.id,
+        produtoId: produto.id,
+        produtoNome: produto.nome,
+        local: localEstoque || lote.local || "",
+        tipo: "venda",
+        delta: -1,
+        antes,
+        depois,
+        saldoAtualizado: saldoExiste,
+        origem: "caixa",
+        registradoEm: serverTimestamp(),
+      });
+
+      return {
+        status: "registrado",
+        quantidadeNova,
+        saldoAtualizado: saldoExiste,
+        saldoDepois: depois,
+      };
     });
 
-    if (resultado.status === "baixado") {
-      registrarLeitura(produto.nome, `Baixa registrada — restam ${resultado.quantidadeNova} un.`, "ok");
-    } else if (resultado.status === "encerrado") {
-      registrarLeitura(produto.nome, "Baixa registrada — lote encerrado.", "ok");
+    if (resultado.status === "registrado") {
+      const mensagemLote = resultado.quantidadeNova > 0
+        ? `Venda registrada — restam ${resultado.quantidadeNova} un. no lote.`
+        : "Venda registrada — lote encerrado.";
+      const mensagemSaldo = resultado.saldoAtualizado
+        ? ` Saldo geral: ${resultado.saldoDepois} un.`
+        : " Saldo geral ainda não contado; venda registrada no histórico.";
+      registrarLeitura(produto.nome, mensagemLote + mensagemSaldo, "ok");
     } else if (tentativas < 3) {
       await processarLeitura(codigo, tentativas + 1);
     } else {
