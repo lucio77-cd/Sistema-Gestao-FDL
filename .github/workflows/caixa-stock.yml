@@ -1,0 +1,28 @@
+name: Caixa stock logic tests
+
+on:
+  pull_request:
+    paths:
+      - "js/caixa.js"
+      - "js/caixa-stock.js"
+      - "tests/caixa-stock.test.mjs"
+      - ".github/workflows/caixa-stock.yml"
+  push:
+    branches:
+      - "fix/caixa-stock-and-sales-history"
+    paths:
+      - "js/caixa.js"
+      - "js/caixa-stock.js"
+      - "tests/caixa-stock.test.mjs"
+      - ".github/workflows/caixa-stock.yml"
+
+jobs:
+  caixa-stock:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Test stock balance logic
+        run: node --test tests/caixa-stock.test.mjs

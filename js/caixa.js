@@ -3,6 +3,7 @@ import { protegerPagina } from "./auth-guard.js";
 import { iniciarNavegacao } from "./nav.js";
 import { escapeHtml } from "./status.js";
 import { mostrarToast } from "./toast.js";
+import { calcularBaixaEstoque } from "./caixa-stock.js";
 import {
   collection,
   query,
@@ -77,9 +78,12 @@ async function processarLeitura(codigo, tentativas = 0) {
     }
 
     const loteRef = doc(db, "lotes", candidatos[0].id);
+    const estoqueRef = doc(db, "estoque", produto.id);
 
     const resultado = await runTransaction(db, async (tx) => {
+      // Todas as leituras acontecem antes de qualquer escrita na transação.
       const loteSnap = await tx.get(loteRef);
+      const estoqueSnap = await tx.get(estoqueRef);
 
       if (!loteSnap.exists()) {
         return { status: "lote-mudou" };
@@ -88,39 +92,103 @@ async function processarLeitura(codigo, tentativas = 0) {
       const lote = loteSnap.data();
       const quantidadeAtual = Number(lote.quantidade) || 0;
 
-      if (quantidadeAtual <= 0) {
+      // Revalida o vínculo, pois a lista de candidatos foi consultada antes
+      // da transação e pode ter ficado desatualizada.
+      if (
+        lote.estabelecimentoId !== estabelecimentoAtual.id ||
+        lote.produtoId !== produto.id ||
+        quantidadeAtual <= 0
+      ) {
         return { status: "lote-mudou" };
       }
 
       const quantidadeNova = quantidadeAtual - 1;
+      const refSaida = doc(collection(db, "saidas"));
+      const refMovimento = doc(collection(db, "movimentosEstoque"));
+      const precoCusto = Number(lote.precoCusto ?? produto.precoCusto) || 0;
 
+      // Cada leitura válida gera uma saída, não apenas a última unidade do lote.
       if (quantidadeNova > 0) {
         tx.update(loteRef, { quantidade: quantidadeNova });
-        return { status: "baixado", quantidadeNova };
+      } else {
+        tx.delete(loteRef);
       }
 
-      const refSaida = doc(collection(db, "saidas"));
-      tx.delete(loteRef);
       tx.set(refSaida, {
         estabelecimentoId: estabelecimentoAtual.id,
         produtoId: produto.id,
         produtoNome: produto.nome,
         motivo: "vendido",
         quantidade: 1,
-        precoCusto: lote.precoCusto ?? produto.precoCusto ?? 0,
-        valor: (lote.precoCusto ?? produto.precoCusto ?? 0) * 1,
+        precoCusto,
+        valor: precoCusto,
         local: lote.local || "",
-        dataVencimentoOriginal: lote.dataVencimento,
+        dataVencimentoOriginal: lote.dataVencimento ?? null,
         origem: "caixa",
         registradoEm: serverTimestamp(),
       });
-      return { status: "encerrado" };
+
+      // O saldo geral é uma contagem independente. Se já existe um documento
+      // de estoque, a venda baixa o campo correspondente na mesma transação.
+      // Se nunca foi contado, não inventamos um saldo inicial negativo: o
+      // movimento fica registrado com saldoAtualizado=false para reconciliação.
+      let localEstoque = null;
+      if (lote.local === "Geladeira") localEstoque = "geladeira";
+      else if (lote.local === "Estoque seco" || lote.local === "Seco") localEstoque = "seco";
+
+      const saldoExiste = estoqueSnap.exists() && localEstoque !== null;
+      const baixa = calcularBaixaEstoque(
+        saldoExiste ? estoqueSnap.data()[localEstoque] : null,
+        saldoExiste
+      );
+
+      // A venda e a baixa do lote são registradas mesmo quando o saldo contado
+      // já está zerado; nesse caso, preservamos zero e sinalizamos divergência.
+      if (baixa.atualizar) {
+        tx.update(estoqueRef, {
+          [localEstoque]: baixa.depois,
+          atualizadoEm: serverTimestamp(),
+        });
+      }
+
+      tx.set(refMovimento, {
+        estabelecimentoId: estabelecimentoAtual.id,
+        produtoId: produto.id,
+        produtoNome: produto.nome,
+        local: localEstoque || lote.local || "",
+        tipo: "venda",
+        delta: -1,
+        antes: baixa.antes,
+        depois: baixa.depois,
+        saldoAtualizado: baixa.atualizar,
+        divergenciaSaldo: baixa.divergencia,
+        origem: "caixa",
+        registradoEm: serverTimestamp(),
+      });
+
+      return {
+        status: "registrado",
+        quantidadeNova,
+        saldoAtualizado: baixa.atualizar,
+        saldoDepois: baixa.depois,
+        divergenciaSaldo: baixa.divergencia,
+        saldoNaoContado: !saldoExiste,
+      };
     });
 
-    if (resultado.status === "baixado") {
-      registrarLeitura(produto.nome, `Baixa registrada — restam ${resultado.quantidadeNova} un.`, "ok");
-    } else if (resultado.status === "encerrado") {
-      registrarLeitura(produto.nome, "Baixa registrada — lote encerrado.", "ok");
+    if (resultado.status === "registrado") {
+      const mensagemLote = resultado.quantidadeNova > 0
+        ? `Venda registrada — restam ${resultado.quantidadeNova} un. no lote.`
+        : "Venda registrada — lote encerrado.";
+      let mensagemSaldo;
+      if (resultado.saldoAtualizado) {
+        mensagemSaldo = ` Saldo geral: ${resultado.saldoDepois} un.`;
+      } else if (resultado.divergenciaSaldo) {
+        mensagemSaldo = " ATENÇÃO: saldo geral já estava zerado; mantido em 0. Confira o estoque físico.";
+      } else {
+        mensagemSaldo = " Saldo geral ainda não contado; venda registrada no histórico.";
+      }
+      registrarLeitura(produto.nome, mensagemLote + mensagemSaldo, "ok");
     } else if (tentativas < 3) {
       await processarLeitura(codigo, tentativas + 1);
     } else {
