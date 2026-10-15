@@ -31,3 +31,12 @@ test("saldo legado negativo é normalizado para zero sem aprofundar o negativo",
     atualizar: false, antes: 0, depois: 0, delta: 0, divergencia: true,
   });
 });
+
+test("baixas sucessivas de lotes do mesmo produto acumulam sem saldo negativo", () => {
+  const primeira = calcularBaixaPorVencimento(4, 3, true);
+  const segunda = calcularBaixaPorVencimento(primeira.depois, 2, true);
+  assert.equal(primeira.depois, 1);
+  assert.equal(segunda.depois, 0);
+  assert.equal(segunda.delta, -1);
+  assert.equal(segunda.divergencia, true);
+});
