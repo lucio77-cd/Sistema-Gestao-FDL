@@ -7,21 +7,24 @@
 <title>Vistoria — Controle de Bebidas</title>
 <link rel="stylesheet" href="css/styles.css" />
 </head>
-<body>
+<body data-pagina-atual="vistoria">
   <header class="topo">
     <div class="topo-marca">Controle de Bebidas</div>
     <div class="topo-sub" id="nome-estabelecimento">Carregando…</div>
   </header>
-  <nav class="nav">
-    <a href="index.html">Dashboard</a>
-    <a href="vistoria.html" class="ativo">Vistoria</a>
-        <a href="estoque.html">Estoque</a>
-    <a href="promocoes.html">Promoções</a>
-    <a href="produtos.html">Produtos</a>
-    <a href="caixa.html">Caixa</a>
-    <a href="configuracoes.html">Configurações</a>
-    <a href="#" id="link-sair">Sair</a>
+  <nav class="tabbar" aria-label="Navegação principal">
+    <a href="index.html" class="tabbar-item" data-pagina="dashboard"><span>Início</span></a>
+    <a href="vistoria.html" class="tabbar-item" data-pagina="vistoria"><span>Vistoria</span></a>
+    <a href="promocoes.html" class="tabbar-item" data-pagina="promocoes"><span>Promoções</span></a>
+    <a href="produtos.html" class="tabbar-item" data-pagina="produtos"><span>Produtos</span></a>
+    <button type="button" class="tabbar-item" id="btn-mais" aria-haspopup="true" aria-expanded="false"><span>Mais</span></button>
   </nav>
+  <div class="menu-mais" id="menu-mais" hidden>
+    <a href="estoque.html" data-pagina="estoque">Estoque</a>
+    <a href="caixa.html" data-pagina="caixa">Caixa</a>
+    <a href="configuracoes.html" data-pagina="configuracoes">Configurações</a>
+    <a href="#" id="link-sair">Sair</a>
+  </div>
 
   <main>
     <h1>Vistoria</h1>
