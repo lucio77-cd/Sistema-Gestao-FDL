@@ -38,6 +38,7 @@ beforeEach(async () => {
     await setDoc(doc(db, "produtos", "produto-a"), { estabelecimentoId: "loja-a", nome: "Produto A" });
     await setDoc(doc(db, "produtos", "produto-b"), { estabelecimentoId: "loja-b", nome: "Produto B" });
     await setDoc(doc(db, "estoque", "produto-a"), { estabelecimentoId: "loja-a", geladeira: 4, seco: 2 });
+    await setDoc(doc(db, "estoque", "produto-b"), { estabelecimentoId: "loja-b", geladeira: 7, seco: 3 });
     await setDoc(doc(db, "vistorias", "vistoria-a"), { estabelecimentoId: "loja-a", itens: [] });
   });
 });
