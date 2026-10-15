@@ -469,21 +469,23 @@ document.getElementById("btn-salvar-vistoria").addEventListener("click", async (
   botao.textContent = "Salvando…";
 
   try {
-    const itensHistorico = [];
     const loteRefs = prontos.map(([loteId]) => doc(db, "lotes", loteId));
     const produtosVencidos = [...new Set(prontos
       .filter(([, c]) => c.acaoZero === "vencido" && (c.quantidadeParaAcao ?? c.valorOriginal) > 0)
       .map(([, c]) => c.produtoId))];
     const estoqueRefs = produtosVencidos.map((produtoId) => doc(db, "estoque", produtoId));
-    const divergencias = [];
 
-    await runTransaction(db, async (tx) => {
+    const divergencias = await runTransaction(db, async (tx) => {
       // Todas as leituras ocorrem antes de qualquer escrita. A transação
       // protege a baixa do estoque contra vendas/ajustes concorrentes.
       const loteSnaps = await Promise.all(loteRefs.map((ref) => tx.get(ref)));
       const estoqueSnaps = await Promise.all(estoqueRefs.map((ref) => tx.get(ref)));
       const lotesAtuais = new Map(loteSnaps.map((snap) => [snap.id, snap]));
       const estoqueAtual = new Map(estoqueSnaps.map((snap) => [snap.id, snap]));
+      const saldosTrabalho = new Map();
+      const atualizacoesEstoque = new Map();
+      const divergenciasTransacao = [];
+      const itensHistoricoTransacao = [];
 
       for (let i = 0; i < prontos.length; i += 1) {
         const [loteId, c] = prontos[i];
@@ -523,16 +525,19 @@ document.getElementById("btn-salvar-vistoria").addEventListener("click", async (
             const campo = campoEstoqueDoLocal(c.local);
             const saldoSnap = estoqueAtual.get(c.produtoId);
             const existeSaldo = !!saldoSnap?.exists();
-            const saldo = existeSaldo ? saldoSnap.data()[campo] : null;
+            const chaveSaldo = `${c.produtoId}:${campo}`;
+            const saldoInicial = existeSaldo ? saldoSnap.data()[campo] : null;
+            const saldo = saldosTrabalho.has(chaveSaldo) ? saldosTrabalho.get(chaveSaldo) : saldoInicial;
             const baixa = calcularBaixaPorVencimento(saldo, quantidadeDaAcao, existeSaldo);
+            if (existeSaldo) saldosTrabalho.set(chaveSaldo, baixa.depois);
 
             if (baixa.atualizar) {
-              tx.update(doc(db, "estoque", c.produtoId), {
-                [campo]: baixa.depois,
-                atualizadoEm: serverTimestamp(),
-              });
+              const atualizacao = atualizacoesEstoque.get(c.produtoId) || {};
+              atualizacao[campo] = baixa.depois;
+              atualizacao.atualizadoEm = serverTimestamp();
+              atualizacoesEstoque.set(c.produtoId, atualizacao);
             }
-            if (baixa.divergencia) divergencias.push(c.produtoNome);
+            if (baixa.divergencia) divergenciasTransacao.push(c.produtoNome);
 
             tx.set(doc(collection(db, "movimentosEstoque")), {
               estabelecimentoId: estabelecimentoAtual.id,
@@ -554,7 +559,7 @@ document.getElementById("btn-salvar-vistoria").addEventListener("click", async (
           tx.update(loteRef, { quantidade: quantidadeNova });
         }
 
-        itensHistorico.push({
+        itensHistoricoTransacao.push({
           loteId,
           produtoId: c.produtoId,
           quantidadeAnterior: c.valorOriginal,
@@ -563,15 +568,21 @@ document.getElementById("btn-salvar-vistoria").addEventListener("click", async (
         });
       });
 
+      for (const [produtoId, atualizacao] of atualizacoesEstoque) {
+        tx.update(doc(db, "estoque", produtoId), atualizacao);
+      }
+
       tx.set(doc(collection(db, "vistorias")), {
         estabelecimentoId: estabelecimentoAtual.id,
         data: serverTimestamp(),
-        itens: itensHistorico,
+        itens: itensHistoricoTransacao,
       });
 
       tx.update(doc(db, "estabelecimentos", estabelecimentoAtual.id), {
         ultimaVistoria: serverTimestamp(),
       });
+
+      return [...new Set(divergenciasTransacao)];
     });
 
     if (divergencias.length > 0) {
