@@ -1,0 +1,39 @@
+name: Firestore rules tests
+
+on:
+  pull_request:
+    paths:
+      - "firestore.rules"
+      - "firebase.json"
+      - "package.json"
+      - "package-lock.json"
+      - "tests/**"
+      - ".github/workflows/firestore-rules.yml"
+  push:
+    branches:
+      - main
+      - "fix/**"
+    paths:
+      - "firestore.rules"
+      - "firebase.json"
+      - "package.json"
+      - "package-lock.json"
+      - "tests/**"
+      - ".github/workflows/firestore-rules.yml"
+
+jobs:
+  firestore-rules:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - name: Install dependencies
+        run: npm install
+      - name: Test Firestore rules in emulator
+        run: npm run test:rules
