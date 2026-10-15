@@ -126,8 +126,8 @@ function atualizarResumo() {
     const base = dataMillis(e.ultimaContagemEm);
     if (base > 0) {
       dataBase = Math.max(dataBase, base);
-      vendas += movimentos.filter(m => m.produtoId === p.id && m.tipo === "venda" && dataMillis(m.registradoEm) > base)
-        .reduce((s,m) => s + Math.abs(numero(m.quantidade) || numero(m.delta)), 0);
+      vendas += movimentos.filter(m => m.produtoId === p.id && ["venda","estorno_venda"].includes(m.tipo) && dataMillis(m.registradoEm) > base)
+        .reduce((s,m) => s + (m.tipo === "estorno_venda" ? -1 : 1) * Math.abs(numero(m.quantidade) || numero(m.delta)), 0);
     }
   });
   document.getElementById("resumo-registrado").textContent = String(total);
