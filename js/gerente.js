@@ -1,5 +1,6 @@
 import { db } from "./firebase-config.js";
 import { protegerPagina } from "./auth-guard.js";
+import { iniciarNavegacao } from "./nav.js";
 import {
   calcularStatus,
   formatarDiasRestantes,
@@ -19,7 +20,19 @@ import {
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 import { mostrarToast } from "./toast.js";
 
-// A gerente precisa entrar com e-mail e senha; os dados são limitados ao estabelecimento autenticado.\n\nlet itensEstoque = []; // linhas planas { produtoNome, quantidade, local } vindas da coleção "estoque"\nlet estoqueCarregado = false;\nlet todosLotes = []; // TODOS os lotes ativos (para calcular os que precisam de atenção)\nlet lotesUrgentes = []; // só os que precisam de atenção, para a aba Vencimentos\nlet graficoAtual = null;\nconst filtroPeriodo = document.getElementById("filtro-periodo");\nconst filtroEstoqueLocal = document.getElementById("filtro-estoque-local");\n\n// ---------- Abas Vencimentos / Estoque ----------
+iniciarNavegacao();
+
+// A gerente precisa entrar com e-mail e senha; os dados são limitados ao estabelecimento autenticado.
+
+let itensEstoque = []; // linhas planas { produtoNome, quantidade, local } vindas da coleção "estoque"
+let estoqueCarregado = false;
+let todosLotes = []; // TODOS os lotes ativos (para calcular os que precisam de atenção)
+let lotesUrgentes = []; // só os que precisam de atenção, para a aba Vencimentos
+let graficoAtual = null;
+const filtroPeriodo = document.getElementById("filtro-periodo");
+const filtroEstoqueLocal = document.getElementById("filtro-estoque-local");
+
+// ---------- Abas Vencimentos / Estoque ----------
 
 const segVencimentos = document.getElementById("seg-vencimentos");
 const segEstoque = document.getElementById("seg-estoque");
