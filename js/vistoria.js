@@ -20,9 +20,6 @@ iniciarNavegacao();
 
 let estabelecimentoAtual = null;
 let produtosCache = {};
-// Produtos que já têm contagem na aba Estoque (só esses sofrem o desconto
-// quando um lote é marcado como "Vencido").
-let produtosComEstoque = new Set();
 // { loteId: { input, valorOriginal, produtoId, produtoNome, precoCusto, local, dataVencimento, acaoZero, quantidadeParaAcao } }
 let controlesQuantidade = {};
 
@@ -32,13 +29,6 @@ let loteAlvoPendente = new URLSearchParams(window.location.search).get("lote");
 
 function campoEstoqueDoLocal(local) {
   return local === "Geladeira" ? "geladeira" : "seco";
-}
-
-async function carregarProdutosComEstoque() {
-  const snap = await getDocs(
-    query(collection(db, "estoque"), where("estabelecimentoId", "==", estabelecimentoAtual.id))
-  );
-  produtosComEstoque = new Set(snap.docs.map((d) => d.id));
 }
 
 // ---------- Ordenação da lista ----------
@@ -113,13 +103,6 @@ protegerPagina(async ({ estabelecimento }) => {
   estabelecimentoAtual = estabelecimento;
   document.getElementById("nome-estabelecimento").textContent = estabelecimento.nome;
   await carregarProdutos();
-  try {
-    await carregarProdutosComEstoque();
-  } catch (erro) {
-    // Sem a regra de "estoque" publicada, a vistoria continua funcionando —
-    // só não desconta o estoque ao marcar "Vencido".
-    console.error("Não foi possível ler o estoque:", erro);
-  }
   await carregarLotes();
 });
 
