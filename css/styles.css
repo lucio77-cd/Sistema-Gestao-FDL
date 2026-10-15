@@ -1010,3 +1010,40 @@ label.switch {
   background: #eef3f2;
   color: var(--ink-soft);
 }
+
+
+/* ---------- Vistoria física do estoque ---------- */
+.stock-resumo h2 { margin-top: 0; }
+.stock-resumo-grid { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:.6rem; }
+.stock-resumo-grid > div { display:flex; flex-direction:column; gap:.2rem; background:var(--bg); border-radius:8px; padding:.7rem; min-width:0; }
+.stock-resumo-grid span, .stock-resumo-grid small { font-size:.72rem; color:var(--ink-soft); }
+.stock-resumo-grid strong { font-size:1.35rem; overflow-wrap:anywhere; }
+.stock-form-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:.7rem; }
+.stock-item { background:var(--surface); border:1px solid var(--steel-light); border-radius:10px; padding:.9rem; margin:.65rem 0; }
+.stock-item--contado { border-left:4px solid var(--normal); }
+.stock-item-head { display:flex; align-items:flex-start; justify-content:space-between; gap:.6rem; }
+.stock-item-head strong { display:block; overflow-wrap:anywhere; }
+.stock-item-head small, .stock-review-row small { display:block; color:var(--ink-soft); font-size:.78rem; margin-top:.15rem; }
+.stock-item-meta { color:var(--ink-soft); font-size:.8rem; margin:.5rem 0; }
+.stock-item-controls { display:grid; grid-template-columns:minmax(0,1fr) auto; gap:.4rem .6rem; align-items:end; }
+.stock-item-controls label { grid-column:1 / -1; font-size:.82rem; font-weight:600; }
+.stock-item-controls input { margin:0; min-width:0; }
+.stock-item-controls button { white-space:nowrap; }
+.stock-entry-toggle { margin-top:.55rem; }
+.stock-entry-form { margin-top:.7rem; padding:.7rem; border-radius:8px; background:var(--bg); }
+.stock-entry-form input { margin-bottom:.5rem; }
+.stock-review-button { margin:1rem 0; }
+.stock-review-actions { display:flex; flex-wrap:wrap; gap:.6rem; margin-top:1rem; }
+.stock-review-actions .btn { flex:1; }
+.stock-review-stats { display:flex; flex-wrap:wrap; gap:.5rem; margin:.8rem 0; }
+.stock-review-stats strong { background:var(--bg); padding:.55rem .7rem; border-radius:8px; font-size:.85rem; }
+.stock-review-row { display:flex; align-items:center; justify-content:space-between; gap:.8rem; padding:.7rem 0; border-bottom:1px solid var(--steel-light); }
+.stock-review-row span { min-width:0; overflow-wrap:anywhere; }
+@media (max-width:520px) {
+ .stock-resumo-grid { grid-template-columns:1fr 1fr; }
+ .stock-resumo-grid > div:last-child { grid-column:1 / -1; }
+ .stock-form-grid { grid-template-columns:1fr; }
+ .stock-item-controls { grid-template-columns:1fr; }
+ .stock-item-controls label { grid-column:auto; }
+ .stock-review-actions { flex-direction:column; }
+}
