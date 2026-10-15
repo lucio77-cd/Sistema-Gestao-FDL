@@ -28,7 +28,7 @@ test("saldo inexistente não é inventado nem atualizado", () => {
 
 test("saldo legado negativo é normalizado para zero sem aprofundar o negativo", () => {
   assert.deepEqual(calcularBaixaPorVencimento(-2, 1, true), {
-    atualizar: false, antes: 0, depois: 0, delta: 0, divergencia: true,
+    atualizar: true, antes: 0, depois: 0, delta: 0, divergencia: true,
   });
 });
 
