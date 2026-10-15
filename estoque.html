@@ -8,48 +8,57 @@
 <link rel="stylesheet" href="css/styles.css" />
 </head>
 <body data-pagina-atual="estoque">
-  <header class="topo">
-    <div class="topo-marca">Controle de Bebidas</div>
-    <div class="topo-sub" id="nome-estabelecimento">Carregando…</div>
-  </header>
-  <nav class="tabbar" aria-label="Navegação principal">
-    <a href="index.html" class="tabbar-item" data-pagina="dashboard"><span>Início</span></a>
-    <a href="vistoria.html" class="tabbar-item" data-pagina="vistoria"><span>Vistoria</span></a>
-    <a href="promocoes.html" class="tabbar-item" data-pagina="promocoes"><span>Promoções</span></a>
-    <a href="produtos.html" class="tabbar-item" data-pagina="produtos"><span>Produtos</span></a>
-    <button type="button" class="tabbar-item" id="btn-mais" aria-haspopup="true" aria-expanded="false"><span>Mais</span></button>
-  </nav>
-  <div class="menu-mais" id="menu-mais" hidden>
-    <a href="caixa.html" data-pagina="caixa">Caixa</a>
-    <a href="configuracoes.html" data-pagina="configuracoes">Configurações</a>
-    <a href="#" id="link-sair">Sair</a>
-  </div>
-
-  <main>
-    <h1>Estoque</h1>
-    <p class="legenda">Quanto você tem de cada produto, separado por local. Esta contagem é independente da Vistoria (que cuida só dos vencimentos).</p>
-
-    <div class="painel" id="painel-importacao" hidden>
-      <h2 style="margin-top:0">Importar contagem já feita</h2>
-      <p class="legenda" id="texto-importacao"></p>
-      <div id="conferencia-importacao"></div>
-      <button type="button" class="btn" id="btn-confirmar-importacao">Confirmar importação</button>
-    </div>
-
-    <div class="segmentado" role="tablist" aria-label="Local da contagem">
-      <button type="button" id="seg-geladeira" class="ativo" role="tab" aria-selected="true">Contando: Geladeira</button>
-      <button type="button" id="seg-seco" role="tab" aria-selected="false">Contando: Seco</button>
-    </div>
-
-    <div class="barra-busca">
-      <input type="search" id="campo-busca" placeholder="Buscar produto" autocomplete="off" />
-    </div>
-
-    <div id="lista-estoque">
-      <p class="mensagem-vazio">Carregando…</p>
-    </div>
-  </main>
-
-  <script type="module" src="js/estoque.js"></script>
+<header class="topo"><div class="topo-marca">Controle de Bebidas</div><div class="topo-sub" id="nome-estabelecimento">Carregando…</div></header>
+<nav class="tabbar" aria-label="Navegação principal">
+<a href="index.html" class="tabbar-item" data-pagina="dashboard"><span>Início</span></a>
+<a href="vistoria.html" class="tabbar-item" data-pagina="vistoria"><span>Vistoria</span></a>
+<a href="promocoes.html" class="tabbar-item" data-pagina="promocoes"><span>Promoções</span></a>
+<a href="produtos.html" class="tabbar-item" data-pagina="produtos"><span>Produtos</span></a>
+<button type="button" class="tabbar-item" id="btn-mais" aria-haspopup="true" aria-expanded="false"><span>Mais</span></button>
+</nav>
+<div class="menu-mais" id="menu-mais" hidden><a href="caixa.html" data-pagina="caixa">Caixa</a><a href="configuracoes.html" data-pagina="configuracoes">Configurações</a><a href="#" id="link-sair">Sair</a></div>
+<main>
+<h1>Estoque</h1>
+<p class="legenda">Conte fisicamente os produtos da geladeira e da parte seca. Cada item é salvo durante a vistoria; o saldo oficial só muda após revisar e finalizar.</p>
+<section class="painel stock-resumo">
+<h2>Resumo do estoque</h2>
+<div class="stock-resumo-grid">
+<div><span>Saldo registrado</span><strong id="resumo-registrado">—</strong></div>
+<div><span>Vendas desde a última contagem</span><strong id="resumo-vendas">—</strong></div>
+<div><span>Saldo estimado</span><strong id="resumo-estimado">—</strong><small>Estimativa, não contagem física</small></div>
+</div>
+<p class="legenda" id="resumo-data">Carregando dados…</p>
+</section>
+<div class="segmentado" role="tablist" aria-label="Local da contagem">
+<button type="button" id="seg-geladeira" class="ativo" role="tab" aria-selected="true">Geladeira</button>
+<button type="button" id="seg-seco" role="tab" aria-selected="false">Parte seca</button>
+</div>
+<section class="painel" id="painel-sessao"><div id="estado-sessao"><p class="mensagem-vazio">Carregando vistoria…</p></div></section>
+<section id="secao-contagem" hidden>
+<div class="barra-busca"><input type="search" id="campo-busca" placeholder="Buscar nome, marca, embalagem ou volume" autocomplete="off" /></div>
+<div id="lista-estoque"><p class="mensagem-vazio">Carregando produtos…</p></div>
+<section class="painel stock-cadastro">
+<h2>Cadastrar produto durante a vistoria</h2>
+<p class="legenda">Use quando encontrar um produto que ainda não existe no catálogo. Confira se ele já não está cadastrado com outro nome.</p>
+<form id="form-novo-produto-estoque">
+<label for="np-nome">Nome do produto *</label><input type="text" id="np-nome" required placeholder="Ex.: Refrigerante de cola" />
+<div class="stock-form-grid">
+<div><label for="np-marca">Marca</label><input id="np-marca" type="text" placeholder="Ex.: Coca-Cola" /></div>
+<div><label for="np-categoria">Categoria</label><select id="np-categoria"><option value="">Selecione…</option><option>Refrigerante</option><option>Água</option><option>Suco</option><option>Cerveja</option><option>Energético</option><option>Isotônico</option><option>Chá</option><option>Laticínio</option><option>Outro</option></select></div>
+<div><label for="np-variante">Sabor/variante</label><input id="np-variante" type="text" placeholder="Ex.: Original, Zero, Laranja" /></div>
+<div><label for="np-embalagem">Embalagem</label><select id="np-embalagem"><option value="">Selecione…</option><option>Lata</option><option>PET</option><option>Vidro</option><option>Long neck</option><option>Caixa</option><option>Pacote</option><option>Copo</option><option>Sachê</option><option>Outra</option></select></div>
+<div><label for="np-volume">Volume/medida</label><input id="np-volume" list="opcoes-volume" placeholder="Ex.: 350 ml, 2 L, 12 un." />
+<datalist id="opcoes-volume"><option value="200 ml"></option><option value="220 ml"></option><option value="250 ml"></option><option value="269 ml"></option><option value="290 ml"></option><option value="300 ml"></option><option value="310 ml"></option><option value="330 ml"></option><option value="350 ml"></option><option value="473 ml"></option><option value="500 ml"></option><option value="600 ml"></option><option value="1 L"></option><option value="1,5 L"></option><option value="2 L"></option><option value="2,5 L"></option><option value="3 L"></option><option value="5 L"></option></datalist></div>
+<div><label for="np-codigo">Código de barras</label><input id="np-codigo" type="text" inputmode="numeric" /></div>
+</div>
+<button class="btn" type="submit">Cadastrar produto</button>
+</form>
+</section>
+<button type="button" class="btn stock-review-button" id="btn-revisar">Encerrar contagem e revisar</button>
+</section>
+<section class="painel stock-review" id="painel-revisao" hidden><h2>Revisão da vistoria</h2><p class="legenda" id="texto-revisao"></p><div id="resumo-revisao"></div><div class="stock-review-actions"><button type="button" class="btn btn-secundario" id="btn-voltar-contagem">Voltar à contagem</button><button type="button" class="btn" id="btn-finalizar">Confirmar e aplicar saldos</button></div></section>
+<section class="painel" id="painel-importacao" hidden><h2>Importar contagem antiga</h2><p class="legenda" id="texto-importacao"></p><div id="conferencia-importacao"></div><button type="button" class="btn" id="btn-confirmar-importacao">Confirmar importação</button></section>
+</main>
+<script type="module" src="js/estoque.js"></script>
 </body>
 </html>
