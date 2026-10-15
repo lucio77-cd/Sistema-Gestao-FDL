@@ -3,6 +3,7 @@ import { protegerPagina } from "./auth-guard.js";
 import { iniciarNavegacao } from "./nav.js";
 import { escapeHtml } from "./status.js";
 import { mostrarToast } from "./toast.js";
+import { calcularBaixaEstoque } from "./caixa-stock.js";
 import {
   collection,
   query,
@@ -136,16 +137,16 @@ async function processarLeitura(codigo, tentativas = 0) {
       else if (lote.local === "Estoque seco" || lote.local === "Seco") localEstoque = "seco";
 
       const saldoExiste = estoqueSnap.exists() && localEstoque !== null;
-      let antes = null;
-      let depois = null;
+      const baixa = calcularBaixaEstoque(
+        saldoExiste ? estoqueSnap.data()[localEstoque] : null,
+        saldoExiste
+      );
 
-      if (saldoExiste) {
-        const estoque = estoqueSnap.data();
-        antes = Number(estoque[localEstoque]) || 0;
-        depois = antes - 1;
-
+      // A venda e a baixa do lote são registradas mesmo quando o saldo contado
+      // já está zerado; nesse caso, preservamos zero e sinalizamos divergência.
+      if (baixa.atualizar) {
         tx.update(estoqueRef, {
-          [localEstoque]: depois,
+          [localEstoque]: baixa.depois,
           atualizadoEm: serverTimestamp(),
         });
       }
@@ -157,9 +158,10 @@ async function processarLeitura(codigo, tentativas = 0) {
         local: localEstoque || lote.local || "",
         tipo: "venda",
         delta: -1,
-        antes,
-        depois,
-        saldoAtualizado: saldoExiste,
+        antes: baixa.antes,
+        depois: baixa.depois,
+        saldoAtualizado: baixa.atualizar,
+        divergenciaSaldo: baixa.divergencia,
         origem: "caixa",
         registradoEm: serverTimestamp(),
       });
@@ -167,8 +169,10 @@ async function processarLeitura(codigo, tentativas = 0) {
       return {
         status: "registrado",
         quantidadeNova,
-        saldoAtualizado: saldoExiste,
-        saldoDepois: depois,
+        saldoAtualizado: baixa.atualizar,
+        saldoDepois: baixa.depois,
+        divergenciaSaldo: baixa.divergencia,
+        saldoNaoContado: !saldoExiste,
       };
     });
 
@@ -176,9 +180,14 @@ async function processarLeitura(codigo, tentativas = 0) {
       const mensagemLote = resultado.quantidadeNova > 0
         ? `Venda registrada — restam ${resultado.quantidadeNova} un. no lote.`
         : "Venda registrada — lote encerrado.";
-      const mensagemSaldo = resultado.saldoAtualizado
-        ? ` Saldo geral: ${resultado.saldoDepois} un.`
-        : " Saldo geral ainda não contado; venda registrada no histórico.";
+      let mensagemSaldo;
+      if (resultado.saldoAtualizado) {
+        mensagemSaldo = ` Saldo geral: ${resultado.saldoDepois} un.`;
+      } else if (resultado.divergenciaSaldo) {
+        mensagemSaldo = " ATENÇÃO: saldo geral já estava zerado; mantido em 0. Confira o estoque físico.";
+      } else {
+        mensagemSaldo = " Saldo geral ainda não contado; venda registrada no histórico.";
+      }
       registrarLeitura(produto.nome, mensagemLote + mensagemSaldo, "ok");
     } else if (tentativas < 3) {
       await processarLeitura(codigo, tentativas + 1);
