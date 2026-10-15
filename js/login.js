@@ -4,8 +4,27 @@ import {
   onAuthStateChanged,
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 
+const PAGINAS_PERMITIDAS = new Set([
+  "index.html", "vistoria.html", "estoque.html", "promocoes.html",
+  "produtos.html", "caixa.html", "configuracoes.html", "gerente.html",
+]);
+
+function obterDestino() {
+  const solicitado = new URLSearchParams(window.location.search).get("returnTo");
+  if (!solicitado) return "index.html";
+  try {
+    const url = new URL(solicitado, window.location.origin);
+    const pagina = url.pathname.split("/").pop();
+    if (url.origin !== window.location.origin || !PAGINAS_PERMITIDAS.has(pagina)) return "index.html";
+    return pagina + url.search;
+  } catch {
+    return "index.html";
+  }
+}
+
+const destino = obterDestino();
 onAuthStateChanged(auth, (user) => {
-  if (user) window.location.href = "index.html";
+  if (user) window.location.replace(destino);
 });
 
 const form = document.getElementById("form-login");
@@ -24,7 +43,7 @@ form.addEventListener("submit", async (e) => {
 
   try {
     await signInWithEmailAndPassword(auth, email, senha);
-    window.location.href = "index.html";
+    window.location.replace(destino);
   } catch (e) {
     erro.textContent = "E-mail ou senha inválidos.";
     erro.hidden = false;
