@@ -1,41 +1,97 @@
 rules_version = '2';
+
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // "estabelecimentos" e "lotes" têm leitura pública porque a página da
-    // gerente (gerente.html) acessa via link com token, sem login. O nome e
-    // preço de custo do produto ficam gravados diretamente no lote
-    // (denormalizado) — assim a gerente nunca precisa ler "produtos", que é
-    // restrita.
+    function autenticado() {
+      return request.auth != null;
+    }
+
+    function donoDoEstabelecimento(estabelecimentoId) {
+      return autenticado()
+        && exists(
+          /databases/$(database)/documents/estabelecimentos/$(estabelecimentoId)
+        )
+        && get(
+          /databases/$(database)/documents/estabelecimentos/$(estabelecimentoId)
+        ).data.ownerId == request.auth.uid;
+    }
+
+    function podeAcessarDados(dados) {
+      return dados.keys().hasAll(['estabelecimentoId'])
+        && donoDoEstabelecimento(dados.estabelecimentoId);
+    }
+
+    // Cada usuário autenticado só acessa o próprio estabelecimento.
     match /estabelecimentos/{id} {
-      allow read: if true;
-      allow write: if request.auth != null;
+      allow get, list: if autenticado()
+        && resource.data.ownerId == request.auth.uid;
+
+      allow create: if autenticado()
+        && request.resource.data.ownerId == request.auth.uid;
+
+      allow update: if autenticado()
+        && resource.data.ownerId == request.auth.uid
+        && request.resource.data.ownerId == request.auth.uid;
+
+      allow delete: if false;
     }
 
-    match /lotes/{id} {
-      allow read: if true;
-      // A gerente (sem login) pode ajustar só o valor de venda promocional
-      // de um item que vai vencer — nunca quantidade, vencimento ou outro
-      // campo. Qualquer outra alteração continua exigindo login.
-      allow update: if request.auth != null ||
-        request.resource.data.diff(resource.data).affectedKeys().hasOnly(["precoPromocional", "promocaoAtiva"]);
-      allow create, delete: if request.auth != null;
-    }
-
-    // Produtos (custo, código de barras) e vistorias ficam restritos ao
-    // operador logado.
+    // Produtos: somente o dono do estabelecimento associado pode acessar.
     match /produtos/{id} {
-      allow read, write: if request.auth != null;
+      allow read, delete: if podeAcessarDados(resource.data);
+
+      allow create: if podeAcessarDados(request.resource.data);
+
+      allow update: if podeAcessarDados(resource.data)
+        && podeAcessarDados(request.resource.data);
     }
 
+    // Lotes podem ser removidos quando vendidos, vencidos ou cadastrados por engano.
+    match /lotes/{id} {
+      allow read, delete: if podeAcessarDados(resource.data);
+
+      allow create: if podeAcessarDados(request.resource.data);
+
+      allow update: if podeAcessarDados(resource.data)
+        && podeAcessarDados(request.resource.data);
+    }
+
+    // Saldo atual do estoque: o dono pode ler, criar, ajustar e remover o documento.
+    match /estoque/{id} {
+      allow read, delete: if podeAcessarDados(resource.data);
+
+      allow create: if podeAcessarDados(request.resource.data);
+
+      allow update: if podeAcessarDados(resource.data)
+        && podeAcessarDados(request.resource.data);
+    }
+
+    // Histórico de vistorias: leitura e criação; sem edição ou exclusão pelo cliente.
     match /vistorias/{id} {
-      allow read, write: if request.auth != null;
+      allow read: if podeAcessarDados(resource.data);
+
+      allow create: if podeAcessarDados(request.resource.data);
+
+      allow update, delete: if false;
     }
 
-    // Coleção única para "saiu do estoque ativo" (vendido ou vencido),
-    // substituindo as antigas "excluidos" e "perdas".
+    // Histórico de movimentações: leitura e criação; sem edição ou exclusão pelo cliente.
+    match /movimentosEstoque/{id} {
+      allow read: if podeAcessarDados(resource.data);
+
+      allow create: if podeAcessarDados(request.resource.data);
+
+      allow update, delete: if false;
+    }
+
+    // Saídas (vendidos e vencidos): histórico imutável pelo cliente.
     match /saidas/{id} {
-      allow read, write: if request.auth != null;
+      allow read: if podeAcessarDados(resource.data);
+
+      allow create: if podeAcessarDados(request.resource.data);
+
+      allow update, delete: if false;
     }
   }
 }
