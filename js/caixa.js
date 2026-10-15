@@ -93,6 +93,18 @@ async function processarLeitura(codigo, tentativas = 0) {
       }
 
       const quantidadeNova = quantidadeAtual - 1;
+      const refMovimentoEstoque = doc(collection(db, "movimentosEstoque"));
+      tx.set(refMovimentoEstoque, {
+        estabelecimentoId: estabelecimentoAtual.id,
+        produtoId: produto.id,
+        produtoNome: produto.nome,
+        local: "geral",
+        tipo: "venda",
+        quantidade: 1,
+        delta: -1,
+        origem: "caixa",
+        registradoEm: serverTimestamp(),
+      });
 
       if (quantidadeNova > 0) {
         tx.update(loteRef, { quantidade: quantidadeNova });
