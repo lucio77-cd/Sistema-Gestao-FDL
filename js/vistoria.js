@@ -3,6 +3,7 @@ import { protegerPagina } from "./auth-guard.js";
 import { iniciarNavegacao } from "./nav.js";
 import { calcularStatus, formatarData, formatarValorOuAviso } from "./status.js";
 import { mostrarToast } from "./toast.js";
+import { calcularBaixaPorVencimento } from "./vistoria-stock.js";
 import {
   collection,
   query,
@@ -11,7 +12,7 @@ import {
   addDoc,
   doc,
   writeBatch,
-  increment,
+  runTransaction,
   serverTimestamp,
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
@@ -468,84 +469,114 @@ document.getElementById("btn-salvar-vistoria").addEventListener("click", async (
   botao.textContent = "Salvando…";
 
   try {
-    const batch = writeBatch(db);
     const itensHistorico = [];
+    const loteRefs = prontos.map(([loteId]) => doc(db, "lotes", loteId));
+    const produtosVencidos = [...new Set(prontos
+      .filter(([, c]) => c.acaoZero === "vencido" && (c.quantidadeParaAcao ?? c.valorOriginal) > 0)
+      .map(([, c]) => c.produtoId))];
+    const estoqueRefs = produtosVencidos.map((produtoId) => doc(db, "estoque", produtoId));
+    const divergencias = [];
 
-    prontos.forEach(([loteId, c, quantidadeNova]) => {
-      const loteRef = doc(db, "lotes", loteId);
-      // A quantidade da ação é a que estava no campo NO MOMENTO do clique no
-      // botão — não a quantidade original do banco — pra não perder o caso de
-      // alguém ajustar um pouco pelo stepper e só depois decidir a ação.
-      const quantidadeDaAcao = c.quantidadeParaAcao ?? c.valorOriginal;
+    await runTransaction(db, async (tx) => {
+      // Todas as leituras ocorrem antes de qualquer escrita. A transação
+      // protege a baixa do estoque contra vendas/ajustes concorrentes.
+      const loteSnaps = await Promise.all(loteRefs.map((ref) => tx.get(ref)));
+      const estoqueSnaps = await Promise.all(estoqueRefs.map((ref) => tx.get(ref)));
+      const lotesAtuais = new Map(loteSnaps.map((snap) => [snap.id, snap]));
+      const estoqueAtual = new Map(estoqueSnaps.map((snap) => [snap.id, snap]));
 
-      if (c.acaoZero === "excluir") {
-        // Só apaga o lote: sem registro em "saidas".
-        batch.delete(loteRef);
-      } else if (c.acaoZero === "vendido" || c.acaoZero === "vencido") {
-        batch.delete(loteRef);
-        const refSaida = doc(collection(db, "saidas"));
-        batch.set(refSaida, {
-          estabelecimentoId: estabelecimentoAtual.id,
-          produtoId: c.produtoId,
-          produtoNome: c.produtoNome,
-          motivo: c.acaoZero,
-          quantidade: quantidadeDaAcao,
-          precoCusto: c.precoCusto,
-          valor: quantidadeDaAcao * c.precoCusto,
-          local: c.local,
-          dataVencimentoOriginal: c.dataVencimento,
-          origem: "vistoria",
-          registradoEm: serverTimestamp(),
-        });
+      for (let i = 0; i < prontos.length; i += 1) {
+        const [loteId, c] = prontos[i];
+        const snap = lotesAtuais.get(loteId);
+        if (!snap?.exists()) throw new Error("Um dos lotes foi removido. Atualize a página e tente novamente.");
+        const lote = snap.data();
+        if (lote.estabelecimentoId !== estabelecimentoAtual.id ||
+            Number(lote.quantidade) !== Number(c.valorOriginal)) {
+          throw new Error("Um dos lotes mudou desde que a página foi carregada. Atualize a página e tente novamente.");
+        }
+      }
 
-        // "Vencido" também desconta do estoque (no local do lote) — mas só se
-        // o produto já foi contado na aba Estoque, para não criar número
-        // negativo sem motivo. "Vendido" não desconta: isso é papel do Caixa.
-        if (c.acaoZero === "vencido" && quantidadeDaAcao > 0 && produtosComEstoque.has(c.produtoId)) {
-          const campo = campoEstoqueDoLocal(c.local);
-          batch.set(
-            doc(db, "estoque", c.produtoId),
-            { [campo]: increment(-quantidadeDaAcao), atualizadoEm: serverTimestamp() },
-            { merge: true }
-          );
-          batch.set(doc(collection(db, "movimentosEstoque")), {
+      prontos.forEach(([loteId, c, quantidadeNova]) => {
+        const loteRef = doc(db, "lotes", loteId);
+        const quantidadeDaAcao = c.quantidadeParaAcao ?? c.valorOriginal;
+
+        if (c.acaoZero === "excluir") {
+          tx.delete(loteRef);
+        } else if (c.acaoZero === "vendido" || c.acaoZero === "vencido") {
+          tx.delete(loteRef);
+          const refSaida = doc(collection(db, "saidas"));
+          tx.set(refSaida, {
             estabelecimentoId: estabelecimentoAtual.id,
             produtoId: c.produtoId,
             produtoNome: c.produtoNome,
-            local: campo,
-            tipo: "vencido",
-            delta: -quantidadeDaAcao,
+            motivo: c.acaoZero,
+            quantidade: quantidadeDaAcao,
+            precoCusto: c.precoCusto,
+            valor: quantidadeDaAcao * c.precoCusto,
+            local: c.local,
+            dataVencimentoOriginal: c.dataVencimento,
             origem: "vistoria",
             registradoEm: serverTimestamp(),
           });
-        }
-      } else {
-        batch.update(loteRef, { quantidade: quantidadeNova });
-      }
 
-      itensHistorico.push({
-        loteId,
-        produtoId: c.produtoId,
-        quantidadeAnterior: c.valorOriginal,
-        quantidadeNova,
-        acao: c.acaoZero || "ajuste",
+          if (c.acaoZero === "vencido" && quantidadeDaAcao > 0) {
+            const campo = campoEstoqueDoLocal(c.local);
+            const saldoSnap = estoqueAtual.get(c.produtoId);
+            const existeSaldo = !!saldoSnap?.exists();
+            const saldo = existeSaldo ? saldoSnap.data()[campo] : null;
+            const baixa = calcularBaixaPorVencimento(saldo, quantidadeDaAcao, existeSaldo);
+
+            if (baixa.atualizar) {
+              tx.update(doc(db, "estoque", c.produtoId), {
+                [campo]: baixa.depois,
+                atualizadoEm: serverTimestamp(),
+              });
+            }
+            if (baixa.divergencia) divergencias.push(c.produtoNome);
+
+            tx.set(doc(collection(db, "movimentosEstoque")), {
+              estabelecimentoId: estabelecimentoAtual.id,
+              produtoId: c.produtoId,
+              produtoNome: c.produtoNome,
+              local: campo,
+              tipo: "vencido",
+              delta: baixa.delta,
+              quantidadeSolicitada: quantidadeDaAcao,
+              antes: baixa.antes,
+              depois: baixa.depois,
+              saldoAtualizado: baixa.atualizar,
+              divergenciaSaldo: baixa.divergencia,
+              origem: "vistoria",
+              registradoEm: serverTimestamp(),
+            });
+          }
+        } else {
+          tx.update(loteRef, { quantidade: quantidadeNova });
+        }
+
+        itensHistorico.push({
+          loteId,
+          produtoId: c.produtoId,
+          quantidadeAnterior: c.valorOriginal,
+          quantidadeNova,
+          acao: c.acaoZero || "ajuste",
+        });
+      });
+
+      tx.set(doc(collection(db, "vistorias")), {
+        estabelecimentoId: estabelecimentoAtual.id,
+        data: serverTimestamp(),
+        itens: itensHistorico,
+      });
+
+      tx.update(doc(db, "estabelecimentos", estabelecimentoAtual.id), {
+        ultimaVistoria: serverTimestamp(),
       });
     });
 
-    const refVistoria = doc(collection(db, "vistorias"));
-    batch.set(refVistoria, {
-      estabelecimentoId: estabelecimentoAtual.id,
-      data: serverTimestamp(),
-      itens: itensHistorico,
-    });
-
-    batch.update(doc(db, "estabelecimentos", estabelecimentoAtual.id), {
-      ultimaVistoria: serverTimestamp(),
-    });
-
-    await batch.commit();
-
-    if (pendentes.length > 0) {
+    if (divergencias.length > 0) {
+      mostrarToast(`Vistoria salva, mas o saldo geral era insuficiente para: ${[...new Set(divergencias)].join(", ")}. Saldo preservado em zero; confira o estoque físico.`, "erro");
+    } else if (pendentes.length > 0) {
       mostrarToast(`Vistoria salva. Falta decidir: ${pendentes.join(", ")}.`, "erro");
     } else {
       mostrarToast("Vistoria salva com sucesso.", "ok");
