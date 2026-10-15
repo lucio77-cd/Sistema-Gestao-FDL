@@ -1,0 +1,28 @@
+name: Vistoria stock logic tests
+
+on:
+  pull_request:
+    paths:
+      - "js/vistoria.js"
+      - "js/vistoria-stock.js"
+      - "tests/vistoria-stock.test.mjs"
+      - ".github/workflows/vistoria-stock.yml"
+  push:
+    branches:
+      - "fix/vistoria-stock-no-negative"
+    paths:
+      - "js/vistoria.js"
+      - "js/vistoria-stock.js"
+      - "tests/vistoria-stock.test.mjs"
+      - ".github/workflows/vistoria-stock.yml"
+
+jobs:
+  vistoria-stock:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Test stock balance logic
+        run: node --test tests/vistoria-stock.test.mjs
