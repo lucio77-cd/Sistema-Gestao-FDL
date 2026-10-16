@@ -1082,3 +1082,54 @@ label.switch {
 .scanner-modal { max-width:520px; }
 .scanner-modal video { display:block; width:100%; max-height:55vh; object-fit:contain; background:#111; border-radius:6px; }
 .scanner-status { margin:.7rem 0 0 !important; min-height:1.3em; }
+
+
+/* ---------- Panorama de vencimentos: indicadores e gráficos ---------- */
+.vencimento-resumo-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: .65rem;
+  margin: .2rem 0 1rem;
+}
+.vencimento-indicador {
+  display: flex;
+  flex-direction: column;
+  gap: .25rem;
+  min-width: 0;
+  padding: .85rem;
+  background: var(--surface);
+  border: 1px solid var(--steel-light);
+  border-radius: 8px;
+}
+.vencimento-indicador span {
+  color: var(--ink-soft);
+  font-size: .76rem;
+}
+.vencimento-indicador strong {
+  font-family: var(--font-mono);
+  font-size: clamp(1rem, 4vw, 1.35rem);
+  overflow-wrap: anywhere;
+}
+.vencimento-indicador small {
+  color: var(--ink-soft);
+  font-size: .72rem;
+  line-height: 1.35;
+}
+.vencimento-indicador--urgente {
+  border-left: 4px solid var(--vencido);
+}
+.vencimento-indicador--perda {
+  border-left: 4px solid var(--atencao);
+}
+.vencimento-grafico-faixas {
+  height: 230px;
+  position: relative;
+}
+#area-grafico-vencimentos {
+  position: relative;
+  min-height: 200px;
+}
+@media (max-width: 380px) {
+  .vencimento-resumo-grid { gap: .45rem; }
+  .vencimento-indicador { padding: .65rem; }
+}
