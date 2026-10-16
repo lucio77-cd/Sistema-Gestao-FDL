@@ -1,7 +1,11 @@
 import { db } from "./firebase-config.js";
 import { protegerPagina } from "./auth-guard.js";
 import { iniciarNavegacao } from "./nav.js";
-import { escapeHtml } from "./status.js";
+function escapeHtml(valor) {
+  return String(valor ?? "").replace(/[&<>"']/g, (c) => ({
+    "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"
+  }[c]));
+}
 import { mostrarToast } from "./toast.js";
 import {
   collection,
