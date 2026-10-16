@@ -120,6 +120,7 @@ function gerarListaWhatsApp(local) {
   const rotulo = ROTULO_LOCAL[local];
   const itens = produtos
     .map(p => ({ produto: p, quantidade: numero((estoqueMap[p.id] || {})[local]) }))
+    .filter(i => i.quantidade > 0)
     .sort((a,b) => nomeApresentacao(a.produto).localeCompare(nomeApresentacao(b.produto), "pt-BR", { sensitivity:"base" }));
   const linhas = [
     "📦 ESTOQUE — " + rotulo.toLocaleUpperCase("pt-BR"),
