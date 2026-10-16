@@ -155,7 +155,7 @@ function renderizarGrafico() {
   const lotesDoLocal = lotesCarregados.filter((l) => local === "todos" || l.local === local);
   const lotesVencidos = lotesDoLocal.filter((l) => l.diasRestantes !== null && l.diasRestantes < 0);
   const lotesFuturos = lotesDoLocal.filter((l) =>
-    l.diasRestantes !== null && l.diasRestantes >= 0 && l.diasRestantes < periodo
+    l.diasRestantes !== null && l.diasRestantes >= 0 && l.diasRestantes <= periodo
   );
   const valorVencido = lotesVencidos.reduce((soma, l) => soma + (Number(l.quantidade) || 0) * (Number(l.precoCusto) || 0), 0);
   const valorRisco = lotesFuturos.reduce((soma, l) => soma + (Number(l.quantidade) || 0) * (Number(l.precoCusto) || 0), 0);
@@ -190,13 +190,13 @@ function renderizarGrafico() {
   const semFaixas = document.getElementById("grafico-faixas-sem-dados");
   const faixasBase = [
     { rotulo: "0–7 dias", inicio: 0, fim: 7, cor: "#a83232" },
-    { rotulo: "8–14 dias", inicio: 7, fim: 14, cor: "#c2790a" },
-    { rotulo: "15–30 dias", inicio: 14, fim: 30, cor: "#235571" },
+    { rotulo: "8–14 dias", inicio: 8, fim: 14, cor: "#c2790a" },
+    { rotulo: "15–30 dias", inicio: 15, fim: 30, cor: "#235571" },
   ];
   const faixas = faixasBase.filter((f) => f.inicio < periodo).map((f) => ({
     ...f,
     unidades: lotesDoLocal
-      .filter((l) => l.diasRestantes !== null && l.diasRestantes >= f.inicio && l.diasRestantes < Math.min(f.fim, periodo))
+      .filter((l) => l.diasRestantes !== null && l.diasRestantes >= f.inicio && l.diasRestantes <= Math.min(f.fim, periodo))
       .reduce((soma, l) => soma + (Number(l.quantidade) || 0), 0),
   }));
   const totalFaixas = faixas.reduce((soma, f) => soma + f.unidades, 0);
