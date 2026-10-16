@@ -123,7 +123,7 @@ function renderizarLegendaAtualizacao(ultimaVistoria) {
 // produto vai vencer".
 function renderizarGrafico() {
   const periodo = Number(filtroPeriodo.value);
-  const lotesNoPeriodo = lotesCarregados.filter((l) => l.status !== "normal" && l.status !== "sem-validade" && l.diasRestantes <= periodo);
+  const lotesNoPeriodo = lotesCarregados.filter((l) => l.status !== "normal" && l.status !== "sem-validade" && l.diasRestantes >= 0 && l.diasRestantes <= periodo);
 
   if (graficoAtual) {
     graficoAtual.destroy();
