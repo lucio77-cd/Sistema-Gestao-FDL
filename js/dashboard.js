@@ -116,8 +116,9 @@ protegerPagina(async ({ estabelecimento }) => {
   if (lotes.length === 0) {
     document.getElementById("lista-lotes").innerHTML =
       '<p class="mensagem-vazio">Nenhum dado encontrado. Cadastre um produto e um lote na Vistoria para começar.</p>';
-    document.getElementById("secao-panorama-conteudo").innerHTML =
-      '<p class="mensagem-vazio">Nenhum dado encontrado ainda.</p>';
+    // Mantém a estrutura do Panorama para que os indicadores exibam zero
+    // e os gráficos apresentem seus estados vazios sem quebrar os filtros.
+    renderizarGrafico();
     return;
   }
 
