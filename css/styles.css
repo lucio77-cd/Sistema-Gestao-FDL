@@ -1071,3 +1071,14 @@ label.switch {
   .produtos-resumo-grid > div:last-child { grid-column:1 / -1; }
   .produto-item summary { padding:.8rem; }
 }
+
+
+/* ---------- Leitor de código de barras na aba Produtos ---------- */
+.produto-codigo-campo { min-width:0; }
+.produto-codigo-campo .pe-codigo { width:100%; }
+.btn-escanear-codigo { width:100%; margin-top:.45rem; }
+.produto-ajuda-scanner { display:block; margin-top:.4rem; color:var(--ink-soft); font-size:.75rem; line-height:1.4; }
+.scanner-overlay[hidden] { display:none; }
+.scanner-modal { max-width:520px; }
+.scanner-modal video { display:block; width:100%; max-height:55vh; object-fit:contain; background:#111; border-radius:6px; }
+.scanner-status { margin:.7rem 0 0 !important; min-height:1.3em; }
