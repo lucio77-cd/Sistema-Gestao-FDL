@@ -134,7 +134,12 @@ function renderizarProdutos() {
           <div><label>Preço de venda (R$)</label><input type="number" step="0.01" min="0" class="pe-venda" value="${esc(valorCampo(p.precoVenda))}" /></div>
           <div><label>Estoque mínimo (opcional)</label><input type="number" min="0" step="1" class="pe-minimo" value="${esc(valorCampo(p.estoqueMinimo))}" placeholder="Ex.: 12" /></div>
           <div><label>Antecedência do alerta (dias, opcional)</label><input type="number" min="0" step="1" class="pe-dias-alerta" value="${esc(valorCampo(p.diasAlerta))}" placeholder="Usar padrão se vazio" /></div>
-          <div class="produto-codigo-campo"><label>Código de barras (para o Caixa)</label><input type="text" inputmode="numeric" class="pe-codigo" value="${esc(valorCampo(p.codigoBarras))}" placeholder="Escaneie ou digite o código" /></div>
+          <div class="produto-codigo-campo">
+            <label>Código de barras (para o Caixa)</label>
+            <input type="text" inputmode="numeric" autocomplete="off" class="pe-codigo" value="${esc(valorCampo(p.codigoBarras))}" placeholder="Escaneie ou digite o código" />
+            <button type="button" class="btn-secundario btn-escanear-codigo" data-id="${esc(p.id)}">Escanear com câmera</button>
+            <small class="produto-ajuda-scanner">No computador, você também pode clicar no campo e usar um leitor USB.</small>
+          </div>
         </div>
         <button type="button" class="btn btn-salvar-produto" data-id="${esc(p.id)}">Salvar alterações</button>
       </div>`;
@@ -144,6 +149,92 @@ function renderizarProdutos() {
   container.querySelectorAll(".btn-salvar-produto").forEach(btn => {
     btn.addEventListener("click", () => salvarProduto(btn));
   });
+  container.querySelectorAll(".btn-escanear-codigo").forEach(btn => {
+    btn.addEventListener("click", () => escanearCodigo(btn));
+  });
+}
+
+let leitorCodigo = null;
+let controlesLeitura = null;
+let modalScanner = null;
+
+async function escanearCodigo(btn) {
+  const painel = btn.closest(".produto-form");
+  const campoCodigo = painel.querySelector(".pe-codigo");
+  if (!modalScanner) {
+    modalScanner = document.createElement("div");
+    modalScanner.className = "modal-overlay scanner-overlay";
+    modalScanner.innerHTML = `
+      <section class="modal scanner-modal" role="dialog" aria-modal="true" aria-labelledby="scanner-titulo">
+        <h2 id="scanner-titulo">Escanear código de barras</h2>
+        <p id="scanner-instrucao">Aponte a câmera para o código de barras do produto.</p>
+        <video id="scanner-video" autoplay muted playsinline></video>
+        <p id="scanner-status" class="scanner-status" role="status">Preparando câmera…</p>
+        <div class="modal-acoes">
+          <button type="button" class="btn-secundario" id="scanner-fechar">Cancelar</button>
+        </div>
+      </section>`;
+    document.body.appendChild(modalScanner);
+    modalScanner.querySelector("#scanner-fechar").addEventListener("click", fecharScanner);
+    modalScanner.addEventListener("click", evento => {
+      if (evento.target === modalScanner) fecharScanner();
+    });
+  }
+
+  const video = modalScanner.querySelector("#scanner-video");
+  const status = modalScanner.querySelector("#scanner-status");
+  modalScanner.hidden = false;
+  status.textContent = "Solicitando acesso à câmera…";
+  btn.disabled = true;
+
+  try {
+    const { BrowserMultiFormatReader } = await import("https://cdn.jsdelivr.net/npm/@zxing/browser@0.1.5/+esm");
+    leitorCodigo = new BrowserMultiFormatReader();
+    controlesLeitura = await leitorCodigo.decodeFromVideoDevice(
+      undefined,
+      video,
+      (resultado, erro) => {
+        if (resultado) {
+          const codigo = resultado.getText();
+          campoCodigo.value = codigo;
+          campoCodigo.dispatchEvent(new Event("input", { bubbles: true }));
+          fecharScanner();
+          campoCodigo.focus();
+          mostrarToast("Código de barras lido. Salve as alterações do produto.", "ok");
+        } else if (erro && erro.name !== "NotFoundException") {
+          status.textContent = "Mantenha o código visível e tente ajustar a distância.";
+        }
+      }
+    );
+    status.textContent = "Câmera ativa. Posicione o código dentro da imagem.";
+  } catch (erro) {
+    console.error(erro);
+    status.textContent = location.protocol !== "https:" && location.hostname !== "localhost"
+      ? "A câmera exige que o sistema esteja publicado em HTTPS."
+      : "Não foi possível abrir a câmera. Confira a permissão do navegador.";
+    mostrarToast("Não foi possível iniciar o leitor de câmera.", "erro");
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+function fecharScanner() {
+  if (controlesLeitura) {
+    try { controlesLeitura.stop(); } catch (erro) { console.warn(erro); }
+    controlesLeitura = null;
+  }
+  if (leitorCodigo) {
+    try { leitorCodigo.reset(); } catch (erro) { console.warn(erro); }
+    leitorCodigo = null;
+  }
+  if (modalScanner) {
+    const video = modalScanner.querySelector("#scanner-video");
+    if (video.srcObject) {
+      video.srcObject.getTracks().forEach(trilha => trilha.stop());
+      video.srcObject = null;
+    }
+    modalScanner.hidden = true;
+  }
 }
 
 async function salvarProduto(btn) {
