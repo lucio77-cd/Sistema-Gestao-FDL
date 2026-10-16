@@ -157,6 +157,8 @@ function renderizarProdutos() {
 let leitorCodigo = null;
 let controlesLeitura = null;
 let modalScanner = null;
+let scannerAtivo = false;
+let frameScanner = null;
 
 async function escanearCodigo(btn) {
   const painel = btn.closest(".produto-form");
@@ -167,7 +169,7 @@ async function escanearCodigo(btn) {
     modalScanner.innerHTML = `
       <section class="modal scanner-modal" role="dialog" aria-modal="true" aria-labelledby="scanner-titulo">
         <h2 id="scanner-titulo">Escanear código de barras</h2>
-        <p id="scanner-instrucao">Aponte a câmera para o código de barras do produto.</p>
+        <p id="scanner-instrucao">Centralize as barras na imagem. Evite reflexos e mantenha o código inteiro visível.</p>
         <video id="scanner-video" autoplay muted playsinline></video>
         <p id="scanner-status" class="scanner-status" role="status">Preparando câmera…</p>
         <div class="modal-acoes">
@@ -184,65 +186,100 @@ async function escanearCodigo(btn) {
   const video = modalScanner.querySelector("#scanner-video");
   const status = modalScanner.querySelector("#scanner-status");
   modalScanner.hidden = false;
-  status.textContent = "Solicitando acesso à câmera…";
+  status.textContent = "Abrindo câmera traseira…";
   btn.disabled = true;
 
   try {
-    const [{ BrowserMultiFormatReader }, { BarcodeFormat, DecodeHintType }] = await Promise.all([
-      import("https://cdn.jsdelivr.net/npm/@zxing/browser@0.1.5/+esm"),
-      import("https://cdn.jsdelivr.net/npm/@zxing/library@0.21.3/+esm")
-    ]);
+    // Usa o detector nativo do navegador quando disponível; evita carregar uma
+    // biblioteca pesada e costuma responder mais rápido em celulares compatíveis.
+    if ("BarcodeDetector" in window) {
+      const formatosSuportados = await BarcodeDetector.getSupportedFormats();
+      const formatosDesejados = ["ean_13", "ean_8", "upc_a", "upc_e", "code_128", "code_39", "itf"];
+      const formatos = formatosDesejados.filter(formato => formatosSuportados.includes(formato));
+      if (!formatos.length) throw new Error("O navegador não oferece formatos compatíveis.");
 
-    // Limita a busca aos formatos mais comuns em produtos de mercado.
-    const dicas = new Map();
-    dicas.set(DecodeHintType.POSSIBLE_FORMATS, [
-      BarcodeFormat.EAN_13,
-      BarcodeFormat.EAN_8,
-      BarcodeFormat.UPC_A,
-      BarcodeFormat.UPC_E,
-      BarcodeFormat.CODE_128,
-      BarcodeFormat.CODE_39,
-      BarcodeFormat.ITF
-    ]);
-    leitorCodigo = new BrowserMultiFormatReader(dicas, 180);
-
-    // Prioriza a câmera traseira e uma resolução moderada para leitura rápida.
-    controlesLeitura = await leitorCodigo.decodeFromConstraints(
-      {
+      const detector = new BarcodeDetector({ formats: formatos });
+      const stream = await navigator.mediaDevices.getUserMedia({
+        audio: false,
         video: {
           facingMode: { ideal: "environment" },
           width: { ideal: 1280 },
           height: { ideal: 720 }
-        },
-        audio: false
-      },
-      video,
-      (resultado, erro) => {
-        if (resultado) {
-          const codigo = resultado.getText();
-          campoCodigo.value = codigo;
-          campoCodigo.dispatchEvent(new Event("input", { bubbles: true }));
-          fecharScanner();
-          campoCodigo.focus();
-          mostrarToast("Código de barras lido. Salve as alterações do produto.", "ok");
-        } else if (erro && erro.name !== "NotFoundException") {
-          status.textContent = "Mantenha o código visível, firme e bem iluminado.";
         }
-      }
-    );
-    status.textContent = "Câmera traseira ativa. Centralize o código e mantenha o celular firme.";
+      });
+      video.srcObject = stream;
+      await video.play();
+      scannerAtivo = true;
+      status.textContent = "Câmera ativa. Centralize o código de barras.";
+
+      const procurar = async () => {
+        if (!scannerAtivo || modalScanner.hidden) return;
+        if (video.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA) {
+          try {
+            const resultados = await detector.detect(video);
+            if (resultados.length && resultados[0].rawValue) {
+              concluirLeitura(resultados[0].rawValue, campoCodigo);
+              return;
+            }
+          } catch (erro) {
+            console.warn("Falha temporária ao analisar a imagem:", erro);
+          }
+        }
+        if (scannerAtivo) frameScanner = requestAnimationFrame(procurar);
+      };
+      frameScanner = requestAnimationFrame(procurar);
+    } else {
+      // Compatibilidade com navegadores sem BarcodeDetector nativo.
+      const { BrowserMultiFormatReader } = await import("https://cdn.jsdelivr.net/npm/@zxing/browser@0.1.5/+esm");
+      leitorCodigo = new BrowserMultiFormatReader();
+      controlesLeitura = await leitorCodigo.decodeFromConstraints(
+        {
+          video: {
+            facingMode: { ideal: "environment" },
+            width: { ideal: 1280 },
+            height: { ideal: 720 }
+          },
+          audio: false
+        },
+        video,
+        (resultado, erro) => {
+          if (resultado) {
+            concluirLeitura(resultado.getText(), campoCodigo);
+          } else if (erro && erro.name !== "NotFoundException") {
+            status.textContent = "Ajuste a distância e mantenha o código inteiro visível.";
+          }
+        }
+      );
+      status.textContent = "Câmera ativa. Centralize o código de barras.";
+    }
   } catch (erro) {
-    console.error(erro);
-    status.textContent = location.protocol !== "https:" && location.hostname !== "localhost"
-      ? "A câmera exige que o sistema esteja publicado em HTTPS."
-      : "Não foi possível abrir a câmera. Confira a permissão do navegador.";
-    mostrarToast("Não foi possível iniciar o leitor de câmera.", "erro");
+    console.error("Erro no scanner:", erro);
+    status.textContent = erro.name === "NotAllowedError"
+      ? "Permita o acesso à câmera nas configurações do navegador."
+      : location.protocol !== "https:" && location.hostname !== "localhost"
+        ? "A câmera exige que o sistema esteja publicado em HTTPS."
+        : "Não foi possível iniciar a leitura. Feche e tente novamente.";
+    mostrarToast("Não foi possível iniciar a leitura do código.", "erro");
   } finally {
     btn.disabled = false;
   }
 }
 
+function concluirLeitura(codigo, campoCodigo) {
+  if (!codigo || !scannerAtivo && !controlesLeitura) return;
+  campoCodigo.value = codigo;
+  campoCodigo.dispatchEvent(new Event("input", { bubbles: true }));
+  fecharScanner();
+  campoCodigo.focus();
+  mostrarToast("Código lido. Clique em Salvar alterações para gravar.", "ok");
+}
+
 function fecharScanner() {
+  scannerAtivo = false;
+  if (frameScanner !== null) {
+    cancelAnimationFrame(frameScanner);
+    frameScanner = null;
+  }
   if (controlesLeitura) {
     try { controlesLeitura.stop(); } catch (erro) { console.warn(erro); }
     controlesLeitura = null;
@@ -257,6 +294,7 @@ function fecharScanner() {
       video.srcObject.getTracks().forEach(trilha => trilha.stop());
       video.srcObject = null;
     }
+    video.pause();
     modalScanner.hidden = true;
   }
 }
