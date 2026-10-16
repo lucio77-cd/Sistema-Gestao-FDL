@@ -114,7 +114,7 @@ protegerPagina(async ({ estabelecimento }) => {
 // Uma barra por lote, nome do produto ao lado, comprimento = quantidade.
 function renderizarGrafico() {
   const periodo = Number(filtroPeriodo.value);
-  const lotesNoPeriodo = lotesUrgentes.filter((l) => l.diasRestantes <= periodo);
+  const lotesNoPeriodo = lotesUrgentes.filter((l) => l.diasRestantes >= 0 && l.diasRestantes <= periodo);
 
   if (graficoAtual) {
     graficoAtual.destroy();
