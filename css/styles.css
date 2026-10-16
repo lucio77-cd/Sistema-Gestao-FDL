@@ -1243,3 +1243,8 @@ label.switch {
   .caixa-item-compra { font-size:.76rem; }
   .caixa-total-principal strong { font-size:2rem; }
 }
+
+/* Menos elementos administrativos na tela compartilhada com o cliente. */
+.pagina-caixa .tabbar,
+.pagina-caixa .menu-mais { display:none !important; }
+.pagina-caixa .caixa-cabecalho { margin-bottom:1rem; }
