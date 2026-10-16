@@ -12,7 +12,7 @@ export function iniciarNavegacao() {
   const btnMais = document.getElementById("btn-mais");
   const menuMais = document.getElementById("menu-mais");
 
-  if (btnMais && ["estoque", "caixa", "configuracoes"].includes(paginaAtual)) {
+  if (btnMais && ["estoque", "caixa", "configuracoes", "graficos"].includes(paginaAtual)) {
     btnMais.classList.add("ativo");
   }
 
