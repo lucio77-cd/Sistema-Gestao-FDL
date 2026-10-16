@@ -112,8 +112,43 @@ async function carregarContagensDaSessao() {
 
 function renderizarTudo() {
   atualizarResumo();
+  renderizarEstoqueBaixo();
   renderizarSessao();
   renderizarLista();
+}
+
+function renderizarEstoqueBaixo() {
+  const totalEl = document.getElementById("estoque-baixo-total");
+  const listaEl = document.getElementById("lista-estoque-baixo");
+  if (!totalEl || !listaEl) return;
+
+  const itens = produtos
+    .filter(p => p.ativo !== false && p.estoqueMinimo !== undefined && p.estoqueMinimo !== null && p.estoqueMinimo !== "")
+    .map(p => {
+      const saldo = estoqueMap[p.id] || {};
+      const geladeira = numero(saldo.geladeira);
+      const seco = numero(saldo.seco);
+      const total = geladeira + seco;
+      const minimo = numero(p.estoqueMinimo);
+      return { produto:p, geladeira, seco, total, minimo };
+    })
+    .filter(i => i.total <= i.minimo)
+    .sort((a,b) => (a.total-a.minimo) - (b.total-b.minimo) || nomeApresentacao(a.produto).localeCompare(nomeApresentacao(b.produto), "pt-BR", {sensitivity:"base"}));
+
+  totalEl.textContent = String(itens.length);
+  if (!itens.length) {
+    listaEl.innerHTML = '<p class="mensagem-vazio">Nenhum produto está no limite ou abaixo do estoque mínimo cadastrado.</p>';
+    return;
+  }
+
+  listaEl.innerHTML = "";
+  itens.forEach(i => {
+    const item = document.createElement("article");
+    item.className = "stock-item";
+    item.innerHTML = '<div class="stock-item-head"><div><strong>' + esc(nomeApresentacao(i.produto)) + '</strong><small>Estoque mínimo: ' + i.minimo + ' un.</small></div><span class="selo selo--atencao">' + (i.total === 0 ? "Sem estoque" : "Estoque baixo") + '</span></div>' +
+      '<div class="stock-item-meta">Total: <strong>' + i.total + ' un.</strong> · Geladeira: ' + i.geladeira + ' · Parte seca: ' + i.seco + '</div>';
+    listaEl.appendChild(item);
+  });
 }
 
 function gerarListaWhatsApp(local) {
