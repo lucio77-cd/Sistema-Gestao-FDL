@@ -15,12 +15,26 @@
 
   <main>
     <h1>Produtos</h1>
-    <p class="legenda">Toque em um produto para editar — inclusive pra adicionar o código de barras, usado pela baixa automática no Caixa.</p>
+    <p class="legenda">Consulte e complete o cadastro dos produtos. Os dados salvos aqui são usados nas rotinas de estoque e caixa.</p>
 
-    <div class="busca-produto-wrap">
+    <section class="painel stock-resumo">
+      <h2>Cadastro de produtos</h2>
+      <div class="stock-resumo-grid produtos-resumo-grid">
+        <div><span>Total de produtos</span><strong id="total-produtos">—</strong></div>
+        <div><span>Cadastros incompletos</span><strong id="total-incompletos">—</strong></div>
+        <div><span>Cadastros completos</span><strong id="total-completos">—</strong></div>
+      </div>
+    </section>
+
+    <section class="painel produtos-filtros">
       <label for="busca-produto">Buscar produto</label>
-      <input type="search" id="busca-produto" placeholder="Digite o nome…" />
-    </div>
+      <input type="search" id="busca-produto" placeholder="Nome, marca, categoria, volume ou código de barras" autocomplete="off" />
+      <label class="produtos-filtro-incompletos">
+        <input type="checkbox" id="filtro-incompletos" />
+        Mostrar somente produtos com informações faltando
+      </label>
+      <p class="legenda">Abra um produto para revisar ou completar seus dados. Campos não preenchidos serão destacados.</p>
+    </section>
 
     <div id="lista-produtos">
       <div class="skeleton-lote"><div class="skeleton-linha skeleton-linha--titulo"></div><div class="skeleton-linha skeleton-linha--meta"></div></div>
