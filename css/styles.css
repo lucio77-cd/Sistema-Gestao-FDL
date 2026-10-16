@@ -1201,3 +1201,45 @@ label.switch {
 
 .caixa-status--desativado { background:#f6dede; border-color:#e8bcbc; color:#8a2828; }
 .caixa-status--desativado .caixa-status-ponto { background:#a83232; }
+
+
+/* ---------- Caixa compartilhado com o cliente ---------- */
+.pagina-caixa { background:#f4f6f7; }
+.caixa-topo-separador { color:var(--steel-light); padding:0 .2rem; }
+.caixa-cliente-layout { display:grid; grid-template-columns:minmax(260px,.72fr) minmax(0,1.5fr); gap:1rem; align-items:start; }
+.caixa-operador { position:sticky; top:1rem; }
+.caixa-compra-painel { padding:clamp(1rem,2.4vw,1.65rem); }
+.caixa-compra-topo { display:flex; align-items:center; justify-content:space-between; gap:1rem; margin-bottom:1rem; }
+.caixa-compra-topo h2 { margin:0; font-size:1.2rem; }
+.caixa-compra-topo .caixa-sobretitulo { margin-bottom:.2rem; }
+.caixa-tabela-cabecalho,.caixa-item-compra { display:grid; grid-template-columns:minmax(0,1fr) 3.2rem minmax(5.5rem,.65fr) minmax(5.5rem,.7fr); gap:.65rem; align-items:center; }
+.caixa-tabela-cabecalho { padding:.65rem .2rem; color:var(--ink-soft); border-bottom:1px solid var(--steel-light); font-size:.74rem; }
+.caixa-tabela-cabecalho span:not(:first-child) { text-align:right; }
+.caixa-lista-leituras { min-height:150px; max-height:48vh; overflow:auto; }
+.caixa-vazio { padding:2.8rem 1rem; text-align:center; color:var(--ink-soft); }
+.caixa-vazio strong { display:block; color:var(--ink); font-size:1rem; }
+.caixa-vazio p { max-width:300px; margin:.4rem auto 0; font-size:.85rem; }
+.caixa-item-compra { padding:.9rem .2rem; border-bottom:1px solid #e8edef; font-size:.86rem; }
+.caixa-item-nome { min-width:0; overflow-wrap:anywhere; font-weight:600; }
+.caixa-item-qtd,.caixa-item-unitario,.caixa-item-total { text-align:right; font-variant-numeric:tabular-nums; white-space:nowrap; }
+.caixa-item-qtd { color:var(--ink-soft); }
+.caixa-item-total { font-weight:700; }
+.caixa-total-area { margin-top:1rem; padding:1.15rem; border-radius:10px; background:#f0f5f7; }
+.caixa-total-linha { display:flex; align-items:center; justify-content:space-between; gap:1rem; color:var(--ink-soft); font-size:.85rem; }
+.caixa-total-linha strong { color:var(--ink); font-variant-numeric:tabular-nums; }
+.caixa-total-principal { align-items:flex-end; margin-top:.6rem; padding-top:.8rem; border-top:1px solid #d7e1e5; color:var(--ink); }
+.caixa-total-principal span { font-size:.9rem; font-weight:700; }
+.caixa-total-principal strong { color:var(--primary); font-size:clamp(2rem,4vw,3rem); line-height:1.05; letter-spacing:-.045em; }
+.caixa-aviso-precos { margin:.8rem 0 0; color:#80520b; font-size:.8rem; line-height:1.45; }
+.caixa-nota-operacao { margin:.8rem 0 0; color:var(--ink-soft); font-size:.72rem; line-height:1.45; }
+@media(max-width:850px) {
+  .caixa-cliente-layout { grid-template-columns:1fr; }
+  .caixa-operador { position:static; }
+  .caixa-lista-leituras { max-height:38vh; }
+}
+@media(max-width:520px) {
+  .caixa-tabela-cabecalho,.caixa-item-compra { grid-template-columns:minmax(0,1fr) 2.1rem minmax(4.3rem,.6fr) minmax(4.3rem,.65fr); gap:.35rem; }
+  .caixa-tabela-cabecalho { font-size:.66rem; }
+  .caixa-item-compra { font-size:.76rem; }
+  .caixa-total-principal strong { font-size:2rem; }
+}
