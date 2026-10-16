@@ -115,7 +115,7 @@ async function processarLeitura(codigo, tentativas = 0) {
 
       if (quantidadeNova > 0) {
         tx.update(loteRef, { quantidade: quantidadeNova });
-        return { status: "baixado", quantidadeNova };
+        return { status: "baixado", quantidadeNova, precoPromocional: lote.promocaoAtiva && lote.precoPromocional != null ? lote.precoPromocional : null };
       }
 
       const refSaida = doc(collection(db, "saidas"));
@@ -133,13 +133,19 @@ async function processarLeitura(codigo, tentativas = 0) {
         origem: "caixa",
         registradoEm: serverTimestamp(),
       });
-      return { status: "encerrado" };
+      return { status: "encerrado", precoPromocional: lote.promocaoAtiva && lote.precoPromocional != null ? lote.precoPromocional : null };
     });
 
+    const precoPromocional = resultado.precoPromocional;
+    const precoCadastro = produto.precoVenda;
+    const precoUnitario = precoPromocional != null && precoPromocional !== "" && Number.isFinite(Number(precoPromocional))
+      ? Number(precoPromocional)
+      : (precoCadastro != null && precoCadastro !== "" && Number.isFinite(Number(precoCadastro)) ? Number(precoCadastro) : null);
+
     if (resultado.status === "baixado") {
-      registrarLeitura(produto.nome, `Baixa registrada — restam ${resultado.quantidadeNova} un.`, "ok");
+      registrarLeitura(produto.nome, `Baixa registrada — restam ${resultado.quantidadeNova} un.`, "ok", { produtoId: produto.id, precoUnitario });
     } else if (resultado.status === "encerrado") {
-      registrarLeitura(produto.nome, "Baixa registrada — lote encerrado.", "ok");
+      registrarLeitura(produto.nome, "Baixa registrada — lote encerrado.", "ok", { produtoId: produto.id, precoUnitario });
     } else if (tentativas < 3) {
       await processarLeitura(codigo, tentativas + 1);
     } else {
@@ -152,27 +158,46 @@ async function processarLeitura(codigo, tentativas = 0) {
 }
 
 let totalLeiturasSessao = 0;
+const itensCompra = new Map();
 
-function registrarLeitura(produtoNome, mensagem, tipo) {
+function dinheiro(valor) {
+  return Number(valor).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+}
+
+function registrarLeitura(produtoNome, mensagem, tipo, detalhes = null) {
   mostrarToast(produtoNome ? `${produtoNome}: ${mensagem}` : mensagem, tipo);
+  if (tipo !== "ok" || !detalhes) return;
 
-  const container = document.getElementById("lista-leituras");
-  const vazio = container.querySelector(".caixa-vazio");
-  if (vazio) vazio.remove();
-
+  const chave = detalhes.produtoId || produtoNome;
+  const existente = itensCompra.get(chave);
+  if (existente) {
+    existente.quantidade += 1;
+    if (existente.precoUnitario == null && detalhes.precoUnitario != null) existente.precoUnitario = detalhes.precoUnitario;
+  } else {
+    itensCompra.set(chave, { produtoId: chave, nome: produtoNome, quantidade: 1, precoUnitario: detalhes.precoUnitario });
+  }
   totalLeiturasSessao += 1;
-  document.getElementById("caixa-contador-leituras").textContent = String(totalLeiturasSessao);
+  renderizarCompra();
+}
 
-  const div = document.createElement("div");
-  div.className = `caixa-leitura-item${tipo === "erro" ? " caixa-leitura-item--erro" : ""}`;
-  const hora = new Date().toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit", second: "2-digit" });
-  div.innerHTML = `
-    <div class="caixa-leitura-estado" aria-hidden="true">${tipo === "erro" ? "!" : "✓"}</div>
-    <div class="caixa-leitura-conteudo">
-      <div class="caixa-leitura-nome">${escapeHtml(produtoNome) || "Produto não identificado"}</div>
-      <div class="caixa-leitura-mensagem">${escapeHtml(mensagem)}</div>
-    </div>
-    <time class="caixa-leitura-hora">${hora}</time>
-  `;
-  container.prepend(div);
+function renderizarCompra() {
+  const container = document.getElementById("lista-leituras");
+  const itens = [...itensCompra.values()];
+  const unidades = itens.reduce((soma, item) => soma + item.quantidade, 0);
+  const incompletos = itens.some(item => item.precoUnitario == null);
+  const totalConhecido = itens.reduce((soma, item) => soma + (item.precoUnitario == null ? 0 : item.precoUnitario * item.quantidade), 0);
+  document.getElementById("caixa-contador-leituras").textContent = `${itens.length} ${itens.length === 1 ? "produto" : "produtos"}`;
+  document.getElementById("caixa-total-unidades").textContent = String(unidades);
+  document.getElementById("caixa-total-valor").textContent = incompletos ? `${dinheiro(totalConhecido)}*` : dinheiro(totalConhecido);
+  document.getElementById("caixa-aviso-precos").hidden = !incompletos;
+
+  if (!itens.length) {
+    container.innerHTML = '<div class="caixa-vazio"><div class="caixa-vazio-icone" aria-hidden="true">▢</div><strong>Vamos começar?</strong><p>Os produtos adicionados aparecerão aqui, com os preços cadastrados.</p></div>';
+    return;
+  }
+  container.innerHTML = itens.map(item => {
+    const total = item.precoUnitario == null ? "—" : dinheiro(item.precoUnitario * item.quantidade);
+    const unitario = item.precoUnitario == null ? "Sem preço" : dinheiro(item.precoUnitario);
+    return `<div class="caixa-item-compra"><div class="caixa-item-nome">${escapeHtml(item.nome)}</div><div class="caixa-item-qtd">${item.quantidade}</div><div class="caixa-item-unitario">${unitario}</div><div class="caixa-item-total">${total}</div></div>`;
+  }).join("");
 }
