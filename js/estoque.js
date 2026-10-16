@@ -116,6 +116,48 @@ function renderizarTudo() {
   renderizarLista();
 }
 
+function gerarListaWhatsApp(local) {
+  const rotulo = ROTULO_LOCAL[local];
+  const itens = produtos
+    .map(p => ({ produto: p, quantidade: numero((estoqueMap[p.id] || {})[local]) }))
+    .sort((a,b) => nomeApresentacao(a.produto).localeCompare(nomeApresentacao(b.produto), "pt-BR", { sensitivity:"base" }));
+  const linhas = [
+    "📦 ESTOQUE — " + rotulo.toLocaleUpperCase("pt-BR"),
+    "Data: " + new Date().toLocaleString("pt-BR", { dateStyle:"short", timeStyle:"short" }),
+    "",
+    ...itens.map(i => "• " + nomeApresentacao(i.produto) + " — " + i.quantidade + " un.")
+  ];
+  const campo = document.getElementById("texto-lista-whatsapp");
+  campo.value = linhas.join("\n");
+  campo.dataset.local = local;
+  document.getElementById("btn-copiar-lista").disabled = itens.length === 0;
+}
+
+document.getElementById("btn-lista-geladeira").addEventListener("click", () => gerarListaWhatsApp("geladeira"));
+document.getElementById("btn-lista-seco").addEventListener("click", () => gerarListaWhatsApp("seco"));
+document.getElementById("btn-copiar-lista").addEventListener("click", async () => {
+  const campo = document.getElementById("texto-lista-whatsapp");
+  if (!campo.value.trim()) {
+    mostrarToast("Gere uma lista antes de copiar.", "erro");
+    return;
+  }
+  try {
+    if (navigator.clipboard && window.isSecureContext) {
+      await navigator.clipboard.writeText(campo.value);
+    } else {
+      campo.focus();
+      campo.select();
+      if (!document.execCommand("copy")) throw new Error("Cópia não disponível");
+    }
+    mostrarToast("Lista copiada. Agora é só colar no WhatsApp.", "ok");
+  } catch (erro) {
+    console.error(erro);
+    campo.focus();
+    campo.select();
+    mostrarToast("Selecione o texto e copie manualmente.", "erro");
+  }
+});
+
 function atualizarResumo() {
   document.getElementById("resumo-produtos").textContent = String(produtos.length);
   document.getElementById("resumo-contados").textContent = String(Object.keys(contagens).length);
