@@ -47,17 +47,50 @@
     <section id="secao-panorama" hidden>
       <div id="secao-panorama-conteudo">
         <div class="filtros">
-          <select id="filtro-periodo" aria-label="Período do gráfico">
+          <select id="filtro-periodo" aria-label="Período da análise">
             <option value="7">Próximos 7 dias</option>
             <option value="14" selected>Próximos 14 dias</option>
             <option value="30">Próximos 30 dias</option>
           </select>
         </div>
-        <div class="painel">
-          <canvas id="grafico-vencimentos"></canvas>
-          <p class="mensagem-vazio" id="grafico-sem-dados" hidden>Nenhum dado neste período.</p>
+
+        <div class="vencimento-resumo-grid" aria-live="polite">
+          <article class="vencimento-indicador vencimento-indicador--urgente">
+            <span>Lotes vencidos</span>
+            <strong id="resumo-lotes-vencidos">—</strong>
+            <small id="resumo-valor-vencido">Calculando valor...</small>
+          </article>
+          <article class="vencimento-indicador">
+            <span>Lotes a vencer</span>
+            <strong id="resumo-lotes-futuros">—</strong>
+            <small id="resumo-unidades-futuras">— unidades no período</small>
+          </article>
+          <article class="vencimento-indicador">
+            <span>Valor em risco</span>
+            <strong id="resumo-valor-risco">—</strong>
+            <small>Estoque com vencimento futuro</small>
+          </article>
+          <article class="vencimento-indicador vencimento-indicador--perda">
+            <span>Perdas registradas</span>
+            <strong id="resumo-perdas-periodo">—</strong>
+            <small id="resumo-perdas-legenda">Nos últimos dias selecionados</small>
+          </article>
         </div>
-                <p class="legenda">Quantidade que vai vencer, por produto — os mais urgentes primeiro. Toque numa barra para abrir o lote na Vistoria.</p>
+
+        <section class="painel">
+          <h2>Vencimentos por faixa</h2>
+          <p class="legenda">Unidades com vencimento próximo. Cada lote aparece em uma única faixa.</p>
+          <div class="vencimento-grafico-faixas"><canvas id="grafico-faixas-vencimento"></canvas></div>
+          <p class="mensagem-vazio" id="grafico-faixas-sem-dados" hidden>Nenhum vencimento futuro neste período.</p>
+        </section>
+
+        <section class="painel">
+          <h2>Lotes que vencem primeiro</h2>
+          <p class="legenda">Quantidade por lote, ordenada pela urgência. Toque numa barra para abrir o lote na Vistoria.</p>
+          <div id="area-grafico-vencimentos"><canvas id="grafico-vencimentos"></canvas></div>
+          <p class="mensagem-vazio" id="grafico-sem-dados" hidden>Nenhum dado neste período.</p>
+        </section>
+        <p class="legenda">O valor em risco é uma estimativa baseada na quantidade restante e no custo cadastrado. Perdas registradas são mostradas separadamente e usam a data do registro da saída, não a data de validade do lote.</p>
       </div>
     </section>
   </main>
