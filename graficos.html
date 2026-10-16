@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+<meta name="robots" content="noindex, nofollow" />
+<title>Gráficos — Controle de Bebidas</title>
+<link rel="stylesheet" href="css/styles.css" />
+</head>
+<body data-pagina-atual="graficos">
+<header class="topo">
+  <div class="topo-marca">Controle de Bebidas</div>
+  <div class="topo-sub" id="nome-estabelecimento">Carregando…</div>
+</header>
+<main>
+  <h1>Vendas</h1>
+  <p class="legenda">Acompanhe as unidades vendidas por dia e os produtos com maior saída, usando os registros reais do Caixa.</p>
+  <section class="painel">
+    <label for="filtro-periodo-vendas">Período da análise</label>
+    <select id="filtro-periodo-vendas">
+      <option value="7">Últimos 7 dias</option>
+      <option value="30" selected>Últimos 30 dias</option>
+      <option value="90">Últimos 90 dias</option>
+    </select>
+  </section>
+  <div class="stock-resumo-grid">
+    <div class="painel"><span>Unidades vendidas</span><strong id="total-vendido">—</strong></div>
+    <div class="painel"><span>Produtos vendidos</span><strong id="produtos-vendidos">—</strong></div>
+    <div class="painel"><span>Dias com vendas</span><strong id="dias-com-vendas">—</strong></div>
+  </div>
+  <section class="painel">
+    <h2>Vendas por dia</h2>
+    <p class="legenda">Quantidade de unidades registradas como venda em cada dia.</p>
+    <div style="height:260px;position:relative"><canvas id="grafico-vendas-dia"></canvas></div>
+    <p id="sem-vendas-dia" class="mensagem-vazio" hidden>Nenhuma venda registrada neste período.</p>
+  </section>
+  <section class="painel">
+    <h2>Produtos mais vendidos</h2>
+    <p class="legenda">Ranking por quantidade de unidades vendidas no período.</p>
+    <div id="area-grafico-produtos" style="height:320px;position:relative"><canvas id="grafico-produtos-vendidos"></canvas></div>
+    <p id="sem-vendas-produtos" class="mensagem-vazio" hidden>Nenhum produto vendido neste período.</p>
+  </section>
+  <p class="legenda">Importante: estes gráficos usam somente vendas registradas pelo Caixa. O sistema registra essas vendas como local “geral”, então os dados incluem a operação da geladeira e da parte seca, mas ainda não permitem separar as vendas por local. A vistoria física não é contabilizada como venda. Este relatório mostra unidades, não faturamento, pois o registro atual de venda não grava o preço efetivamente cobrado.</p>
+</main>
+<nav class="tabbar" aria-label="Navegação principal">
+  <a href="index.html" class="tabbar-item" data-pagina="dashboard"><span>Início</span></a>
+  <a href="vistoria.html" class="tabbar-item" data-pagina="vistoria"><span>Vistoria</span></a>
+  <a href="promocoes.html" class="tabbar-item" data-pagina="promocoes"><span>Promoções</span></a>
+  <a href="produtos.html" class="tabbar-item" data-pagina="produtos"><span>Produtos</span></a>
+  <button type="button" class="tabbar-item" id="btn-mais" aria-haspopup="true" aria-expanded="false"><span>Mais</span></button>
+</nav>
+<div class="menu-mais" id="menu-mais" hidden>
+  <a href="graficos.html" data-pagina="graficos">Gráficos</a>
+  <a href="estoque.html" data-pagina="estoque">Estoque</a>
+  <a href="caixa.html" data-pagina="caixa">Caixa</a>
+  <a href="configuracoes.html" data-pagina="configuracoes">Configurações</a>
+  <a href="#" id="link-sair">Sair</a>
+</div>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<script type="module" src="js/graficos.js"></script>
+</body>
+</html>
