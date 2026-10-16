@@ -70,6 +70,7 @@
 <div><label for="np-volume">Volume/medida</label><input id="np-volume" list="opcoes-volume" placeholder="Ex.: 350 ml, 2 L, 12 un." />
 <datalist id="opcoes-volume"><option value="200 ml"></option><option value="220 ml"></option><option value="250 ml"></option><option value="269 ml"></option><option value="290 ml"></option><option value="300 ml"></option><option value="310 ml"></option><option value="330 ml"></option><option value="350 ml"></option><option value="473 ml"></option><option value="500 ml"></option><option value="600 ml"></option><option value="1 L"></option><option value="1,5 L"></option><option value="2 L"></option><option value="2,5 L"></option><option value="3 L"></option><option value="5 L"></option></datalist></div>
 <div><label for="np-codigo">Código de barras</label><input id="np-codigo" type="text" inputmode="numeric" /></div>
+<div><label for="np-estoque-minimo">Estoque mínimo (opcional)</label><input id="np-estoque-minimo" type="number" min="0" step="1" inputmode="numeric" placeholder="Ex.: 12" /><small class="legenda">Alerta quando o saldo total chegar a este número ou ficar abaixo dele.</small></div>
 </div>
 <button class="btn" type="submit">Cadastrar produto</button>
 </form>
