@@ -232,3 +232,17 @@ export function calcularPercentuaisEstoque(lotes) {
     }))
     .sort((a, b) => b.quantidade - a.quantidade);
 }
+
+
+/**
+ * Escapa texto antes de inseri-lo em HTML.
+ * Evita que nomes ou campos vindos do Firestore sejam interpretados como marcação.
+ */
+export function escapeHtml(valor) {
+  return String(valor ?? "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
