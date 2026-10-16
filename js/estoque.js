@@ -117,25 +117,11 @@ function renderizarTudo() {
 }
 
 function atualizarResumo() {
-  let total = 0;
-  let vendas = 0;
-  let dataBase = 0;
-  produtos.forEach(p => {
-    const e = estoqueMap[p.id] || { geladeira:0, seco:0 };
-    total += e.geladeira + e.seco;
-    const base = dataMillis(e.ultimaContagemEm);
-    if (base > 0) {
-      dataBase = Math.max(dataBase, base);
-      vendas += movimentos.filter(m => m.produtoId === p.id && ["venda","estorno_venda"].includes(m.tipo) && dataMillis(m.registradoEm) > base)
-        .reduce((s,m) => s + (m.tipo === "estorno_venda" ? -1 : 1) * Math.abs(numero(m.quantidade) || numero(m.delta)), 0);
-    }
-  });
-  document.getElementById("resumo-registrado").textContent = String(total);
-  document.getElementById("resumo-vendas").textContent = String(vendas);
-  document.getElementById("resumo-estimado").textContent = String(total - vendas);
-  document.getElementById("resumo-data").textContent = dataBase
-    ? "Estimativa desde a última contagem registrada. Como as vendas não identificam o local de origem, o número é aproximado."
-    : "Ainda não há uma contagem física registrada para estabelecer a referência da estimativa.";
+  document.getElementById("resumo-produtos").textContent = String(produtos.length);
+  document.getElementById("resumo-contados").textContent = String(Object.keys(contagens).length);
+  document.getElementById("resumo-data").textContent = sessaoAtual
+    ? "Sessão atual: " + ROTULO_LOCAL[localAtual] + ". Confira os itens pendentes antes de finalizar."
+    : "Nenhuma contagem em andamento. Inicie uma vistoria física para registrar as quantidades reais.";
 }
 
 function renderizarSessao() {
