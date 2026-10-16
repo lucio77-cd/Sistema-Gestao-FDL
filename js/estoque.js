@@ -413,6 +413,13 @@ document.getElementById("form-novo-produto-estoque").addEventListener("submit", 
   e.preventDefault();
   const nome = document.getElementById("np-nome").value.trim();
   if (!nome) return;
+  const minimoEl = document.getElementById("np-estoque-minimo");
+  const minimoTexto = minimoEl.value.trim();
+  if (minimoTexto !== "" && (!Number.isInteger(Number(minimoTexto)) || Number(minimoTexto) < 0)) {
+    mostrarToast("O estoque mínimo deve ser um número inteiro igual ou maior que zero.", "erro");
+    minimoEl.focus();
+    return;
+  }
   const dados = {
     estabelecimentoId:estabelecimentoAtual.id, nome,
     marca:document.getElementById("np-marca").value.trim(),
@@ -421,7 +428,8 @@ document.getElementById("form-novo-produto-estoque").addEventListener("submit", 
     embalagem:document.getElementById("np-embalagem").value,
     volume:document.getElementById("np-volume").value.trim(),
     codigoBarras:document.getElementById("np-codigo").value.trim(),
-    precoCusto:0, precoVenda:0, ativo:true
+    precoCusto:0, precoVenda:0, ativo:true,
+    ...(minimoTexto !== "" ? { estoqueMinimo:Number(minimoTexto) } : {})
   };
   const chave = [dados.nome,dados.marca,dados.variante,dados.embalagem,dados.volume].join("|").toLocaleLowerCase("pt-BR");
   const duplicado = produtos.find(p => [p.nome,p.marca||"",p.variante||"",p.embalagem||"",p.volume||""].join("|").toLocaleLowerCase("pt-BR") === chave);
