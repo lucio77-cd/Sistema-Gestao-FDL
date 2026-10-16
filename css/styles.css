@@ -1047,3 +1047,27 @@ label.switch {
  .stock-item-controls label { grid-column:auto; }
  .stock-review-actions { flex-direction:column; }
 }
+
+
+/* ---------- Cadastro e complementação de produtos ---------- */
+.produtos-resumo-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.produtos-filtros { margin-bottom: 1rem; }
+.produtos-filtro-incompletos { display:flex; align-items:center; gap:.55rem; margin:.85rem 0 .3rem; font-weight:500; }
+.produtos-filtro-incompletos input { width:18px; height:18px; margin:0; flex:0 0 auto; }
+.produto-titulo { display:flex; flex-direction:column; gap:.2rem; min-width:0; }
+.produto-titulo strong { overflow-wrap:anywhere; }
+.produto-titulo small { color:var(--ink-soft); font-size:.78rem; font-weight:400; }
+.produto-status { display:inline-block; border-radius:999px; padding:.25rem .5rem; font-size:.68rem; white-space:nowrap; }
+.produto-status--pendente { background:#fff0d7; color:#80520b; }
+.produto-status--completo { background:#e1f3e7; color:#23683b; }
+.produto-pendencias { color:var(--ink-soft); font-size:.82rem; margin:.8rem 0; }
+.produto-pendencias strong { color:var(--atencao); }
+.produto-pendencias--ok { color:var(--normal); }
+.produto-form .stock-form-grid { margin-bottom:.5rem; }
+.produto-form input { min-width:0; }
+.produto-form .btn { width:100%; }
+@media (max-width:520px) {
+  .produtos-resumo-grid { grid-template-columns:1fr 1fr; }
+  .produtos-resumo-grid > div:last-child { grid-column:1 / -1; }
+  .produto-item summary { padding:.8rem; }
+}
