@@ -165,7 +165,7 @@ function dinheiro(valor) {
 }
 
 function registrarLeitura(produtoNome, mensagem, tipo, detalhes = null) {
-  mostrarToast(produtoNome ? `${produtoNome}: ${mensagem}` : mensagem, tipo);
+  if (tipo !== "ok") mostrarToast(produtoNome ? `${produtoNome}: ${mensagem}` : mensagem, tipo);
   if (tipo !== "ok" || !detalhes) return;
 
   const chave = detalhes.produtoId || produtoNome;
