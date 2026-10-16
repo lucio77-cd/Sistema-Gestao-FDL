@@ -1,7 +1,7 @@
 import { db } from "./firebase-config.js";
 import { protegerPagina } from "./auth-guard.js";
 import { iniciarNavegacao } from "./nav.js";
-import { calcularStatus, formatarDiasRestantes, montarGraficoPorProduto, seloHtml, formatarValorOuAviso } from "./status.js";
+import { calcularStatus, formatarDiasRestantes, montarGraficoPorProduto, seloHtml, formatarValorOuAviso, escapeHtml } from "./status.js";
 import {
   collection,
   query,
@@ -183,8 +183,8 @@ function renderizarTabela(lotes) {
     link.setAttribute("aria-label", `Abrir ${l.produtoNome} na Vistoria`);
     link.innerHTML = `
       <div class="lote-info">
-        <div class="lote-produto">${l.produtoNome}${l.status === "promocao" ? seloHtml("promocao") : ""}</div>
-        <div class="lote-meta">${l.local || "—"} · ${l.quantidade} un.</div>
+        <div class="lote-produto">${escapeHtml(l.produtoNome)}${l.status === "promocao" ? seloHtml("promocao") : ""}</div>
+        <div class="lote-meta">${escapeHtml(l.local || "—")} · ${l.quantidade} un.</div>
       </div>
       <div class="lote-dados">
         <div class="lote-dias lote-dias--${l.status}">${formatarDiasRestantes(l.diasRestantes)}</div>
