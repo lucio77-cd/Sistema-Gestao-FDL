@@ -5,21 +5,21 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
 <meta name="robots" content="noindex, nofollow" />
 <meta name="theme-color" content="#163b4f" />
-<title>Caixa — Controle de Bebidas</title>
+<title>Caixa — Sistema de Gestão FDL</title>
 <link rel="stylesheet" href="css/styles.css" />
 </head>
 <body data-pagina-atual="caixa" class="pagina-caixa">
   <header class="topo">
-    <div class="topo-marca">Controle de Bebidas</div>
+    <div class="topo-marca">FDL <span class="caixa-topo-separador">/</span> Caixa</div>
     <div class="topo-sub" id="nome-estabelecimento">Carregando…</div>
   </header>
 
   <main class="caixa-main">
     <div class="caixa-cabecalho">
       <div>
-        <p class="caixa-sobretitulo">PONTO DE VENDA</p>
-        <h1>Caixa rápido</h1>
-        <p class="caixa-descricao">Leitura simples e rápida dos produtos no balcão.</p>
+        <p class="caixa-sobretitulo">ATENDIMENTO</p>
+        <h1>Olá! Vamos registrar sua compra.</h1>
+        <p class="caixa-descricao">Confira os produtos e os valores conforme são adicionados.</p>
       </div>
       <div class="caixa-status" id="caixa-status" role="status">
         <span class="caixa-status-ponto"></span>
@@ -35,52 +35,37 @@
       </div>
     </div>
 
-    <div id="caixa-ativo" class="caixa-layout" hidden>
-      <section class="caixa-painel caixa-leitura-painel" aria-labelledby="titulo-leitura">
+    <div id="caixa-ativo" class="caixa-cliente-layout" hidden>
+      <section class="caixa-painel caixa-leitura-painel caixa-operador" aria-labelledby="titulo-leitura">
         <div class="caixa-painel-cabecalho">
-          <div class="caixa-etapa">01</div>
-          <div>
-            <h2 id="titulo-leitura">Ler produto</h2>
-            <p>Use o leitor USB ou digite o código.</p>
-          </div>
+          <div class="caixa-etapa">+</div>
+          <div><h2 id="titulo-leitura">Adicionar produto</h2><p>Escaneie o código de barras para incluir um item.</p></div>
         </div>
-
         <form id="form-scanner" class="caixa-form-scanner">
-          <label for="campo-codigo">Código de barras</label>
+          <label for="campo-codigo">Leitor de código de barras</label>
           <div class="caixa-campo-codigo">
-            <span class="caixa-codigo-icone" aria-hidden="true">
-              <svg viewBox="0 0 24 24" width="25" height="25" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M4 5v14M7 5v14M10 5v14M14 5v14M17 5v14M20 5v14"/></svg>
-            </span>
-            <input type="text" id="campo-codigo" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="Passe o leitor no código…" aria-describedby="caixa-ajuda-scanner" autofocus />
-            <button type="submit" class="caixa-btn-ler">Registrar</button>
+            <span class="caixa-codigo-icone" aria-hidden="true"><svg viewBox="0 0 24 24" width="25" height="25" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M4 5v14M7 5v14M10 5v14M14 5v14M17 5v14M20 5v14"/></svg></span>
+            <input type="text" id="campo-codigo" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="Escaneie ou digite o código…" aria-describedby="caixa-ajuda-scanner" autofocus />
+            <button type="submit" class="caixa-btn-ler">Adicionar</button>
           </div>
-          <p id="caixa-ajuda-scanner" class="caixa-ajuda">O leitor funciona como um teclado. Normalmente, basta escanear o código; o leitor envia a leitura automaticamente.</p>
+          <p id="caixa-ajuda-scanner" class="caixa-ajuda">O leitor USB funciona como um teclado. Pressione Enter ou use o botão para registrar o código digitado.</p>
         </form>
-
-        <div class="caixa-operacao-nota">
-          <span aria-hidden="true">i</span>
-          <p><strong>Modo atual:</strong> cada leitura válida registra a baixa de uma unidade no estoque. A cesta e o recebimento do pagamento serão adicionados na próxima etapa.</p>
-        </div>
       </section>
-
-      <section class="caixa-painel caixa-historico-painel" aria-labelledby="titulo-leituras">
-        <div class="caixa-painel-cabecalho caixa-historico-cabecalho">
-          <div class="caixa-etapa caixa-etapa--secundaria">02</div>
-          <div class="caixa-historico-titulo">
-            <h2 id="titulo-leituras">Leituras recentes</h2>
-            <p>Atividade desta sessão</p>
-          </div>
-          <span id="caixa-contador-leituras" class="caixa-contador">0</span>
+      <section class="caixa-painel caixa-compra-painel" aria-labelledby="titulo-compra">
+        <div class="caixa-compra-topo">
+          <div><p class="caixa-sobretitulo">RESUMO DA COMPRA</p><h2 id="titulo-compra">Produtos registrados</h2></div>
+          <span id="caixa-contador-leituras" class="caixa-contador">0 produtos</span>
         </div>
+        <div class="caixa-tabela-cabecalho" aria-hidden="true"><span>Produto</span><span>Qtd.</span><span>Unitário</span><span>Total</span></div>
         <div id="lista-leituras" class="caixa-lista-leituras" aria-live="polite" aria-relevant="additions">
-          <div class="caixa-vazio">
-            <div class="caixa-vazio-icone" aria-hidden="true">
-              <svg viewBox="0 0 24 24" width="36" height="36" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M3 7h18M5 7l1.5 13h11L19 7M9 7V4h6v3M9 11v5M15 11v5"/></svg>
-            </div>
-            <strong>Nenhuma leitura ainda</strong>
-            <p>Os produtos lidos aparecerão aqui durante esta sessão.</p>
-          </div>
+          <div class="caixa-vazio"><div class="caixa-vazio-icone" aria-hidden="true">▢</div><strong>Vamos começar?</strong><p>Os produtos adicionados aparecerão aqui, com os preços cadastrados.</p></div>
         </div>
+        <div class="caixa-total-area">
+          <div class="caixa-total-linha"><span>Quantidade de unidades</span><strong id="caixa-total-unidades">0</strong></div>
+          <div class="caixa-total-linha caixa-total-principal"><span>Total dos itens registrados</span><strong id="caixa-total-valor">—</strong></div>
+          <p id="caixa-aviso-precos" class="caixa-aviso-precos" hidden>Há produto(s) sem preço de venda cadastrado. O valor exibido é parcial.</p>
+        </div>
+        <p class="caixa-nota-operacao">O estoque é atualizado conforme cada leitura, seguindo o funcionamento atual do sistema. Esta tela ainda não confirma pagamentos nem registra uma venda financeira.</p>
       </section>
     </div>
   </main>
