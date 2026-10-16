@@ -43,12 +43,27 @@
   <p class="legenda">Importante: estes gráficos usam somente vendas registradas pelo Caixa. O sistema registra essas vendas como local “geral”, então os dados incluem a operação da geladeira e da parte seca, mas ainda não permitem separar as vendas por local. A vistoria física não é contabilizada como venda. Este relatório mostra unidades, não faturamento, pois o registro atual de venda não grava o preço efetivamente cobrado.</p>
 </main>
 <nav class="tabbar" aria-label="Navegação principal">
-  <a href="index.html" class="tabbar-item" data-pagina="dashboard"><span>Início</span></a>
-  <a href="vistoria.html" class="tabbar-item" data-pagina="vistoria"><span>Vistoria</span></a>
-  <a href="promocoes.html" class="tabbar-item" data-pagina="promocoes"><span>Promoções</span></a>
-  <a href="produtos.html" class="tabbar-item" data-pagina="produtos"><span>Produtos</span></a>
-  <button type="button" class="tabbar-item" id="btn-mais" aria-haspopup="true" aria-expanded="false"><span>Mais</span></button>
-</nav>
+    <a href="index.html" class="tabbar-item" data-pagina="dashboard">
+      <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 19V10M12 19V5M20 19v-7"/></svg>
+      <span>Início</span>
+    </a>
+    <a href="vistoria.html" class="tabbar-item" data-pagina="vistoria">
+      <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="4" width="14" height="17" rx="2"/><path d="M9 3h6v3H9z"/><path d="M9 12l2 2 4-4"/></svg>
+      <span>Vistoria</span>
+    </a>
+    <a href="promocoes.html" class="tabbar-item" data-pagina="promocoes">
+      <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 12l-8 8-9-9V4h7z"/><circle cx="7.5" cy="7.5" r="1.2" fill="currentColor" stroke="none"/></svg>
+      <span>Promoções</span>
+    </a>
+    <a href="produtos.html" class="tabbar-item" data-pagina="produtos">
+      <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 8l-9-5-9 5 9 5 9-5z"/><path d="M3 8v8l9 5 9-5V8"/><path d="M12 13v8"/></svg>
+      <span>Produtos</span>
+    </a>
+    <button type="button" class="tabbar-item" id="btn-mais" aria-haspopup="true" aria-expanded="false">
+      <svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor" aria-hidden="true"><circle cx="5" cy="12" r="1.8"/><circle cx="12" cy="12" r="1.8"/><circle cx="19" cy="12" r="1.8"/></svg>
+      <span>Mais</span>
+    </button>
+  </nav>
 <div class="menu-mais" id="menu-mais" hidden>
   <a href="graficos.html" data-pagina="graficos">Gráficos</a>
   <a href="estoque.html" data-pagina="estoque">Estoque</a>
