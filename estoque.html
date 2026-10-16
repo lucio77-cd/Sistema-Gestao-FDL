@@ -41,6 +41,14 @@
 <textarea id="texto-lista-whatsapp" rows="8" readonly placeholder="Escolha um local para gerar a lista."></textarea>
 <button type="button" class="btn" id="btn-copiar-lista" disabled>Copiar lista para WhatsApp</button>
 </section>
+<section class="painel" id="painel-estoque-baixo">
+<h2>Alerta de estoque baixo</h2>
+<p class="legenda">Produtos cujo saldo total (geladeira + parte seca) está igual ou abaixo do estoque mínimo cadastrado.</p>
+<div class="stock-resumo-grid">
+<div><span>Produtos para conferir</span><strong id="estoque-baixo-total">—</strong></div>
+</div>
+<div id="lista-estoque-baixo"><p class="mensagem-vazio">Carregando alertas…</p></div>
+</section>
 <div class="segmentado" role="tablist" aria-label="Local da contagem">
 <button type="button" id="seg-geladeira" class="ativo" role="tab" aria-selected="true">Geladeira</button>
 <button type="button" id="seg-seco" role="tab" aria-selected="false">Parte seca</button>
