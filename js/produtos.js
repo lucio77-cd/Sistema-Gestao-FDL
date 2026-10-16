@@ -188,10 +188,34 @@ async function escanearCodigo(btn) {
   btn.disabled = true;
 
   try {
-    const { BrowserMultiFormatReader } = await import("https://cdn.jsdelivr.net/npm/@zxing/browser@0.1.5/+esm");
-    leitorCodigo = new BrowserMultiFormatReader();
-    controlesLeitura = await leitorCodigo.decodeFromVideoDevice(
-      undefined,
+    const [{ BrowserMultiFormatReader }, { BarcodeFormat, DecodeHintType }] = await Promise.all([
+      import("https://cdn.jsdelivr.net/npm/@zxing/browser@0.1.5/+esm"),
+      import("https://cdn.jsdelivr.net/npm/@zxing/library@0.21.3/+esm")
+    ]);
+
+    // Limita a busca aos formatos mais comuns em produtos de mercado.
+    const dicas = new Map();
+    dicas.set(DecodeHintType.POSSIBLE_FORMATS, [
+      BarcodeFormat.EAN_13,
+      BarcodeFormat.EAN_8,
+      BarcodeFormat.UPC_A,
+      BarcodeFormat.UPC_E,
+      BarcodeFormat.CODE_128,
+      BarcodeFormat.CODE_39,
+      BarcodeFormat.ITF
+    ]);
+    leitorCodigo = new BrowserMultiFormatReader(dicas, 180);
+
+    // Prioriza a câmera traseira e uma resolução moderada para leitura rápida.
+    controlesLeitura = await leitorCodigo.decodeFromConstraints(
+      {
+        video: {
+          facingMode: { ideal: "environment" },
+          width: { ideal: 1280 },
+          height: { ideal: 720 }
+        },
+        audio: false
+      },
       video,
       (resultado, erro) => {
         if (resultado) {
@@ -202,11 +226,11 @@ async function escanearCodigo(btn) {
           campoCodigo.focus();
           mostrarToast("Código de barras lido. Salve as alterações do produto.", "ok");
         } else if (erro && erro.name !== "NotFoundException") {
-          status.textContent = "Mantenha o código visível e tente ajustar a distância.";
+          status.textContent = "Mantenha o código visível, firme e bem iluminado.";
         }
       }
     );
-    status.textContent = "Câmera ativa. Posicione o código dentro da imagem.";
+    status.textContent = "Câmera traseira ativa. Centralize o código e mantenha o celular firme.";
   } catch (erro) {
     console.error(erro);
     status.textContent = location.protocol !== "https:" && location.hostname !== "localhost"
