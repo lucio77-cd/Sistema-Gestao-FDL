@@ -1198,3 +1198,6 @@ label.switch {
   .caixa-btn-ler { padding:.65rem .7rem; }
   .caixa-painel { padding:1rem; }
 }
+
+.caixa-status--desativado { background:#f6dede; border-color:#e8bcbc; color:#8a2828; }
+.caixa-status--desativado .caixa-status-ponto { background:#a83232; }
