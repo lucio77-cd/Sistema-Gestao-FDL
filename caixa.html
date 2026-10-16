@@ -4,33 +4,84 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
 <meta name="robots" content="noindex, nofollow" />
+<meta name="theme-color" content="#163b4f" />
 <title>Caixa — Controle de Bebidas</title>
 <link rel="stylesheet" href="css/styles.css" />
 </head>
-<body data-pagina-atual="caixa">
+<body data-pagina-atual="caixa" class="pagina-caixa">
   <header class="topo">
     <div class="topo-marca">Controle de Bebidas</div>
     <div class="topo-sub" id="nome-estabelecimento">Carregando…</div>
   </header>
 
-  <main>
-    <h1>Caixa</h1>
-
-    <div id="caixa-desativado" hidden>
-      <p class="legenda">Este recurso está desativado. Ative em <a href="configuracoes.html">Configurações</a> pra usar a baixa automática por código de barras.</p>
+  <main class="caixa-main">
+    <div class="caixa-cabecalho">
+      <div>
+        <p class="caixa-sobretitulo">PONTO DE VENDA</p>
+        <h1>Caixa rápido</h1>
+        <p class="caixa-descricao">Leitura simples e rápida dos produtos no balcão.</p>
+      </div>
+      <div class="caixa-status" id="caixa-status" role="status">
+        <span class="caixa-status-ponto"></span>
+        <span id="caixa-status-texto">Aguardando ativação</span>
+      </div>
     </div>
 
-    <div id="caixa-ativo" hidden>
-      <p class="legenda">Escaneie o produto — a leitura funciona como um teclado, então o campo abaixo já recebe o código sozinho. Como não dá pra saber de qual lote específico a venda saiu, a baixa é feita do lote com mais quantidade daquele produto.</p>
-
-      <form id="form-scanner">
-        <input type="text" id="campo-codigo" autocomplete="off" placeholder="Aguardando leitura…" autofocus />
-      </form>
-
-      <h2>Últimas leituras</h2>
-      <div id="lista-leituras">
-        <p class="mensagem-vazio">Nenhuma leitura ainda nesta sessão.</p>
+    <div id="caixa-desativado" class="caixa-aviso" hidden>
+      <div class="caixa-aviso-icone" aria-hidden="true">!</div>
+      <div>
+        <strong>Caixa desativado</strong>
+        <p>Ative a baixa automática nas <a href="configuracoes.html">Configurações</a> para usar a leitura por código de barras.</p>
       </div>
+    </div>
+
+    <div id="caixa-ativo" class="caixa-layout" hidden>
+      <section class="caixa-painel caixa-leitura-painel" aria-labelledby="titulo-leitura">
+        <div class="caixa-painel-cabecalho">
+          <div class="caixa-etapa">01</div>
+          <div>
+            <h2 id="titulo-leitura">Ler produto</h2>
+            <p>Use o leitor USB ou digite o código.</p>
+          </div>
+        </div>
+
+        <form id="form-scanner" class="caixa-form-scanner">
+          <label for="campo-codigo">Código de barras</label>
+          <div class="caixa-campo-codigo">
+            <span class="caixa-codigo-icone" aria-hidden="true">
+              <svg viewBox="0 0 24 24" width="25" height="25" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M4 5v14M7 5v14M10 5v14M14 5v14M17 5v14M20 5v14"/></svg>
+            </span>
+            <input type="text" id="campo-codigo" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="Passe o leitor no código…" aria-describedby="caixa-ajuda-scanner" autofocus />
+            <button type="submit" class="caixa-btn-ler">Registrar</button>
+          </div>
+          <p id="caixa-ajuda-scanner" class="caixa-ajuda">O leitor funciona como um teclado. Normalmente, basta escanear o código; o leitor envia a leitura automaticamente.</p>
+        </form>
+
+        <div class="caixa-operacao-nota">
+          <span aria-hidden="true">i</span>
+          <p><strong>Modo atual:</strong> cada leitura válida registra a baixa de uma unidade no estoque. A cesta e o recebimento do pagamento serão adicionados na próxima etapa.</p>
+        </div>
+      </section>
+
+      <section class="caixa-painel caixa-historico-painel" aria-labelledby="titulo-leituras">
+        <div class="caixa-painel-cabecalho caixa-historico-cabecalho">
+          <div class="caixa-etapa caixa-etapa--secundaria">02</div>
+          <div class="caixa-historico-titulo">
+            <h2 id="titulo-leituras">Leituras recentes</h2>
+            <p>Atividade desta sessão</p>
+          </div>
+          <span id="caixa-contador-leituras" class="caixa-contador">0</span>
+        </div>
+        <div id="lista-leituras" class="caixa-lista-leituras" aria-live="polite" aria-relevant="additions">
+          <div class="caixa-vazio">
+            <div class="caixa-vazio-icone" aria-hidden="true">
+              <svg viewBox="0 0 24 24" width="36" height="36" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M3 7h18M5 7l1.5 13h11L19 7M9 7V4h6v3M9 11v5M15 11v5"/></svg>
+            </div>
+            <strong>Nenhuma leitura ainda</strong>
+            <p>Os produtos lidos aparecerão aqui durante esta sessão.</p>
+          </div>
+        </div>
+      </section>
     </div>
   </main>
 
@@ -66,4 +117,4 @@
 
   <script type="module" src="js/caixa.js"></script>
 </body>
-        </html>
+</html>
