@@ -31,6 +31,22 @@ function valorCampo(valor) {
   return valor === undefined || valor === null ? "" : String(valor);
 }
 
+
+const OPCOES_CATEGORIA = ["Refrigerante", "Água", "Suco", "Cerveja", "Energético", "Isotônico", "Chá", "Laticínio", "Destilado", "Vinho", "Outro"];
+const OPCOES_EMBALAGEM = ["Lata", "PET", "Vidro", "Long neck", "Garrafa", "Caixa", "Pacote", "Copo", "Sachê", "Barril", "Outra"];
+const OPCOES_VOLUME = ["100 ml", "200 ml", "220 ml", "250 ml", "269 ml", "290 ml", "300 ml", "310 ml", "330 ml", "350 ml", "473 ml", "500 ml", "600 ml", "700 ml", "750 ml", "900 ml", "1 L", "1,5 L", "1,75 L", "2 L", "2,5 L", "3 L", "5 L", "10 L", "12 un.", "18 un.", "24 un."];
+
+function opcoesSelect(valorAtual, opcoes, placeholder = "Selecione uma opção") {
+  const atual = valorCampo(valorAtual);
+  const lista = [...opcoes];
+  if (atual && !lista.some(opcao => opcao.toLocaleLowerCase("pt-BR") === atual.toLocaleLowerCase("pt-BR"))) {
+    lista.unshift(atual);
+  }
+  return '<option value=""' + (!atual ? " selected" : "") + '>' + esc(placeholder) + '</option>' +
+    lista.map(opcao => '<option value="' + esc(opcao) + '"' +
+      (opcao === atual ? " selected" : "") + '>' + esc(opcao) + '</option>').join("");
+}
+
 function camposFaltantes(p) {
   const campos = [
     ["marca", "Marca"],
@@ -110,10 +126,10 @@ function renderizarProdutos() {
         <div class="stock-form-grid">
           <div><label>Nome do produto *</label><input type="text" class="pe-nome" value="${esc(valorCampo(p.nome))}" required /></div>
           <div><label>Marca</label><input type="text" class="pe-marca" value="${esc(valorCampo(p.marca))}" /></div>
-          <div><label>Categoria</label><input type="text" class="pe-categoria" value="${esc(valorCampo(p.categoria))}" placeholder="Ex.: Refrigerante, Cerveja, Água" /></div>
+          <div><label>Categoria</label><select class="pe-categoria">${opcoesSelect(p.categoria, OPCOES_CATEGORIA)}</select></div>
           <div><label>Sabor/variante</label><input type="text" class="pe-variante" value="${esc(valorCampo(p.variante))}" placeholder="Ex.: Original, Zero, Laranja" /></div>
-          <div><label>Embalagem</label><input type="text" class="pe-embalagem" value="${esc(valorCampo(p.embalagem))}" placeholder="Ex.: Lata, PET, Vidro" /></div>
-          <div><label>Volume/medida</label><input type="text" class="pe-volume" value="${esc(valorCampo(p.volume))}" placeholder="Ex.: 350 ml, 2 L, 12 un." /></div>
+          <div><label>Embalagem</label><select class="pe-embalagem">${opcoesSelect(p.embalagem, OPCOES_EMBALAGEM)}</select></div>
+          <div><label>Volume/medida</label><select class="pe-volume">${opcoesSelect(p.volume, OPCOES_VOLUME)}</select></div>
           <div><label>Preço de custo (R$)</label><input type="number" step="0.01" min="0" class="pe-custo" value="${esc(valorCampo(p.precoCusto))}" /></div>
           <div><label>Preço de venda (R$)</label><input type="number" step="0.01" min="0" class="pe-venda" value="${esc(valorCampo(p.precoVenda))}" /></div>
           <div><label>Estoque mínimo (opcional)</label><input type="number" min="0" step="1" class="pe-minimo" value="${esc(valorCampo(p.estoqueMinimo))}" placeholder="Ex.: 12" /></div>
