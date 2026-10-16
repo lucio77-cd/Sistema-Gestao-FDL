@@ -27,11 +27,14 @@ protegerPagina(({ estabelecimento }) => {
   document.getElementById("nome-estabelecimento").textContent = estabelecimento.nome;
 
   if (!estabelecimento.baixaAutomaticaAtiva) {
+    document.getElementById("caixa-status-texto").textContent = "Desativado";
+    document.querySelector(".caixa-status").classList.add("caixa-status--desativado");
     document.getElementById("caixa-desativado").hidden = false;
     return;
   }
 
   document.getElementById("caixa-ativo").hidden = false;
+  document.getElementById("caixa-status-texto").textContent = "Pronto para leitura";
   campoCodigo.focus();
 });
 
@@ -148,23 +151,28 @@ async function processarLeitura(codigo, tentativas = 0) {
   }
 }
 
+let totalLeiturasSessao = 0;
+
 function registrarLeitura(produtoNome, mensagem, tipo) {
   mostrarToast(produtoNome ? `${produtoNome}: ${mensagem}` : mensagem, tipo);
 
   const container = document.getElementById("lista-leituras");
-  if (container.querySelector(".mensagem-vazio")) container.innerHTML = "";
+  const vazio = container.querySelector(".caixa-vazio");
+  if (vazio) vazio.remove();
+
+  totalLeiturasSessao += 1;
+  document.getElementById("caixa-contador-leituras").textContent = String(totalLeiturasSessao);
 
   const div = document.createElement("div");
-  div.className = `lote ${tipo === "erro" ? "lote--vencido" : "lote--normal"}`;
+  div.className = `caixa-leitura-item${tipo === "erro" ? " caixa-leitura-item--erro" : ""}`;
   const hora = new Date().toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit", second: "2-digit" });
   div.innerHTML = `
-    <div class="lote-info">
-      <div class="lote-produto">${escapeHtml(produtoNome) || "—"}</div>
-      <div class="lote-meta">${escapeHtml(mensagem)}</div>
+    <div class="caixa-leitura-estado" aria-hidden="true">${tipo === "erro" ? "!" : "✓"}</div>
+    <div class="caixa-leitura-conteudo">
+      <div class="caixa-leitura-nome">${escapeHtml(produtoNome) || "Produto não identificado"}</div>
+      <div class="caixa-leitura-mensagem">${escapeHtml(mensagem)}</div>
     </div>
-    <div class="lote-dados">
-      <div class="lote-valor">${hora}</div>
-    </div>
+    <time class="caixa-leitura-hora">${hora}</time>
   `;
   container.prepend(div);
 }
