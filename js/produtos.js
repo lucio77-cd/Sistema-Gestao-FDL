@@ -266,7 +266,7 @@ async function escanearCodigo(btn) {
 }
 
 function concluirLeitura(codigo, campoCodigo) {
-  if (!codigo || !scannerAtivo && !controlesLeitura) return;
+  if (!codigo || !modalScanner || modalScanner.hidden) return;
   campoCodigo.value = codigo;
   campoCodigo.dispatchEvent(new Event("input", { bubbles: true }));
   fecharScanner();
