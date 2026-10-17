@@ -151,17 +151,51 @@ function renderizarEstoqueBaixo() {
   });
 }
 
+function nomeCurtoWhatsApp(produto, todosProdutos) {
+  const marca = String(produto.marca || "").trim();
+  const nome = String(produto.nome || "").trim();
+  const volume = String(produto.volume || "").trim();
+  const variante = String(produto.variante || "").trim();
+
+  // Prioriza a marca quando o nome do cadastro repete essa mesma informação.
+  let principal = nome || marca || "Produto";
+  if (marca && nome.toLocaleLowerCase("pt-BR").includes(marca.toLocaleLowerCase("pt-BR"))) {
+    principal = marca;
+  } else if (marca && nome) {
+    principal = marca + " " + nome;
+  }
+
+  let curto = [principal, volume].filter(Boolean).join(" ");
+  const iguais = todosProdutos.filter(p => {
+    const outraMarca = String(p.marca || "").trim();
+    const outroNome = String(p.nome || "").trim();
+    let outroPrincipal = outroNome || outraMarca || "Produto";
+    if (outraMarca && outroNome.toLocaleLowerCase("pt-BR").includes(outraMarca.toLocaleLowerCase("pt-BR"))) {
+      outroPrincipal = outraMarca;
+    } else if (outraMarca && outroNome) {
+      outroPrincipal = outraMarca + " " + outroNome;
+    }
+    return [outroPrincipal, String(p.volume || "").trim()].filter(Boolean).join(" ").toLocaleLowerCase("pt-BR") === curto.toLocaleLowerCase("pt-BR");
+  });
+
+  // Só acrescenta a variante quando ela é necessária para diferenciar itens.
+  if (iguais.length > 1 && variante) curto = [principal, variante, volume].filter(Boolean).join(" ");
+  // Último recurso para evitar nomes iguais na mensagem.
+  if (iguais.length > 1 && !variante) curto = [principal, nome !== principal ? nome : "", volume].filter(Boolean).join(" ");
+  return curto;
+}
+
 function gerarListaWhatsApp(local) {
   const rotulo = ROTULO_LOCAL[local];
   const itens = produtos
     .map(p => ({ produto: p, quantidade: numero((estoqueMap[p.id] || {})[local]) }))
     .filter(i => i.quantidade > 0)
-    .sort((a,b) => nomeApresentacao(a.produto).localeCompare(nomeApresentacao(b.produto), "pt-BR", { sensitivity:"base" }));
+    .sort((a,b) => nomeCurtoWhatsApp(a.produto, produtos).localeCompare(nomeCurtoWhatsApp(b.produto, produtos), "pt-BR", { sensitivity:"base" }));
   const linhas = [
     "📦 ESTOQUE — " + rotulo.toLocaleUpperCase("pt-BR"),
-    "Data: " + new Date().toLocaleString("pt-BR", { dateStyle:"short", timeStyle:"short" }),
+    new Date().toLocaleDateString("pt-BR"),
     "",
-    ...itens.map(i => "• " + nomeApresentacao(i.produto) + " — " + i.quantidade + " un.")
+    ...itens.map(i => "• " + nomeCurtoWhatsApp(i.produto, produtos) + " — " + i.quantidade + " un.")
   ];
   const campo = document.getElementById("texto-lista-whatsapp");
   campo.value = linhas.join("\n");
