@@ -3,6 +3,10 @@ import { protegerPagina } from "./auth-guard.js";
 import { iniciarNavegacao } from "./nav.js";
 import { mostrarToast } from "./toast.js";
 import {
+  OPCOES_CATEGORIA, OPCOES_EMBALAGEM, OPCOES_VOLUME,
+  CHAVE_SEM_VALOR, chaveOpcao, rotuloPadronizado
+} from "./opcoes-produto.js";
+import {
   collection, query, where, getDocs, addDoc, setDoc, updateDoc,
   doc, writeBatch, increment, serverTimestamp, Timestamp
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
@@ -28,6 +32,14 @@ const painelSessao = document.getElementById("estado-sessao");
 const secaoContagem = document.getElementById("secao-contagem");
 const painelRevisao = document.getElementById("painel-revisao");
 
+// Filtros da lista do WhatsApp: guardam as chaves marcadas em cada grupo.
+// Grupo vazio = sem filtro (entram todos).
+const filtrosLista = { categoria: new Set(), embalagem: new Set() };
+const GRUPOS_FILTRO = {
+  categoria: { campo: "categoria", opcoes: OPCOES_CATEGORIA, rotuloSem: "Sem categoria", container: "chips-lista-categoria" },
+  embalagem: { campo: "embalagem", opcoes: OPCOES_EMBALAGEM, rotuloSem: "Sem embalagem", container: "chips-lista-embalagem" }
+};
+
 function numero(v) { return Number(v) || 0; }
 function esc(v) {
   return String(v ?? "").replace(/[&<>"']/g, c => ({ "&":"&amp;", "<":"&lt;", ">":"&gt;", '"':"&quot;", "'":"&#39;" }[c]));
@@ -49,6 +61,21 @@ function formatarDataHora(valor) {
   const ms = dataMillis(valor);
   return ms ? new Date(ms).toLocaleString("pt-BR", { dateStyle:"short", timeStyle:"short" }) : "agora";
 }
+
+// Preenche as listas do cadastro rápido (categoria, embalagem e volume)
+// com as opções compartilhadas em opcoes-produto.js.
+function preencherOpcoesDoCadastro() {
+  const preencher = (id, opcoes) => {
+    const select = document.getElementById(id);
+    select.innerHTML = '<option value="">Selecione…</option>' +
+      opcoes.map(o => '<option value="' + esc(o) + '">' + esc(o) + '</option>').join("");
+  };
+  preencher("np-categoria", OPCOES_CATEGORIA);
+  preencher("np-embalagem", OPCOES_EMBALAGEM);
+  document.getElementById("opcoes-volume").innerHTML =
+    OPCOES_VOLUME.map(v => '<option value="' + esc(v) + '"></option>').join("");
+}
+preencherOpcoesDoCadastro();
 
 protegerPagina(async ({ estabelecimento, user }) => {
   estabelecimentoAtual = estabelecimento;
@@ -189,33 +216,85 @@ function nomeCurtoWhatsApp(produto, todosProdutos) {
 
 let localListaWhatsApp = null;
 
+// ---------- Filtros da lista do WhatsApp (escolha múltipla) ----------
+
+function chaveDoProduto(produto, grupo) {
+  const chave = chaveOpcao(produto[GRUPOS_FILTRO[grupo].campo]);
+  return chave || CHAVE_SEM_VALOR;
+}
+
+// Opções que aparecem como botões: só o que existe nos produtos cadastrados,
+// sem repetir "suco" e "Suco", com "Sem ..." sempre por último.
+function opcoesDoFiltro(grupo) {
+  const cfg = GRUPOS_FILTRO[grupo];
+  const mapa = new Map();
+  produtos.forEach(p => {
+    const chave = chaveDoProduto(p, grupo);
+    if (mapa.has(chave)) return;
+    mapa.set(chave, chave === CHAVE_SEM_VALOR ? cfg.rotuloSem : rotuloPadronizado(p[cfg.campo], cfg.opcoes));
+  });
+  return [...mapa.entries()]
+    .map(([chave, rotulo]) => ({ chave, rotulo }))
+    .sort((a, b) => {
+      if (a.chave === CHAVE_SEM_VALOR) return 1;
+      if (b.chave === CHAVE_SEM_VALOR) return -1;
+      return a.rotulo.localeCompare(b.rotulo, "pt-BR", { sensitivity:"base" });
+    });
+}
+
+function rotulosSelecionados(grupo) {
+  return opcoesDoFiltro(grupo).filter(i => filtrosLista[grupo].has(i.chave)).map(i => i.rotulo);
+}
+
+function produtoPassaNoFiltro(produto) {
+  // "Ou" dentro de cada grupo; "e" entre os grupos.
+  return Object.keys(GRUPOS_FILTRO).every(grupo => {
+    const marcados = filtrosLista[grupo];
+    return marcados.size === 0 || marcados.has(chaveDoProduto(produto, grupo));
+  });
+}
+
+function atualizarResumoFiltros() {
+  const tipos = rotulosSelecionados("categoria");
+  const embalagens = rotulosSelecionados("embalagem");
+  document.getElementById("resumo-filtros-lista").textContent =
+    "Mostrando: " + (tipos.length ? tipos.join(", ") : "todos os tipos") +
+    " · " + (embalagens.length ? embalagens.join(", ") : "todas as embalagens");
+  document.getElementById("btn-limpar-filtros-lista").hidden = !(tipos.length || embalagens.length);
+}
+
 function preencherFiltrosListaWhatsApp() {
-  const categoria = document.getElementById("filtro-lista-categoria");
-  const embalagem = document.getElementById("filtro-lista-embalagem");
-  const preencher = (select, campo, rotulo) => {
-    const selecionado = select.value;
-    const valores = [...new Set(produtos.map(p => String(p[campo] || "").trim()).filter(Boolean))]
-      .sort((a,b) => a.localeCompare(b, "pt-BR", {sensitivity:"base"}));
-    select.innerHTML = '<option value="">Todas ' + rotulo + '</option>' +
-      valores.map(v => '<option value="' + esc(v) + '">' + esc(v) + '</option>').join("");
-    if (valores.includes(selecionado)) select.value = selecionado;
-  };
-  preencher(categoria, "categoria", "as categorias");
-  preencher(embalagem, "embalagem", "as embalagens");
+  Object.keys(GRUPOS_FILTRO).forEach(grupo => {
+    const container = document.getElementById(GRUPOS_FILTRO[grupo].container);
+    const itens = opcoesDoFiltro(grupo);
+    const existentes = new Set(itens.map(i => i.chave));
+    // Remove marcações de opções que deixaram de existir, para não filtrar "no escuro".
+    [...filtrosLista[grupo]].forEach(chave => { if (!existentes.has(chave)) filtrosLista[grupo].delete(chave); });
+
+    if (!itens.length) {
+      container.innerHTML = '<span class="legenda">Nenhum produto cadastrado.</span>';
+      return;
+    }
+    container.innerHTML = itens.map(i => {
+      const ativo = filtrosLista[grupo].has(i.chave);
+      return '<button type="button" class="chip-filtro' + (ativo ? ' chip-filtro--ativo' : '') + '" data-grupo="' + grupo + '" data-chave="' + esc(i.chave) + '" aria-pressed="' + ativo + '">' + esc(i.rotulo) + '</button>';
+    }).join("");
+  });
+  atualizarResumoFiltros();
 }
 
 function gerarListaWhatsApp(local) {
   localListaWhatsApp = local;
   const rotulo = ROTULO_LOCAL[local];
-  const categoria = document.getElementById("filtro-lista-categoria").value;
-  const embalagem = document.getElementById("filtro-lista-embalagem").value;
   const itens = produtos
-    .filter(p => (!categoria || String(p.categoria || "").trim() === categoria)
-      && (!embalagem || String(p.embalagem || "").trim() === embalagem))
+    .filter(produtoPassaNoFiltro)
     .map(p => ({ produto: p, quantidade: numero((estoqueMap[p.id] || {})[local]) }))
     .filter(i => i.quantidade > 0)
     .sort((a,b) => nomeCurtoWhatsApp(a.produto, produtos).localeCompare(nomeCurtoWhatsApp(b.produto, produtos), "pt-BR", { sensitivity:"base" }));
-  const filtros = [categoria, embalagem].filter(Boolean);
+  const filtros = [
+    rotulosSelecionados("categoria").join(", "),
+    rotulosSelecionados("embalagem").join(", ")
+  ].filter(Boolean);
   const linhas = [
     "📦 ESTOQUE — " + rotulo.toLocaleUpperCase("pt-BR") + (filtros.length ? " — " + filtros.join(" / ").toLocaleUpperCase("pt-BR") : ""),
     new Date().toLocaleDateString("pt-BR"),
@@ -230,12 +309,28 @@ function gerarListaWhatsApp(local) {
 
 document.getElementById("btn-lista-geladeira").addEventListener("click", () => gerarListaWhatsApp("geladeira"));
 document.getElementById("btn-lista-seco").addEventListener("click", () => gerarListaWhatsApp("seco"));
-document.getElementById("filtro-lista-categoria").addEventListener("change", () => {
+
+// Um único listener cuida de todos os botões de filtro (tipo e embalagem).
+document.getElementById("painel-lista-whatsapp").addEventListener("click", e => {
+  const chip = e.target.closest(".chip-filtro");
+  if (!chip) return;
+  const { grupo, chave } = chip.dataset;
+  const marcados = filtrosLista[grupo];
+  if (marcados.has(chave)) marcados.delete(chave); else marcados.add(chave);
+  const ativo = marcados.has(chave);
+  chip.classList.toggle("chip-filtro--ativo", ativo);
+  chip.setAttribute("aria-pressed", String(ativo));
+  atualizarResumoFiltros();
   if (localListaWhatsApp) gerarListaWhatsApp(localListaWhatsApp);
 });
-document.getElementById("filtro-lista-embalagem").addEventListener("change", () => {
+
+document.getElementById("btn-limpar-filtros-lista").addEventListener("click", () => {
+  filtrosLista.categoria.clear();
+  filtrosLista.embalagem.clear();
+  preencherFiltrosListaWhatsApp();
   if (localListaWhatsApp) gerarListaWhatsApp(localListaWhatsApp);
 });
+
 document.getElementById("btn-copiar-lista").addEventListener("click", async () => {
   const campo = document.getElementById("texto-lista-whatsapp");
   if (!campo.value.trim()) {
@@ -508,6 +603,7 @@ document.getElementById("form-novo-produto-estoque").addEventListener("submit", 
     e.target.reset();
     campoBusca.value = "";
     renderizarLista();
+    preencherFiltrosListaWhatsApp();
     mostrarToast("Produto cadastrado. Agora informe a quantidade física.", "ok");
     document.getElementById("q-"+ref.id)?.focus();
   } catch (erro) {
