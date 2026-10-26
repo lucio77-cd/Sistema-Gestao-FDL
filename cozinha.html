@@ -16,7 +16,7 @@
 
   <main>
     <h1>Cozinha</h1>
-    <p class="legenda">Lista de pedidos da cozinha para a gerente. Toque em + e − para marcar o que precisa ser pedido.</p>
+    <p class="legenda">Marque o que precisa ser pedido e salve o pedido do dia para enviar à gerente.</p>
 
     <div class="segmentado" role="tablist" aria-label="Seções da cozinha">
       <button type="button" id="seg-lista" class="ativo" role="tab" aria-selected="true">Lista</button>
@@ -32,11 +32,22 @@
         <div><span>Unidades a pedir</span><strong id="topo-unidades">—</strong></div>
       </div>
 
+      <div class="painel cozinha-aviso" id="aviso-rascunho" hidden>
+        <span id="aviso-rascunho-texto">Pedido em andamento, ainda não salvo.</span>
+        <button type="button" class="btn btn-salvar-pedido">Salvar pedido</button>
+      </div>
+
       <div class="barra-busca">
         <input type="search" id="campo-busca" placeholder="Buscar item da cozinha" autocomplete="off" />
       </div>
 
       <div id="lista-cozinha"><p class="mensagem-vazio">Carregando itens…</p></div>
+
+      <section class="painel cozinha-salvar">
+        <button type="button" class="btn btn-salvar-pedido" id="btn-salvar-pedido" disabled>Salvar pedido</button>
+        <p class="legenda" style="margin:0.6rem 0 0">Ao salvar, o pedido do dia fica registrado na Dashboard e as quantidades voltam para zero. Marque pelo menos um item.</p>
+        <button type="button" class="btn-texto" id="btn-limpar-rascunho" disabled>Limpar o pedido em andamento</button>
+      </section>
 
       <section class="painel">
         <h2 style="margin-top:0">Acrescentar produto</h2>
@@ -69,7 +80,7 @@
           <span class="switch-trilho" aria-hidden="true"></span>
           <span class="switch-rotulo">Mostrar renomear e remover</span>
         </label>
-        <p class="legenda" style="margin:0.6rem 0 0">Ao remover, o item sai da lista, mas o histórico dele continua na Dashboard.</p>
+        <p class="legenda" style="margin:0.6rem 0 0">Ao remover, o item sai da lista, mas os pedidos já salvos continuam com ele no histórico.</p>
       </section>
     </section>
 
@@ -77,14 +88,15 @@
     <section id="secao-whatsapp" hidden>
       <section class="painel">
         <h2 style="margin-top:0">Lista para a gerente</h2>
-        <p class="legenda">Entram só os itens com quantidade maior que zero. Você pode ajustar o texto antes de enviar.</p>
+        <label for="select-pedido-wa">Qual pedido enviar</label>
+        <select id="select-pedido-wa"></select>
         <div class="stock-resumo-grid cozinha-resumo-wa">
           <div><span>Itens na mensagem</span><strong id="wa-itens">—</strong></div>
           <div><span>Unidades</span><strong id="wa-unidades">—</strong></div>
         </div>
         <label for="texto-lista-whatsapp">Prévia da mensagem</label>
         <textarea id="texto-lista-whatsapp" rows="12"></textarea>
-        <button type="button" class="btn-texto" id="btn-regerar">Gerar o texto de novo a partir da lista</button>
+        <button type="button" class="btn-texto" id="btn-regerar">Gerar o texto de novo</button>
         <div class="stock-review-actions">
           <button type="button" class="btn" id="btn-copiar-lista" disabled>Copiar lista</button>
           <a class="btn btn-secundario cozinha-link-wa" id="link-abrir-whatsapp" href="#" target="_blank" rel="noopener" aria-disabled="true">Abrir no WhatsApp</a>
@@ -92,9 +104,9 @@
       </section>
 
       <section class="painel">
-        <h2 style="margin-top:0">Começar um novo pedido</h2>
-        <p class="legenda">Depois de enviar a lista, zere os pedidos para começar outra rodada. A lista de produtos não muda.</p>
-        <button type="button" class="btn btn-secundario btn-perigo" id="btn-zerar-pedidos" disabled>Zerar todos os pedidos</button>
+        <h2 style="margin-top:0">Pedidos salvos</h2>
+        <p class="legenda">Os pedidos mais recentes. Use "Ver texto" para copiar de novo, ou "Excluir" se salvou por engano.</p>
+        <div id="lista-pedidos-salvos"><p class="mensagem-vazio">Carregando…</p></div>
       </section>
     </section>
 
@@ -113,14 +125,9 @@
 
       <div class="vencimento-resumo-grid" aria-live="polite">
         <article class="vencimento-indicador">
-          <span>Itens na lista</span>
-          <strong id="dash-total-itens">—</strong>
-          <small>Produtos ativos da cozinha</small>
-        </article>
-        <article class="vencimento-indicador vencimento-indicador--perda">
-          <span>A pedir agora</span>
-          <strong id="dash-pedir-agora">—</strong>
-          <small id="dash-pedir-legenda">—</small>
+          <span>Pedidos salvos</span>
+          <strong id="dash-pedidos">—</strong>
+          <small id="dash-pedidos-legenda">No período</small>
         </article>
         <article class="vencimento-indicador">
           <span>Unidades pedidas</span>
@@ -128,32 +135,37 @@
           <small id="dash-unidades-legenda">No período</small>
         </article>
         <article class="vencimento-indicador">
-          <span>Dias com pedido</span>
-          <strong id="dash-dias-pedido">—</strong>
-          <small>Dias em que algo foi marcado</small>
+          <span>Último pedido</span>
+          <strong id="dash-ultimo">—</strong>
+          <small id="dash-ultimo-legenda">—</small>
+        </article>
+        <article class="vencimento-indicador">
+          <span>Itens na lista</span>
+          <strong id="dash-total-itens">—</strong>
+          <small>Produtos ativos da cozinha</small>
         </article>
       </div>
 
       <section class="painel">
         <h2 style="margin-top:0">Pedidos ao longo do tempo</h2>
-        <p class="legenda" id="legenda-linha">Unidades pedidas em cada dia.</p>
+        <p class="legenda" id="legenda-linha">Unidades pedidas em cada dia com pedido salvo.</p>
         <div style="height:260px;position:relative"><canvas id="grafico-cozinha-linha"></canvas></div>
-        <p class="mensagem-vazio" id="sem-dados-linha" hidden>Nenhum pedido registrado neste período.</p>
+        <p class="mensagem-vazio" id="sem-dados-linha" hidden>Nenhum pedido salvo neste período.</p>
       </section>
 
       <section class="painel">
         <h2 style="margin-top:0">Itens mais pedidos</h2>
-        <p class="legenda">Ranking por unidades marcadas no período (considera todos os produtos).</p>
+        <p class="legenda">Ranking por unidades nos pedidos salvos do período (considera todos os produtos).</p>
         <div id="area-grafico-cozinha-itens" style="position:relative;min-height:200px"><canvas id="grafico-cozinha-itens"></canvas></div>
-        <p class="mensagem-vazio" id="sem-dados-itens" hidden>Nenhum pedido registrado neste período.</p>
+        <p class="mensagem-vazio" id="sem-dados-itens" hidden>Nenhum pedido salvo neste período.</p>
       </section>
 
       <section class="painel">
-        <h2 style="margin-top:0">Pedido atual</h2>
-        <div id="dash-lista-atual"><p class="mensagem-vazio">Carregando…</p></div>
+        <h2 style="margin-top:0">Último pedido salvo</h2>
+        <div id="dash-lista-ultimo"><p class="mensagem-vazio">Carregando…</p></div>
       </section>
 
-      <p class="legenda">Cada + soma no dia em que foi marcado e cada − desconta. Zerar os pedidos não altera o histórico. Itens removidos da lista continuam aparecendo no histórico.</p>
+      <p class="legenda">O gráfico usa apenas pedidos salvos: cada ponto é um dia com pedido. Se houver mais de um pedido no mesmo dia, as quantidades são somadas. Itens removidos da lista continuam no histórico.</p>
     </section>
   </main>
 
