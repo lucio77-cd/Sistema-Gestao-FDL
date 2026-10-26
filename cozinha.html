@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+<meta name="robots" content="noindex, nofollow" />
+<title>Cozinha — Controle de Bebidas</title>
+<link rel="stylesheet" href="css/styles.css" />
+<link rel="stylesheet" href="css/cozinha.css" />
+</head>
+<body data-pagina-atual="cozinha">
+  <header class="topo">
+    <div class="topo-marca">Controle de Bebidas</div>
+    <div class="topo-sub" id="nome-estabelecimento">Carregando…</div>
+  </header>
+
+  <main>
+    <h1>Cozinha</h1>
+    <p class="legenda">Lista de pedidos da cozinha para a gerente. Toque em + e − para marcar o que precisa ser pedido.</p>
+
+    <div class="segmentado" role="tablist" aria-label="Seções da cozinha">
+      <button type="button" id="seg-lista" class="ativo" role="tab" aria-selected="true">Lista</button>
+      <button type="button" id="seg-whatsapp" role="tab" aria-selected="false">WhatsApp</button>
+      <button type="button" id="seg-dashboard" role="tab" aria-selected="false">Dashboard</button>
+    </div>
+
+    <!-- ===== LISTA ===== -->
+    <section id="secao-lista">
+      <div class="stock-resumo-grid cozinha-resumo-topo">
+        <div><span>Itens na lista</span><strong id="topo-total-itens">—</strong></div>
+        <div><span>Itens a pedir</span><strong id="topo-itens-pedir">—</strong></div>
+        <div><span>Unidades a pedir</span><strong id="topo-unidades">—</strong></div>
+      </div>
+
+      <div class="barra-busca">
+        <input type="search" id="campo-busca" placeholder="Buscar item da cozinha" autocomplete="off" />
+      </div>
+
+      <div id="lista-cozinha"><p class="mensagem-vazio">Carregando itens…</p></div>
+
+      <section class="painel">
+        <h2 style="margin-top:0">Acrescentar produto</h2>
+        <form id="form-novo-item">
+          <div class="cozinha-form-novo">
+            <div>
+              <label for="novo-nome">Nome do produto *</label>
+              <input type="text" id="novo-nome" required maxlength="80" placeholder="Ex.: Farinha de trigo" autocomplete="off" />
+            </div>
+            <div>
+              <label for="novo-unidade">Unidade (opcional)</label>
+              <input type="text" id="novo-unidade" maxlength="20" placeholder="Ex.: kg, cx, pct" autocomplete="off" />
+            </div>
+          </div>
+          <button class="btn" type="submit">Adicionar à lista</button>
+        </form>
+
+        <details class="cozinha-colar">
+          <summary>Colar uma lista inteira de uma vez</summary>
+          <p class="legenda">Um produto por linha. Números e marcadores são ignorados (ex.: "Calabresa: 10" vira "Calabresa"). Produtos que já existem não são repetidos.</p>
+          <textarea id="texto-colar" rows="8" placeholder="Farinha de trigo&#10;Açúcar&#10;Ovos&#10;Leite"></textarea>
+          <button type="button" class="btn btn-secundario" id="btn-colar-lista">Cadastrar itens colados</button>
+        </details>
+      </section>
+
+      <section class="painel">
+        <h2 style="margin-top:0">Gerenciar a lista</h2>
+        <label class="switch">
+          <input type="checkbox" id="toggle-edicao" />
+          <span class="switch-trilho" aria-hidden="true"></span>
+          <span class="switch-rotulo">Mostrar renomear e remover</span>
+        </label>
+        <p class="legenda" style="margin:0.6rem 0 0">Ao remover, o item sai da lista, mas o histórico dele continua na Dashboard.</p>
+      </section>
+    </section>
+
+    <!-- ===== WHATSAPP ===== -->
+    <section id="secao-whatsapp" hidden>
+      <section class="painel">
+        <h2 style="margin-top:0">Lista para a gerente</h2>
+        <p class="legenda">Entram só os itens com quantidade maior que zero. Você pode ajustar o texto antes de enviar.</p>
+        <div class="stock-resumo-grid cozinha-resumo-wa">
+          <div><span>Itens na mensagem</span><strong id="wa-itens">—</strong></div>
+          <div><span>Unidades</span><strong id="wa-unidades">—</strong></div>
+        </div>
+        <label for="texto-lista-whatsapp">Prévia da mensagem</label>
+        <textarea id="texto-lista-whatsapp" rows="12"></textarea>
+        <button type="button" class="btn-texto" id="btn-regerar">Gerar o texto de novo a partir da lista</button>
+        <div class="stock-review-actions">
+          <button type="button" class="btn" id="btn-copiar-lista" disabled>Copiar lista</button>
+          <a class="btn btn-secundario cozinha-link-wa" id="link-abrir-whatsapp" href="#" target="_blank" rel="noopener" aria-disabled="true">Abrir no WhatsApp</a>
+        </div>
+      </section>
+
+      <section class="painel">
+        <h2 style="margin-top:0">Começar um novo pedido</h2>
+        <p class="legenda">Depois de enviar a lista, zere os pedidos para começar outra rodada. A lista de produtos não muda.</p>
+        <button type="button" class="btn btn-secundario btn-perigo" id="btn-zerar-pedidos" disabled>Zerar todos os pedidos</button>
+      </section>
+    </section>
+
+    <!-- ===== DASHBOARD ===== -->
+    <section id="secao-dashboard" hidden>
+      <div class="filtros">
+        <select id="filtro-periodo-cozinha" aria-label="Período da análise">
+          <option value="7">Últimos 7 dias</option>
+          <option value="30" selected>Últimos 30 dias</option>
+          <option value="90">Últimos 90 dias</option>
+        </select>
+        <select id="filtro-produto-cozinha" aria-label="Filtrar por produto">
+          <option value="todos">Todos os produtos (total)</option>
+        </select>
+      </div>
+
+      <div class="vencimento-resumo-grid" aria-live="polite">
+        <article class="vencimento-indicador">
+          <span>Itens na lista</span>
+          <strong id="dash-total-itens">—</strong>
+          <small>Produtos ativos da cozinha</small>
+        </article>
+        <article class="vencimento-indicador vencimento-indicador--perda">
+          <span>A pedir agora</span>
+          <strong id="dash-pedir-agora">—</strong>
+          <small id="dash-pedir-legenda">—</small>
+        </article>
+        <article class="vencimento-indicador">
+          <span>Unidades pedidas</span>
+          <strong id="dash-unidades-periodo">—</strong>
+          <small id="dash-unidades-legenda">No período</small>
+        </article>
+        <article class="vencimento-indicador">
+          <span>Dias com pedido</span>
+          <strong id="dash-dias-pedido">—</strong>
+          <small>Dias em que algo foi marcado</small>
+        </article>
+      </div>
+
+      <section class="painel">
+        <h2 style="margin-top:0">Pedidos ao longo do tempo</h2>
+        <p class="legenda" id="legenda-linha">Unidades pedidas em cada dia.</p>
+        <div style="height:260px;position:relative"><canvas id="grafico-cozinha-linha"></canvas></div>
+        <p class="mensagem-vazio" id="sem-dados-linha" hidden>Nenhum pedido registrado neste período.</p>
+      </section>
+
+      <section class="painel">
+        <h2 style="margin-top:0">Itens mais pedidos</h2>
+        <p class="legenda">Ranking por unidades marcadas no período (considera todos os produtos).</p>
+        <div id="area-grafico-cozinha-itens" style="position:relative;min-height:200px"><canvas id="grafico-cozinha-itens"></canvas></div>
+        <p class="mensagem-vazio" id="sem-dados-itens" hidden>Nenhum pedido registrado neste período.</p>
+      </section>
+
+      <section class="painel">
+        <h2 style="margin-top:0">Pedido atual</h2>
+        <div id="dash-lista-atual"><p class="mensagem-vazio">Carregando…</p></div>
+      </section>
+
+      <p class="legenda">Cada + soma no dia em que foi marcado e cada − desconta. Zerar os pedidos não altera o histórico. Itens removidos da lista continuam aparecendo no histórico.</p>
+    </section>
+  </main>
+
+  <nav class="tabbar" aria-label="Navegação principal">
+    <a href="index.html" class="tabbar-item" data-pagina="dashboard">
+      <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 19V10M12 19V5M20 19v-7"/></svg>
+      <span>Início</span>
+    </a>
+    <a href="vistoria.html" class="tabbar-item" data-pagina="vistoria">
+      <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="4" width="14" height="17" rx="2"/><path d="M9 3h6v3H9z"/><path d="M9 12l2 2 4-4"/></svg>
+      <span>Vistoria</span>
+    </a>
+    <a href="promocoes.html" class="tabbar-item" data-pagina="promocoes">
+      <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 12l-8 8-9-9V4h7z"/><circle cx="7.5" cy="7.5" r="1.2" fill="currentColor" stroke="none"/></svg>
+      <span>Promoções</span>
+    </a>
+    <a href="produtos.html" class="tabbar-item" data-pagina="produtos">
+      <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 8l-9-5-9 5 9 5 9-5z"/><path d="M3 8v8l9 5 9-5V8"/><path d="M12 13v8"/></svg>
+      <span>Produtos</span>
+    </a>
+    <button type="button" class="tabbar-item" id="btn-mais" aria-haspopup="true" aria-expanded="false">
+      <svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor" aria-hidden="true"><circle cx="5" cy="12" r="1.8"/><circle cx="12" cy="12" r="1.8"/><circle cx="19" cy="12" r="1.8"/></svg>
+      <span>Mais</span>
+    </button>
+  </nav>
+  <div class="menu-mais" id="menu-mais" hidden>
+    <a href="graficos.html" data-pagina="graficos">Gráficos</a>
+    <a href="estoque.html" data-pagina="estoque">Estoque</a>
+    <a href="cozinha.html" data-pagina="cozinha">Cozinha</a>
+    <a href="caixa.html" data-pagina="caixa">Caixa</a>
+    <a href="configuracoes.html" data-pagina="configuracoes">Configurações</a>
+    <a href="#" id="link-sair">Sair</a>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <script type="module" src="js/cozinha.js"></script>
+</body>
+</html>
