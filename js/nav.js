@@ -3,16 +3,29 @@ import { sair } from "./auth-guard.js";
 export function iniciarNavegacao() {
   const paginaAtual = document.body.dataset.paginaAtual;
 
+  const btnMais = document.getElementById("btn-mais");
+  const menuMais = document.getElementById("menu-mais");
+
+  // Garante o link "Cozinha" no menu "Mais" de todas as páginas, sem precisar
+  // editar cada HTML. Se o HTML já tiver o link, nada é duplicado.
+  if (menuMais && !menuMais.querySelector('a[href="cozinha.html"]')) {
+    const linkCozinha = document.createElement("a");
+    linkCozinha.href = "cozinha.html";
+    linkCozinha.dataset.pagina = "cozinha";
+    linkCozinha.textContent = "Cozinha";
+    const referencia =
+      menuMais.querySelector('a[href="caixa.html"]') || menuMais.querySelector("#link-sair");
+    if (referencia) menuMais.insertBefore(linkCozinha, referencia);
+    else menuMais.appendChild(linkCozinha);
+  }
+
   document.querySelectorAll("[data-pagina]").forEach((el) => {
     if (el.dataset.pagina !== paginaAtual) return;
     el.classList.add("ativo");
     if (el.tagName === "A") el.setAttribute("aria-current", "page");
   });
 
-  const btnMais = document.getElementById("btn-mais");
-  const menuMais = document.getElementById("menu-mais");
-
-  if (btnMais && ["estoque", "caixa", "configuracoes", "graficos"].includes(paginaAtual)) {
+  if (btnMais && ["estoque", "cozinha", "caixa", "configuracoes", "graficos"].includes(paginaAtual)) {
     btnMais.classList.add("ativo");
   }
 
