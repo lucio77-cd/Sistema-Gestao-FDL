@@ -10,10 +10,11 @@ import {
   query,
   where,
   getDocs,
+  addDoc,
   doc,
   updateDoc,
+  deleteDoc,
   writeBatch,
-  increment,
   serverTimestamp,
   Timestamp,
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
@@ -21,8 +22,8 @@ import {
 iniciarNavegacao();
 
 const COL_ITENS = "cozinhaItens";
-const COL_MOV = "cozinhaMovimentos";
-const ESPERA_SALVAR_MS = 700;
+const COL_PEDIDOS = "cozinhaPedidos";
+const LIMITE_PEDIDOS_LISTA = 30;
 
 // Lista que a colega já tinha feito (os números foram ignorados de propósito).
 const ITENS_INICIAIS = [
@@ -43,16 +44,21 @@ const ITENS_INICIAIS = [
 ];
 
 let estabelecimentoAtual = null;
+let usuarioAtual = null;
 let itens = [];
-let movimentos = [];
+let pedidos = [];
 let abaAtual = "lista";
 let textoEditado = false;
+let salvando = false;
+let pedidoSelecionado = null;
+let waItens = 0;
+let waUnidades = 0;
 let graficoLinha = null;
 let graficoItens = null;
 
-// Toques em + e − são somados e gravados juntos depois de uma pequena pausa,
-// para não gerar uma escrita no banco a cada clique.
-const pendentes = new Map();
+// Pedido em andamento (rascunho): itemId -> quantidade. Fica só neste aparelho
+// até o botão "Salvar pedido" gravar tudo de uma vez.
+const quantidades = new Map();
 
 const $ = (id) => document.getElementById(id);
 const lista = $("lista-cozinha");
@@ -62,22 +68,19 @@ const campoTexto = $("texto-lista-whatsapp");
 // ---------- Utilidades ----------
 
 function qtd(item) {
-  return Math.max(0, Number(item.quantidade) || 0);
+  return quantidades.get(item.id) || 0;
 }
 
 function itensAtivos() {
   return itens.filter((i) => i.ativo !== false);
 }
 
-function ordenarItens() {
-  itens.sort((a, b) => String(a.nome).localeCompare(String(b.nome), "pt-BR", { sensitivity: "base" }));
+function itensMarcados() {
+  return itensAtivos().filter((i) => qtd(i) > 0);
 }
 
-function dataDoMov(m) {
-  const v = m.registradoEm;
-  if (v && typeof v.toDate === "function") return v.toDate();
-  if (v instanceof Date) return v;
-  return null;
+function ordenarItens() {
+  itens.sort((a, b) => String(a.nome).localeCompare(String(b.nome), "pt-BR", { sensitivity: "base" }));
 }
 
 function chaveDia(data) {
@@ -88,6 +91,68 @@ function chaveDia(data) {
   ].join("-");
 }
 
+function dataDoPedido(p) {
+  const v = p.data;
+  if (v && typeof v.toDate === "function") return v.toDate();
+  if (v instanceof Date) return v;
+  if (p.dia) return new Date(p.dia + "T12:00:00");
+  return null;
+}
+
+function diaDoPedido(p) {
+  if (p.dia) return p.dia;
+  const d = dataDoPedido(p);
+  return d ? chaveDia(d) : "";
+}
+
+function ordenarPedidos() {
+  pedidos.sort((a, b) => (dataDoPedido(b)?.getTime() || 0) - (dataDoPedido(a)?.getTime() || 0));
+}
+
+function formatarData(d) {
+  return d ? d.toLocaleDateString("pt-BR") : "—";
+}
+
+function formatarHora(d) {
+  return d ? d.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" }) : "";
+}
+
+function somaUnidades(listaItens) {
+  return (listaItens || []).reduce((soma, i) => soma + (Number(i.quantidade) || 0), 0);
+}
+
+// ---------- Rascunho local ----------
+
+function chaveRascunho() {
+  return `cozinha:rascunho:${estabelecimentoAtual.id}`;
+}
+
+function salvarRascunhoLocal() {
+  try {
+    const obj = {};
+    quantidades.forEach((valor, id) => {
+      if (valor > 0) obj[id] = valor;
+    });
+    localStorage.setItem(chaveRascunho(), JSON.stringify(obj));
+  } catch (e) {
+    /* sem localStorage: o rascunho só vale enquanto a página estiver aberta */
+  }
+}
+
+function carregarRascunhoLocal() {
+  quantidades.clear();
+  try {
+    const obj = JSON.parse(localStorage.getItem(chaveRascunho()) || "{}");
+    const ativos = new Set(itensAtivos().map((i) => i.id));
+    Object.entries(obj).forEach(([id, valor]) => {
+      const n = Math.floor(Number(valor));
+      if (ativos.has(id) && n > 0) quantidades.set(id, n);
+    });
+  } catch (e) {
+    /* rascunho ilegível: começa vazio */
+  }
+}
+
 // ---------- Carregamento ----------
 
 async function carregarDados() {
@@ -96,27 +161,30 @@ async function carregarDados() {
   itens = itensSnap.docs.map((d) => ({ id: d.id, ...d.data() }));
   ordenarItens();
 
-  // O histórico é complementar: se falhar, a lista continua funcionando.
+  // Os pedidos salvos são complementares: se falhar, a lista continua funcionando.
   try {
-    const movSnap = await getDocs(query(collection(db, COL_MOV), filtro));
-    movimentos = movSnap.docs.map((d) => ({ id: d.id, ...d.data() }));
+    const pedidosSnap = await getDocs(query(collection(db, COL_PEDIDOS), filtro));
+    pedidos = pedidosSnap.docs.map((d) => ({ id: d.id, ...d.data() }));
+    ordenarPedidos();
   } catch (erro) {
-    console.error("Histórico da cozinha indisponível:", erro);
-    movimentos = [];
-    mostrarToast("Não foi possível carregar o histórico. Confira as regras do Firestore.", "erro");
+    console.error("Pedidos da cozinha indisponíveis:", erro);
+    pedidos = [];
+    mostrarToast("Não foi possível carregar os pedidos salvos. Confira as regras do Firestore.", "erro");
   }
 }
 
-protegerPagina(async ({ estabelecimento }) => {
+protegerPagina(async ({ estabelecimento, user }) => {
   estabelecimentoAtual = estabelecimento;
+  usuarioAtual = user;
   $("nome-estabelecimento").textContent = estabelecimento.nome;
   try {
     await carregarDados();
+    carregarRascunhoLocal();
     depoisDeMudarItens();
   } catch (erro) {
     console.error(erro);
     lista.innerHTML =
-      '<p class="mensagem-vazio">Não foi possível carregar a lista da cozinha. Confira se as regras do Firestore para cozinhaItens e cozinhaMovimentos foram publicadas.</p>';
+      '<p class="mensagem-vazio">Não foi possível carregar a lista da cozinha. Confira se as regras do Firestore para cozinhaItens e cozinhaPedidos foram publicadas.</p>';
   }
 });
 
@@ -135,7 +203,7 @@ const abas = {
   dashboard: { botao: $("seg-dashboard"), secao: $("secao-dashboard") },
 };
 
-async function mostrarAba(nome) {
+function mostrarAba(nome) {
   abaAtual = nome;
   Object.entries(abas).forEach(([chave, { botao, secao }]) => {
     const ativa = chave === nome;
@@ -144,16 +212,10 @@ async function mostrarAba(nome) {
     botao.setAttribute("aria-selected", String(ativa));
   });
 
-  if (nome === "lista") return;
-
-  // Garante que o que foi tocado por último já está gravado antes de mostrar
-  // o texto ou o histórico.
-  await enviarTodosPendentes();
-  if (abaAtual !== nome) return;
-
   if (nome === "whatsapp") {
-    if (textoEditado) atualizarAcoesWhatsApp();
-    else gerarTextoWhatsApp();
+    preencherSelectPedidos();
+    gerarTextoWhatsApp();
+    renderizarPedidosSalvos();
   } else if (nome === "dashboard") {
     renderizarDashboard();
   }
@@ -223,12 +285,22 @@ function atualizarCartao(item) {
 
 function atualizarTotais() {
   const ativos = itensAtivos();
-  const comPedido = ativos.filter((i) => qtd(i) > 0);
-  const unidades = comPedido.reduce((soma, i) => soma + qtd(i), 0);
+  const marcados = itensMarcados();
+  const unidades = marcados.reduce((soma, i) => soma + qtd(i), 0);
+  const temPedido = marcados.length > 0;
+
   $("topo-total-itens").textContent = String(ativos.length);
-  $("topo-itens-pedir").textContent = String(comPedido.length);
+  $("topo-itens-pedir").textContent = String(marcados.length);
   $("topo-unidades").textContent = String(unidades);
-  $("btn-zerar-pedidos").disabled = comPedido.length === 0;
+
+  $("aviso-rascunho").hidden = !temPedido;
+  $("aviso-rascunho-texto").textContent =
+    `Pedido em andamento, ainda não salvo: ${marcados.length} item(ns) · ${unidades} unidade(s).`;
+
+  document.querySelectorAll(".btn-salvar-pedido").forEach((botao) => {
+    botao.disabled = !temPedido || salvando;
+  });
+  $("btn-limpar-rascunho").disabled = !temPedido;
 }
 
 campoBusca.addEventListener("input", renderizarLista);
@@ -237,78 +309,18 @@ $("toggle-edicao").addEventListener("change", (e) => {
   lista.classList.toggle("modo-edicao", e.target.checked);
 });
 
-// ---------- Lista: + e − ----------
+// ---------- Lista: + e − (só montam o rascunho) ----------
 
-function alterarQuantidade(id, delta) {
+function definirQuantidade(id, valor) {
+  const novo = Math.max(0, Math.floor(Number(valor) || 0));
+  if (novo > 0) quantidades.set(id, novo);
+  else quantidades.delete(id);
+  salvarRascunhoLocal();
+
   const item = itens.find((i) => i.id === id);
-  if (!item || !delta) return;
-
-  const atual = qtd(item);
-  const novo = Math.max(0, atual + delta);
-  const real = novo - atual;
-  if (!real) return;
-
-  item.quantidade = novo;
-
-  const pendente = pendentes.get(id) || { delta: 0, timer: null };
-  pendente.delta += real;
-  clearTimeout(pendente.timer);
-  pendente.timer = setTimeout(() => enviarPendente(id), ESPERA_SALVAR_MS);
-  pendentes.set(id, pendente);
-
-  atualizarCartao(item);
+  if (item) atualizarCartao(item);
   atualizarTotais();
-  if (abaAtual === "whatsapp" && !textoEditado) gerarTextoWhatsApp();
 }
-
-async function enviarPendente(id) {
-  const pendente = pendentes.get(id);
-  if (!pendente) return;
-  clearTimeout(pendente.timer);
-  pendentes.delete(id);
-  if (!pendente.delta) return;
-
-  const item = itens.find((i) => i.id === id);
-  if (!item) return;
-
-  const movRef = doc(collection(db, COL_MOV));
-  const mov = {
-    estabelecimentoId: estabelecimentoAtual.id,
-    itemId: id,
-    itemNome: item.nome,
-    tipo: "ajuste",
-    delta: pendente.delta,
-    registradoEm: serverTimestamp(),
-  };
-
-  try {
-    const batch = writeBatch(db);
-    batch.update(doc(db, COL_ITENS, id), {
-      quantidade: increment(pendente.delta),
-      atualizadoEm: serverTimestamp(),
-    });
-    batch.set(movRef, mov);
-    await batch.commit();
-    movimentos.push({ id: movRef.id, ...mov, registradoEm: Timestamp.now() });
-  } catch (erro) {
-    console.error(erro);
-    item.quantidade = Math.max(0, qtd(item) - pendente.delta);
-    atualizarCartao(item);
-    atualizarTotais();
-    mostrarToast("Não foi possível salvar a alteração. Tente de novo.", "erro");
-  }
-}
-
-async function enviarTodosPendentes() {
-  await Promise.all([...pendentes.keys()].map((id) => enviarPendente(id)));
-}
-
-document.addEventListener("visibilitychange", () => {
-  if (document.visibilityState === "hidden") enviarTodosPendentes();
-});
-window.addEventListener("pagehide", () => {
-  enviarTodosPendentes();
-});
 
 lista.addEventListener("click", async (e) => {
   const botao = e.target.closest("[data-acao]");
@@ -323,9 +335,11 @@ lista.addEventListener("click", async (e) => {
   const card = botao.closest("[data-id]");
   if (!card) return;
   const id = card.dataset.id;
+  const item = itens.find((i) => i.id === id);
+  if (!item) return;
 
-  if (acao === "mais") alterarQuantidade(id, 1);
-  else if (acao === "menos") alterarQuantidade(id, -1);
+  if (acao === "mais") definirQuantidade(id, qtd(item) + 1);
+  else if (acao === "menos") definirQuantidade(id, qtd(item) - 1);
   else if (acao === "renomear") await renomearItem(id);
   else if (acao === "remover") await removerItem(id);
 });
@@ -342,7 +356,87 @@ lista.addEventListener("change", (e) => {
     mostrarToast("Informe um número inteiro igual ou maior que zero.", "erro");
     return;
   }
-  alterarQuantidade(item.id, valor - qtd(item));
+  definirQuantidade(item.id, valor);
+});
+
+$("btn-limpar-rascunho").addEventListener("click", async () => {
+  if (!itensMarcados().length) return;
+  const confirmou = await confirmarAcao({
+    titulo: "Limpar o pedido em andamento?",
+    mensagem: "As quantidades marcadas e ainda não salvas voltam para zero.",
+    textoConfirmar: "Limpar",
+    perigo: true,
+  });
+  if (!confirmou) return;
+  quantidades.clear();
+  salvarRascunhoLocal();
+  renderizarLista();
+  atualizarTotais();
+});
+
+// ---------- Salvar pedido ----------
+
+async function salvarPedido() {
+  if (salvando) return;
+  const marcados = itensMarcados();
+  if (!marcados.length) {
+    mostrarToast("Marque pelo menos um item para salvar.", "erro");
+    return;
+  }
+
+  const agora = new Date();
+  const hoje = chaveDia(agora);
+  if (pedidos.some((p) => diaDoPedido(p) === hoje)) {
+    const confirmou = await confirmarAcao({
+      titulo: "Já existe um pedido hoje",
+      mensagem: "Já há um pedido salvo hoje. Este será salvo como outro pedido do mesmo dia e os dois somam na Dashboard. Continuar?",
+      textoConfirmar: "Salvar mesmo assim",
+    });
+    if (!confirmou) return;
+  }
+
+  salvando = true;
+  atualizarTotais();
+
+  try {
+    const itensPedido = marcados.map((i) => ({
+      itemId: i.id,
+      nome: i.nome,
+      unidade: i.unidade || "",
+      quantidade: qtd(i),
+    }));
+    const dados = {
+      estabelecimentoId: estabelecimentoAtual.id,
+      dia: hoje,
+      data: serverTimestamp(),
+      itens: itensPedido,
+      totalItens: itensPedido.length,
+      totalUnidades: somaUnidades(itensPedido),
+      criadoPor: usuarioAtual?.uid || null,
+    };
+    const ref = await addDoc(collection(db, COL_PEDIDOS), dados);
+    pedidos.push({ id: ref.id, ...dados, data: Timestamp.now() });
+    ordenarPedidos();
+
+    quantidades.clear();
+    salvarRascunhoLocal();
+    renderizarLista();
+
+    pedidoSelecionado = ref.id;
+    textoEditado = false;
+    mostrarToast("Pedido salvo. Agora é só enviar para a gerente.", "ok");
+    mostrarAba("whatsapp");
+  } catch (erro) {
+    console.error(erro);
+    mostrarToast("Não salvou — verifique a conexão e tente de novo.", "erro");
+  } finally {
+    salvando = false;
+    atualizarTotais();
+  }
+}
+
+document.querySelectorAll(".btn-salvar-pedido").forEach((botao) => {
+  botao.addEventListener("click", salvarPedido);
 });
 
 // ---------- Lista: cadastro, renomear, remover ----------
@@ -369,11 +463,7 @@ async function adicionarItens(entradas) {
     const existente = existentes.get(chave);
     if (existente) {
       if (existente.ativo === false) {
-        batch.update(doc(db, COL_ITENS, existente.id), {
-          ativo: true,
-          quantidade: 0,
-          atualizadoEm: serverTimestamp(),
-        });
+        batch.update(doc(db, COL_ITENS, existente.id), { ativo: true, atualizadoEm: serverTimestamp() });
         reativados.push(existente);
       } else {
         ignorados++;
@@ -387,7 +477,6 @@ async function adicionarItens(entradas) {
       nome: limpo,
       unidade: String(unidade || "").trim(),
       ativo: true,
-      quantidade: 0,
       criadoEm: serverTimestamp(),
     };
     batch.set(ref, dados);
@@ -402,7 +491,6 @@ async function adicionarItens(entradas) {
   novos.forEach((n) => itens.push(n));
   reativados.forEach((r) => {
     r.ativo = true;
-    r.quantidade = 0;
   });
   return { criados: novos.length, reativados: reativados.length, ignorados };
 }
@@ -514,24 +602,20 @@ async function renomearItem(id) {
 async function removerItem(id) {
   const item = itens.find((i) => i.id === id);
   if (!item) return;
-  await enviarPendente(id);
 
   const confirmou = await confirmarAcao({
     titulo: "Remover da lista?",
-    mensagem: `"${item.nome}" sai da lista da cozinha. O histórico dele continua na Dashboard.`,
+    mensagem: `"${item.nome}" sai da lista da cozinha. Os pedidos já salvos continuam com ele no histórico.`,
     textoConfirmar: "Remover",
     perigo: true,
   });
   if (!confirmou) return;
 
   try {
-    await updateDoc(doc(db, COL_ITENS, id), {
-      ativo: false,
-      quantidade: 0,
-      atualizadoEm: serverTimestamp(),
-    });
+    await updateDoc(doc(db, COL_ITENS, id), { ativo: false, atualizadoEm: serverTimestamp() });
     item.ativo = false;
-    item.quantidade = 0;
+    quantidades.delete(id);
+    salvarRascunhoLocal();
     depoisDeMudarItens();
     mostrarToast("Item removido da lista.", "ok");
   } catch (erro) {
@@ -542,15 +626,59 @@ async function removerItem(id) {
 
 // ---------- WhatsApp ----------
 
+function rotuloPedido(p) {
+  const d = dataDoPedido(p);
+  const n = p.totalItens ?? (p.itens || []).length;
+  return `${formatarData(d)} ${formatarHora(d)} — ${n} item(ns)`;
+}
+
+function preencherSelectPedidos() {
+  const select = $("select-pedido-wa");
+  const temRascunho = itensMarcados().length > 0;
+  const visiveis = pedidos.slice(0, LIMITE_PEDIDOS_LISTA);
+
+  let valor = pedidoSelecionado;
+  const existe = valor === "rascunho" || visiveis.some((p) => p.id === valor);
+  if (!valor || !existe) valor = temRascunho ? "rascunho" : visiveis[0]?.id || "rascunho";
+
+  select.innerHTML =
+    '<option value="rascunho">Pedido em andamento (não salvo)</option>' +
+    visiveis.map((p) => `<option value="${escapeHtml(p.id)}">${escapeHtml(rotuloPedido(p))}</option>`).join("");
+  select.value = valor;
+  pedidoSelecionado = select.value;
+}
+
+$("select-pedido-wa").addEventListener("change", (e) => {
+  pedidoSelecionado = e.target.value;
+  gerarTextoWhatsApp();
+});
+
 function gerarTextoWhatsApp() {
-  const pedidos = itensAtivos().filter((i) => qtd(i) > 0);
+  const escolha = $("select-pedido-wa").value || "rascunho";
+  let linhasItens = [];
+  let dataTexto = new Date().toLocaleDateString("pt-BR");
+
+  if (escolha === "rascunho") {
+    linhasItens = itensMarcados().map((i) => ({ nome: i.nome, unidade: i.unidade, quantidade: qtd(i) }));
+  } else {
+    const pedido = pedidos.find((p) => p.id === escolha);
+    if (pedido) {
+      linhasItens = (pedido.itens || []).map((i) => ({ ...i }));
+      dataTexto = formatarData(dataDoPedido(pedido));
+    }
+  }
+
+  linhasItens.sort((a, b) => String(a.nome).localeCompare(String(b.nome), "pt-BR", { sensitivity: "base" }));
+  waItens = linhasItens.length;
+  waUnidades = somaUnidades(linhasItens);
+
   const linhas = [
     "🍳 PEDIDO DA COZINHA",
-    new Date().toLocaleDateString("pt-BR"),
+    dataTexto,
     "",
-    ...(pedidos.length
-      ? pedidos.map((i) => `• ${i.nome} — ${qtd(i)} ${i.unidade || "un."}`)
-      : ["Nenhum item marcado para pedir."]),
+    ...(linhasItens.length
+      ? linhasItens.map((i) => `• ${i.nome} — ${Number(i.quantidade) || 0} ${i.unidade || "un."}`)
+      : ["Nenhum item neste pedido."]),
   ];
   campoTexto.value = linhas.join("\n");
   textoEditado = false;
@@ -558,13 +686,10 @@ function gerarTextoWhatsApp() {
 }
 
 function atualizarAcoesWhatsApp() {
-  const pedidos = itensAtivos().filter((i) => qtd(i) > 0);
-  const unidades = pedidos.reduce((soma, i) => soma + qtd(i), 0);
-  $("wa-itens").textContent = String(pedidos.length);
-  $("wa-unidades").textContent = String(unidades);
+  $("wa-itens").textContent = String(waItens);
+  $("wa-unidades").textContent = String(waUnidades);
 
-  const texto = campoTexto.value.trim();
-  const habilitado = !!texto && (pedidos.length > 0 || textoEditado);
+  const habilitado = !!campoTexto.value.trim() && (waItens > 0 || textoEditado);
   $("btn-copiar-lista").disabled = !habilitado;
 
   const link = $("link-abrir-whatsapp");
@@ -601,58 +726,75 @@ $("btn-copiar-lista").addEventListener("click", async () => {
   }
 });
 
-$("btn-zerar-pedidos").addEventListener("click", async (e) => {
-  await enviarTodosPendentes();
-  const comPedido = itensAtivos().filter((i) => qtd(i) > 0);
-  if (!comPedido.length) return;
+// ---------- WhatsApp: pedidos salvos ----------
 
-  const confirmou = await confirmarAcao({
-    titulo: "Zerar todos os pedidos?",
-    mensagem: `${comPedido.length} item(ns) voltam para zero. A lista de produtos e o histórico da Dashboard continuam.`,
-    textoConfirmar: "Zerar pedidos",
-    perigo: true,
-  });
-  if (!confirmou) return;
+function renderizarPedidosSalvos() {
+  const container = $("lista-pedidos-salvos");
+  if (!pedidos.length) {
+    container.innerHTML = '<p class="mensagem-vazio">Nenhum pedido salvo ainda.</p>';
+    return;
+  }
 
-  const botao = e.currentTarget;
-  botao.disabled = true;
-  try {
-    for (let i = 0; i < comPedido.length; i += 200) {
-      const batch = writeBatch(db);
-      comPedido.slice(i, i + 200).forEach((item) => {
-        batch.update(doc(db, COL_ITENS, item.id), { quantidade: 0, atualizadoEm: serverTimestamp() });
-        batch.set(doc(collection(db, COL_MOV)), {
-          estabelecimentoId: estabelecimentoAtual.id,
-          itemId: item.id,
-          itemNome: item.nome,
-          tipo: "zerar",
-          delta: -qtd(item),
-          registradoEm: serverTimestamp(),
-        });
-      });
-      await batch.commit();
-    }
-    comPedido.forEach((item) => {
-      item.quantidade = 0;
-    });
-    renderizarLista();
-    atualizarTotais();
+  container.innerHTML = pedidos
+    .slice(0, LIMITE_PEDIDOS_LISTA)
+    .map((p) => {
+      const d = dataDoPedido(p);
+      const nItens = p.totalItens ?? (p.itens || []).length;
+      const nUn = p.totalUnidades ?? somaUnidades(p.itens);
+      return `
+        <div class="cozinha-pedido-salvo" data-id="${escapeHtml(p.id)}">
+          <div><strong>${formatarData(d)} · ${formatarHora(d)}</strong><small>${nItens} item(ns) · ${nUn} un.</small></div>
+          <div class="cozinha-pedido-acoes">
+            <button type="button" class="btn-texto" data-acao="ver-pedido">Ver texto</button>
+            <button type="button" class="btn-texto" data-acao="excluir-pedido">Excluir</button>
+          </div>
+        </div>`;
+    })
+    .join("");
+}
+
+$("lista-pedidos-salvos").addEventListener("click", async (e) => {
+  const botao = e.target.closest("[data-acao]");
+  if (!botao) return;
+  const linha = botao.closest("[data-id]");
+  if (!linha) return;
+  const id = linha.dataset.id;
+
+  if (botao.dataset.acao === "ver-pedido") {
+    pedidoSelecionado = id;
+    $("select-pedido-wa").value = id;
     gerarTextoWhatsApp();
-    mostrarToast("Pedidos zerados. Pronto para um novo pedido.", "ok");
-  } catch (erro) {
-    console.error(erro);
-    mostrarToast("Não foi possível zerar. Recarregando a lista…", "erro");
+    campoTexto.scrollIntoView({ behavior: "smooth", block: "center" });
+    return;
+  }
+
+  if (botao.dataset.acao === "excluir-pedido") {
+    const pedido = pedidos.find((p) => p.id === id);
+    if (!pedido) return;
+    const confirmou = await confirmarAcao({
+      titulo: "Excluir este pedido?",
+      mensagem: `O pedido de ${rotuloPedido(pedido)} sai da lista e também da Dashboard. Não dá para desfazer.`,
+      textoConfirmar: "Excluir pedido",
+      perigo: true,
+    });
+    if (!confirmou) return;
+
     try {
-      await carregarDados();
-      depoisDeMudarItens();
+      await deleteDoc(doc(db, COL_PEDIDOS, id));
+      pedidos = pedidos.filter((p) => p.id !== id);
+      if (pedidoSelecionado === id) pedidoSelecionado = null;
+      preencherSelectPedidos();
       gerarTextoWhatsApp();
-    } catch (e2) {
-      console.error(e2);
+      renderizarPedidosSalvos();
+      mostrarToast("Pedido excluído.", "ok");
+    } catch (erro) {
+      console.error(erro);
+      mostrarToast("Não foi possível excluir o pedido.", "erro");
     }
   }
 });
 
-// ---------- Dashboard ----------
+// ---------- Dashboard (só pedidos salvos) ----------
 
 function preencherFiltroProduto() {
   const select = $("filtro-produto-cozinha");
@@ -671,6 +813,11 @@ function preencherFiltroProduto() {
 $("filtro-periodo-cozinha").addEventListener("change", renderizarDashboard);
 $("filtro-produto-cozinha").addEventListener("change", renderizarDashboard);
 
+function rotuloDia(dia, completo = false) {
+  const [ano, mes, d] = dia.split("-");
+  return completo ? `${d}/${mes}/${ano}` : `${d}/${mes}`;
+}
+
 function renderizarDashboard() {
   const dias = Number($("filtro-periodo-cozinha").value) || 30;
   const produto = $("filtro-produto-cozinha").value || "todos";
@@ -678,46 +825,43 @@ function renderizarDashboard() {
   const inicio = new Date();
   inicio.setHours(0, 0, 0, 0);
   inicio.setDate(inicio.getDate() - (dias - 1));
-  const fim = new Date();
-  fim.setHours(23, 59, 59, 999);
+  const chaveInicio = chaveDia(inicio);
 
-  // Só "ajuste" (+ e −) conta como pedido. "zerar" é apenas a virada de rodada.
-  const ajustes = movimentos
-    .filter((m) => m.tipo === "ajuste")
-    .map((m) => ({ ...m, data: dataDoMov(m) }))
-    .filter((m) => m.data && m.data >= inicio && m.data <= fim);
+  const doPeriodo = pedidos.filter((p) => diaDoPedido(p) >= chaveInicio);
 
-  // ----- Série por dia (respeita o filtro de produto) -----
+  // ----- Série: um ponto por dia com pedido salvo -----
   const porDia = new Map();
-  for (let i = 0; i < dias; i++) {
-    const data = new Date(inicio);
-    data.setDate(inicio.getDate() + i);
-    porDia.set(chaveDia(data), { data, total: 0 });
-  }
-  ajustes
-    .filter((m) => produto === "todos" || m.itemId === produto)
-    .forEach((m) => {
-      const dia = porDia.get(chaveDia(m.data));
-      if (dia) dia.total += Number(m.delta) || 0;
-    });
-  const serie = [...porDia.values()].map((d) => ({ ...d, total: Math.max(0, d.total) }));
+  doPeriodo.forEach((p) => {
+    const dia = diaDoPedido(p);
+    const filtrados = (p.itens || []).filter((i) => produto === "todos" || i.itemId === produto);
+    porDia.set(dia, (porDia.get(dia) || 0) + somaUnidades(filtrados));
+  });
+  const serie = [...porDia.entries()]
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([dia, total]) => ({ dia, total }));
   const unidadesPeriodo = serie.reduce((soma, d) => soma + d.total, 0);
-  const diasComPedido = serie.filter((d) => d.total > 0).length;
 
   const itemSelecionado = itens.find((i) => i.id === produto);
   const nomeSerie = produto === "todos" ? "Todos os produtos" : itemSelecionado ? itemSelecionado.nome : "Produto";
 
   // ----- Indicadores -----
-  const ativos = itensAtivos();
-  const comPedido = ativos.filter((i) => qtd(i) > 0);
-  const unidadesAgora = comPedido.reduce((soma, i) => soma + qtd(i), 0);
-  $("dash-total-itens").textContent = String(ativos.length);
-  $("dash-pedir-agora").textContent = String(comPedido.length);
-  $("dash-pedir-legenda").textContent = `${unidadesAgora} unidade(s) marcadas`;
+  $("dash-total-itens").textContent = String(itensAtivos().length);
+  $("dash-pedidos").textContent = String(doPeriodo.length);
+  $("dash-pedidos-legenda").textContent = `${porDia.size} dia(s) com pedido · ${dias} dias`;
   $("dash-unidades-periodo").textContent = String(unidadesPeriodo);
   $("dash-unidades-legenda").textContent = `${nomeSerie} · ${dias} dias`;
-  $("dash-dias-pedido").textContent = String(diasComPedido);
-  $("legenda-linha").textContent = `Unidades pedidas em cada dia — ${nomeSerie}.`;
+
+  const ultimo = pedidos[0];
+  if (ultimo) {
+    $("dash-ultimo").textContent = formatarData(dataDoPedido(ultimo));
+    $("dash-ultimo-legenda").textContent =
+      `${ultimo.totalItens ?? (ultimo.itens || []).length} item(ns) · ${ultimo.totalUnidades ?? somaUnidades(ultimo.itens)} un.`;
+  } else {
+    $("dash-ultimo").textContent = "—";
+    $("dash-ultimo-legenda").textContent = "Nenhum pedido salvo";
+  }
+
+  $("legenda-linha").textContent = `Unidades pedidas em cada dia com pedido salvo — ${nomeSerie}.`;
 
   // ----- Gráfico de linha -----
   if (graficoLinha) {
@@ -729,16 +873,17 @@ function renderizarDashboard() {
   if (unidadesPeriodo === 0) {
     canvasLinha.hidden = true;
     semLinha.hidden = false;
+    semLinha.textContent =
+      produto !== "todos" && doPeriodo.length > 0
+        ? "Este produto não foi pedido nos pedidos salvos deste período."
+        : "Nenhum pedido salvo neste período.";
   } else {
     canvasLinha.hidden = false;
     semLinha.hidden = true;
-    const rotulosCompletos = serie.map((d) =>
-      d.data.toLocaleDateString("pt-BR", { weekday: "short", day: "2-digit", month: "2-digit" })
-    );
     graficoLinha = new Chart(canvasLinha, {
       type: "line",
       data: {
-        labels: serie.map((d) => d.data.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" })),
+        labels: serie.map((d) => rotuloDia(d.dia)),
         datasets: [
           {
             label: nomeSerie,
@@ -746,10 +891,10 @@ function renderizarDashboard() {
             borderColor: "#235571",
             backgroundColor: "rgba(35, 85, 113, 0.12)",
             fill: true,
-            tension: 0.25,
+            tension: 0.2,
             borderWidth: 2,
-            pointRadius: dias > 30 ? 1 : 3,
-            pointHoverRadius: 5,
+            pointRadius: 4,
+            pointHoverRadius: 6,
           },
         ],
       },
@@ -761,14 +906,14 @@ function renderizarDashboard() {
           legend: { display: false },
           tooltip: {
             callbacks: {
-              title: (itensTooltip) => rotulosCompletos[itensTooltip[0].dataIndex],
+              title: (itensTooltip) => rotuloDia(serie[itensTooltip[0].dataIndex].dia, true),
               label: (ctx) => `${ctx.parsed.y} unidade(s)`,
             },
           },
         },
         scales: {
           y: { beginAtZero: true, ticks: { precision: 0 } },
-          x: { ticks: { maxTicksLimit: 8, maxRotation: 0, minRotation: 0 } },
+          x: { ticks: { maxTicksLimit: 10, maxRotation: 0, minRotation: 0 } },
         },
       },
     });
@@ -776,15 +921,17 @@ function renderizarDashboard() {
 
   // ----- Ranking de itens (considera todos os produtos) -----
   const porItem = new Map();
-  ajustes.forEach((m) => {
-    const atual = porItem.get(m.itemId) || { itemId: m.itemId, nome: m.itemNome || "Item", total: 0 };
-    atual.total += Number(m.delta) || 0;
-    porItem.set(m.itemId, atual);
+  doPeriodo.forEach((p) => {
+    (p.itens || []).forEach((i) => {
+      const atual = porItem.get(i.itemId) || { nome: i.nome, total: 0 };
+      atual.total += Number(i.quantidade) || 0;
+      porItem.set(i.itemId, atual);
+    });
   });
-  const ranking = [...porItem.values()]
-    .map((r) => {
-      const item = itens.find((i) => i.id === r.itemId);
-      return { nome: item ? item.nome : r.nome, total: Math.max(0, r.total) };
+  const ranking = [...porItem.entries()]
+    .map(([itemId, r]) => {
+      const item = itens.find((i) => i.id === itemId);
+      return { nome: item ? item.nome : r.nome, total: r.total };
     })
     .filter((r) => r.total > 0)
     .sort((a, b) => b.total - a.total || a.nome.localeCompare(b.nome, "pt-BR"))
@@ -827,15 +974,16 @@ function renderizarDashboard() {
     });
   }
 
-  // ----- Pedido atual -----
-  const containerAtual = $("dash-lista-atual");
-  if (!comPedido.length) {
-    containerAtual.innerHTML = '<p class="mensagem-vazio">Nenhum item marcado para pedir agora.</p>';
+  // ----- Último pedido salvo -----
+  const containerUltimo = $("dash-lista-ultimo");
+  if (!ultimo || !(ultimo.itens || []).length) {
+    containerUltimo.innerHTML = '<p class="mensagem-vazio">Nenhum pedido salvo ainda.</p>';
   } else {
-    containerAtual.innerHTML = comPedido
+    containerUltimo.innerHTML = [...ultimo.itens]
+      .sort((a, b) => String(a.nome).localeCompare(String(b.nome), "pt-BR", { sensitivity: "base" }))
       .map(
         (i) =>
-          `<div class="cozinha-linha-atual"><span>${escapeHtml(i.nome)}</span><span>${qtd(i)} ${escapeHtml(i.unidade || "un.")}</span></div>`
+          `<div class="cozinha-linha-atual"><span>${escapeHtml(i.nome)}</span><span>${Number(i.quantidade) || 0} ${escapeHtml(i.unidade || "un.")}</span></div>`
       )
       .join("");
   }
