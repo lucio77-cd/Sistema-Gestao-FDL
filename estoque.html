@@ -6,6 +6,7 @@
 <meta name="robots" content="noindex, nofollow" />
 <title>Estoque — Controle de Bebidas</title>
 <link rel="stylesheet" href="css/styles.css" />
+<link rel="stylesheet" href="css/filtros-lista.css" />
 </head>
 <body data-pagina-atual="estoque">
 <header class="topo"><div class="topo-marca">Controle de Bebidas</div><div class="topo-sub" id="nome-estabelecimento">Carregando…</div></header>
@@ -48,17 +49,25 @@
 </section>
 <section class="painel" id="painel-lista-whatsapp">
 <h2>Lista de estoque para WhatsApp</h2>
-<p class="legenda">Gere uma lista com os saldos registrados no sistema e copie para enviar à gerente.</p>
+<p class="legenda">Escolha o que entra na lista (opcional) e depois o local. A lista usa os saldos registrados no sistema.</p>
+<div class="filtro-lista">
+<div class="filtro-lista-grupo">
+<div class="filtro-lista-titulo">Tipo <small>(toque em um ou mais)</small></div>
+<div class="filtro-chips" id="chips-lista-categoria" role="group" aria-label="Filtrar a lista por tipo"></div>
+</div>
+<div class="filtro-lista-grupo">
+<div class="filtro-lista-titulo">Embalagem <small>(toque em uma ou mais)</small></div>
+<div class="filtro-chips" id="chips-lista-embalagem" role="group" aria-label="Filtrar a lista por embalagem"></div>
+</div>
+<p class="legenda filtro-lista-resumo" id="resumo-filtros-lista">Mostrando: todos os tipos · todas as embalagens</p>
+<button type="button" class="btn-texto" id="btn-limpar-filtros-lista" hidden>Limpar filtros</button>
+</div>
 <div class="stock-review-actions">
 <button type="button" class="btn" id="btn-lista-geladeira">Lista da geladeira</button>
 <button type="button" class="btn btn-secundario" id="btn-lista-seco">Lista da parte seca</button>
 </div>
-<div class="stock-form-grid">
-<div><label for="filtro-lista-categoria">Categoria</label><select id="filtro-lista-categoria"><option value="">Todas as categorias</option></select></div>
-<div><label for="filtro-lista-embalagem">Embalagem</label><select id="filtro-lista-embalagem"><option value="">Todas as embalagens</option></select></div>
-</div>
 <label for="texto-lista-whatsapp">Prévia da mensagem</label>
-<textarea id="texto-lista-whatsapp" rows="8" readonly placeholder="Escolha um local para gerar a lista."></textarea>
+<textarea id="texto-lista-whatsapp" rows="8" readonly placeholder="Escolha os filtros (opcional) e toque em Lista da geladeira ou Lista da parte seca."></textarea>
 <button type="button" class="btn" id="btn-copiar-lista" disabled>Copiar lista para WhatsApp</button>
 </section>
 <section class="painel" id="painel-estoque-baixo">
@@ -84,11 +93,11 @@
 <label for="np-nome">Nome do produto *</label><input type="text" id="np-nome" required placeholder="Ex.: Refrigerante de cola" />
 <div class="stock-form-grid">
 <div><label for="np-marca">Marca</label><input id="np-marca" type="text" placeholder="Ex.: Coca-Cola" /></div>
-<div><label for="np-categoria">Categoria</label><select id="np-categoria"><option value="">Selecione…</option><option>Refrigerante</option><option>Água</option><option>Suco</option><option>Cerveja</option><option>Energético</option><option>Isotônico</option><option>Chá</option><option>Laticínio</option><option>Outro</option></select></div>
+<div><label for="np-categoria">Categoria</label><select id="np-categoria"><option value="">Selecione…</option></select></div>
 <div><label for="np-variante">Sabor/variante</label><input id="np-variante" type="text" placeholder="Ex.: Original, Zero, Laranja" /></div>
-<div><label for="np-embalagem">Embalagem</label><select id="np-embalagem"><option value="">Selecione…</option><option>Lata</option><option>PET</option><option>Vidro</option><option>Long neck</option><option>Caixa</option><option>Pacote</option><option>Copo</option><option>Sachê</option><option>Outra</option></select></div>
+<div><label for="np-embalagem">Embalagem</label><select id="np-embalagem"><option value="">Selecione…</option></select></div>
 <div><label for="np-volume">Volume/medida</label><input id="np-volume" list="opcoes-volume" placeholder="Ex.: 350 ml, 2 L, 12 un." />
-<datalist id="opcoes-volume"><option value="200 ml"></option><option value="220 ml"></option><option value="250 ml"></option><option value="269 ml"></option><option value="290 ml"></option><option value="300 ml"></option><option value="310 ml"></option><option value="330 ml"></option><option value="350 ml"></option><option value="473 ml"></option><option value="500 ml"></option><option value="600 ml"></option><option value="1 L"></option><option value="1,5 L"></option><option value="2 L"></option><option value="2,5 L"></option><option value="3 L"></option><option value="5 L"></option></datalist></div>
+<datalist id="opcoes-volume"></datalist></div>
 <div><label for="np-codigo">Código de barras</label><input id="np-codigo" type="text" inputmode="numeric" /></div>
 <div><label for="np-estoque-minimo">Estoque mínimo (opcional)</label><input id="np-estoque-minimo" type="number" min="0" step="1" inputmode="numeric" placeholder="Ex.: 12" /><small class="legenda">Alerta quando o saldo total chegar a este número ou ficar abaixo dele.</small></div>
 </div>
