@@ -1,0 +1,54 @@
+/* Filtros da lista de estoque para WhatsApp (tela Estoque) */
+
+.filtro-lista {
+  margin: 1rem 0 0.4rem;
+}
+
+.filtro-lista-grupo {
+  margin-bottom: 0.9rem;
+}
+
+.filtro-lista-titulo {
+  font-size: 0.85rem;
+  font-weight: 600;
+  margin-bottom: 0.45rem;
+}
+
+.filtro-lista-titulo small {
+  color: var(--ink-soft);
+  font-weight: 400;
+}
+
+.filtro-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+}
+
+.chip-filtro {
+  min-height: 40px;
+  padding: 0.5rem 0.85rem;
+  border: 1px solid var(--steel-light);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--ink-soft);
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
+.chip-filtro--ativo {
+  background: var(--primary);
+  border-color: var(--primary);
+  color: #fff;
+}
+
+.chip-filtro--ativo::before {
+  content: "✓ ";
+}
+
+.filtro-lista-resumo {
+  margin: 0 0 0.4rem;
+  font-size: 0.82rem;
+}
