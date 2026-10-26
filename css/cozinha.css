@@ -1,7 +1,23 @@
 /* ---------- Página Cozinha ---------- */
 
 .cozinha-resumo-topo { margin-bottom: 1rem; }
-.cozinha-resumo-wa { grid-template-columns: repeat(2, minmax(0, 1fr)); margin-bottom: .6rem; }
+.cozinha-resumo-wa { grid-template-columns: repeat(2, minmax(0, 1fr)); margin: .8rem 0 .6rem; }
+
+/* Aviso do pedido em andamento (ainda não salvo) */
+.cozinha-aviso {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: .8rem;
+  flex-wrap: wrap;
+  border-left: 5px solid var(--atencao);
+  background: #fdf6e9;
+}
+.cozinha-aviso span { font-size: .88rem; font-weight: 600; color: #80520b; flex: 1; min-width: 12rem; }
+.cozinha-aviso .btn { margin-top: 0; }
+
+.cozinha-salvar .btn { width: 100%; margin-top: 0; }
+.cozinha-salvar .btn-texto { margin-top: .5rem; }
 
 .cozinha-item {
   display: flex;
@@ -46,6 +62,20 @@
 
 .cozinha-link-wa { text-decoration: none; text-align: center; flex: 1; }
 .cozinha-link-wa[aria-disabled="true"] { opacity: .45; pointer-events: none; }
+
+/* Pedidos salvos */
+.cozinha-pedido-salvo {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: .8rem;
+  padding: .65rem 0;
+  border-bottom: 1px solid var(--steel-light);
+}
+.cozinha-pedido-salvo:last-child { border-bottom: none; }
+.cozinha-pedido-salvo strong { display: block; font-size: .92rem; }
+.cozinha-pedido-salvo small { color: var(--ink-soft); font-size: .78rem; }
+.cozinha-pedido-acoes { display: flex; gap: .8rem; flex-shrink: 0; }
 
 .cozinha-linha-atual {
   display: flex;
