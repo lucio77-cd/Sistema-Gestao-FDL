@@ -115,6 +115,8 @@ function renderizarTudo() {
   renderizarEstoqueBaixo();
   renderizarSessao();
   renderizarLista();
+  preencherFiltrosListaWhatsApp();
+  if (localListaWhatsApp) gerarListaWhatsApp(localListaWhatsApp);
 }
 
 function renderizarEstoqueBaixo() {
@@ -185,17 +187,40 @@ function nomeCurtoWhatsApp(produto, todosProdutos) {
   return curto;
 }
 
+let localListaWhatsApp = null;
+
+function preencherFiltrosListaWhatsApp() {
+  const categoria = document.getElementById("filtro-lista-categoria");
+  const embalagem = document.getElementById("filtro-lista-embalagem");
+  const preencher = (select, campo, rotulo) => {
+    const selecionado = select.value;
+    const valores = [...new Set(produtos.map(p => String(p[campo] || "").trim()).filter(Boolean))]
+      .sort((a,b) => a.localeCompare(b, "pt-BR", {sensitivity:"base"}));
+    select.innerHTML = '<option value="">Todas ' + rotulo + '</option>' +
+      valores.map(v => '<option value="' + esc(v) + '">' + esc(v) + '</option>').join("");
+    if (valores.includes(selecionado)) select.value = selecionado;
+  };
+  preencher(categoria, "categoria", "as categorias");
+  preencher(embalagem, "embalagem", "as embalagens");
+}
+
 function gerarListaWhatsApp(local) {
+  localListaWhatsApp = local;
   const rotulo = ROTULO_LOCAL[local];
+  const categoria = document.getElementById("filtro-lista-categoria").value;
+  const embalagem = document.getElementById("filtro-lista-embalagem").value;
   const itens = produtos
+    .filter(p => (!categoria || String(p.categoria || "").trim() === categoria)
+      && (!embalagem || String(p.embalagem || "").trim() === embalagem))
     .map(p => ({ produto: p, quantidade: numero((estoqueMap[p.id] || {})[local]) }))
     .filter(i => i.quantidade > 0)
     .sort((a,b) => nomeCurtoWhatsApp(a.produto, produtos).localeCompare(nomeCurtoWhatsApp(b.produto, produtos), "pt-BR", { sensitivity:"base" }));
+  const filtros = [categoria, embalagem].filter(Boolean);
   const linhas = [
-    "📦 ESTOQUE — " + rotulo.toLocaleUpperCase("pt-BR"),
+    "📦 ESTOQUE — " + rotulo.toLocaleUpperCase("pt-BR") + (filtros.length ? " — " + filtros.join(" / ").toLocaleUpperCase("pt-BR") : ""),
     new Date().toLocaleDateString("pt-BR"),
     "",
-    ...itens.map(i => "• " + nomeCurtoWhatsApp(i.produto, produtos) + " — " + i.quantidade + " un.")
+    ...(itens.length ? itens.map(i => "• " + nomeCurtoWhatsApp(i.produto, produtos) + " — " + i.quantidade + " un.") : ["Nenhum produto com saldo corresponde aos filtros selecionados."])
   ];
   const campo = document.getElementById("texto-lista-whatsapp");
   campo.value = linhas.join("\n");
@@ -205,6 +230,12 @@ function gerarListaWhatsApp(local) {
 
 document.getElementById("btn-lista-geladeira").addEventListener("click", () => gerarListaWhatsApp("geladeira"));
 document.getElementById("btn-lista-seco").addEventListener("click", () => gerarListaWhatsApp("seco"));
+document.getElementById("filtro-lista-categoria").addEventListener("change", () => {
+  if (localListaWhatsApp) gerarListaWhatsApp(localListaWhatsApp);
+});
+document.getElementById("filtro-lista-embalagem").addEventListener("change", () => {
+  if (localListaWhatsApp) gerarListaWhatsApp(localListaWhatsApp);
+});
 document.getElementById("btn-copiar-lista").addEventListener("click", async () => {
   const campo = document.getElementById("texto-lista-whatsapp");
   if (!campo.value.trim()) {
