@@ -2,6 +2,7 @@ import { db } from "./firebase-config.js";
 import { protegerPagina } from "./auth-guard.js";
 import { iniciarNavegacao } from "./nav.js";
 import { mostrarToast } from "./toast.js";
+import { OPCOES_CATEGORIA, OPCOES_EMBALAGEM, OPCOES_VOLUME, chaveOpcao } from "./opcoes-produto.js";
 import {
   collection, query, where, getDocs, doc, updateDoc
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
@@ -31,20 +32,20 @@ function valorCampo(valor) {
   return valor === undefined || valor === null ? "" : String(valor);
 }
 
-
-const OPCOES_CATEGORIA = ["Refrigerante", "Água", "Suco", "Cerveja", "Energético", "Isotônico", "Chá", "Laticínio", "Destilado", "Vinho", "Outro"];
-const OPCOES_EMBALAGEM = ["Lata", "PET", "Vidro", "Long neck", "Garrafa", "Caixa", "Pacote", "Copo", "Sachê", "Barril", "Outra"];
-const OPCOES_VOLUME = ["100 ml", "200 ml", "220 ml", "250 ml", "269 ml", "290 ml", "300 ml", "310 ml", "330 ml", "350 ml", "473 ml", "500 ml", "600 ml", "700 ml", "750 ml", "900 ml", "1 L", "1,5 L", "1,75 L", "2 L", "2,5 L", "3 L", "5 L", "10 L", "12 un.", "18 un.", "24 un."];
-
+// As listas de categoria, embalagem e volume ficam em js/opcoes-produto.js
+// (compartilhadas com a tela Estoque).
+// A comparação ignora maiúsculas e acentos: um produto salvo como "suco"
+// aparece selecionado em "Suco" em vez de cair em "Selecione".
 function opcoesSelect(valorAtual, opcoes, placeholder = "Selecione uma opção") {
-  const atual = valorCampo(valorAtual);
+  const atual = valorCampo(valorAtual).trim();
+  const chaveAtual = chaveOpcao(atual);
   const lista = [...opcoes];
-  if (atual && !lista.some(opcao => opcao.toLocaleLowerCase("pt-BR") === atual.toLocaleLowerCase("pt-BR"))) {
+  if (atual && !lista.some(opcao => chaveOpcao(opcao) === chaveAtual)) {
     lista.unshift(atual);
   }
   return '<option value=""' + (!atual ? " selected" : "") + '>' + esc(placeholder) + '</option>' +
     lista.map(opcao => '<option value="' + esc(opcao) + '"' +
-      (opcao === atual ? " selected" : "") + '>' + esc(opcao) + '</option>').join("");
+      (atual && chaveOpcao(opcao) === chaveAtual ? " selected" : "") + '>' + esc(opcao) + '</option>').join("");
 }
 
 function camposFaltantes(p) {
