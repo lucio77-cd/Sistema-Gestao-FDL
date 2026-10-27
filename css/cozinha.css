@@ -123,4 +123,4 @@
 @media (max-width: 520px) {
   .cozinha-form-novo { grid-template-columns: 1fr; }
   .cozinha-controles .btn-secundario { width: 100%; }
-  }
+}
