@@ -6,6 +6,7 @@
 <meta name="robots" content="noindex, nofollow" />
 <title>Cozinha — Controle de Bebidas</title>
 <link rel="stylesheet" href="css/styles.css" />
+<link rel="stylesheet" href="css/filtros-lista.css" />
 <link rel="stylesheet" href="css/cozinha.css" />
 </head>
 <body data-pagina-atual="cozinha">
@@ -16,7 +17,7 @@
 
   <main>
     <h1>Cozinha</h1>
-    <p class="legenda">Marque o que precisa ser pedido e salve o pedido do dia para enviar à gerente.</p>
+    <p class="legenda">Estoque da cozinha: confira cada item, salve a vistoria e envie a lista para a gerente.</p>
 
     <div class="segmentado" role="tablist" aria-label="Seções da cozinha">
       <button type="button" id="seg-lista" class="ativo" role="tab" aria-selected="true">Lista</button>
@@ -28,25 +29,28 @@
     <section id="secao-lista">
       <div class="stock-resumo-grid cozinha-resumo-topo">
         <div><span>Itens na lista</span><strong id="topo-total-itens">—</strong></div>
-        <div><span>Itens a pedir</span><strong id="topo-itens-pedir">—</strong></div>
-        <div><span>Unidades a pedir</span><strong id="topo-unidades">—</strong></div>
+        <div><span>Conferidos</span><strong id="topo-conferidos">—</strong></div>
+        <div><span>Baixos ou zerados</span><strong id="topo-baixos">—</strong></div>
       </div>
 
       <div class="painel cozinha-aviso" id="aviso-rascunho" hidden>
-        <span id="aviso-rascunho-texto">Pedido em andamento, ainda não salvo.</span>
-        <button type="button" class="btn btn-salvar-pedido">Salvar pedido</button>
+        <span id="aviso-rascunho-texto">Vistoria em andamento, ainda não salva.</span>
+        <button type="button" class="btn btn-salvar-vistoria">Salvar vistoria</button>
       </div>
 
-      <div class="barra-busca">
+      <p class="legenda">Os números já vêm da última vistoria. Toque em + ou − (ou digite) para atualizar um item, ou em "Confirmar sem mudar" se a quantidade continua igual. Só os itens conferidos entram nos gráficos.</p>
+
+      <div class="cozinha-controles">
         <input type="search" id="campo-busca" placeholder="Buscar item da cozinha" autocomplete="off" />
+        <button type="button" class="btn-secundario" id="btn-conferir-todos">Marcar todos como conferidos</button>
       </div>
 
       <div id="lista-cozinha"><p class="mensagem-vazio">Carregando itens…</p></div>
 
       <section class="painel cozinha-salvar">
-        <button type="button" class="btn btn-salvar-pedido" id="btn-salvar-pedido" disabled>Salvar pedido</button>
-        <p class="legenda" style="margin:0.6rem 0 0">Ao salvar, o pedido do dia fica registrado na Dashboard e as quantidades voltam para zero. Marque pelo menos um item.</p>
-        <button type="button" class="btn-texto" id="btn-limpar-rascunho" disabled>Limpar o pedido em andamento</button>
+        <button type="button" class="btn btn-salvar-vistoria" id="btn-salvar-vistoria" disabled>Salvar vistoria</button>
+        <p class="legenda" style="margin:0.6rem 0 0">Ao salvar, a contagem do dia fica registrada na Dashboard. Confira pelo menos um item.</p>
+        <button type="button" class="btn-texto" id="btn-limpar-rascunho" disabled>Descartar o que ainda não foi salvo</button>
       </section>
 
       <section class="painel">
@@ -61,9 +65,14 @@
               <label for="novo-unidade">Unidade (opcional)</label>
               <input type="text" id="novo-unidade" maxlength="20" placeholder="Ex.: kg, cx, pct" autocomplete="off" />
             </div>
+            <div>
+              <label for="novo-grupo">Grupo (opcional)</label>
+              <input type="text" id="novo-grupo" list="grupos-lista" maxlength="30" placeholder="Ex.: Frios" autocomplete="off" />
+            </div>
           </div>
           <button class="btn" type="submit">Adicionar à lista</button>
         </form>
+        <datalist id="grupos-lista"></datalist>
 
         <details class="cozinha-colar">
           <summary>Colar uma lista inteira de uma vez</summary>
@@ -78,24 +87,26 @@
         <label class="switch">
           <input type="checkbox" id="toggle-edicao" />
           <span class="switch-trilho" aria-hidden="true"></span>
-          <span class="switch-rotulo">Mostrar renomear e remover</span>
+          <span class="switch-rotulo">Mostrar editar e remover</span>
         </label>
-        <p class="legenda" style="margin:0.6rem 0 0">Ao remover, o item sai da lista, mas os pedidos já salvos continuam com ele no histórico.</p>
+        <p class="legenda" style="margin:0.6rem 0 0">Em "Editar" você muda o nome, a unidade, o grupo e o estoque mínimo do item. Ao remover, o item sai da lista, mas as vistorias salvas continuam com ele no histórico.</p>
+        <button type="button" class="btn btn-secundario" id="btn-sugerir-grupos">Sugerir grupos para os itens sem grupo</button>
       </section>
     </section>
 
     <!-- ===== WHATSAPP ===== -->
     <section id="secao-whatsapp" hidden>
       <section class="painel">
-        <h2 style="margin-top:0">Lista para a gerente</h2>
-        <label for="select-pedido-wa">Qual pedido enviar</label>
-        <select id="select-pedido-wa"></select>
+        <h2 style="margin-top:0">Estoque para a gerente</h2>
+        <label for="select-vistoria-wa">Qual vistoria enviar</label>
+        <select id="select-vistoria-wa"></select>
         <div class="stock-resumo-grid cozinha-resumo-wa">
           <div><span>Itens na mensagem</span><strong id="wa-itens">—</strong></div>
-          <div><span>Unidades</span><strong id="wa-unidades">—</strong></div>
+          <div><span>Itens que acabaram</span><strong id="wa-zerados">—</strong></div>
         </div>
         <label for="texto-lista-whatsapp">Prévia da mensagem</label>
-        <textarea id="texto-lista-whatsapp" rows="12"></textarea>
+        <textarea id="texto-lista-whatsapp" rows="14"></textarea>
+        <p class="legenda" style="margin:.4rem 0 0">Entram só os itens conferidos. Você pode ajustar o texto antes de enviar.</p>
         <button type="button" class="btn-texto" id="btn-regerar">Gerar o texto de novo</button>
         <div class="stock-review-actions">
           <button type="button" class="btn" id="btn-copiar-lista" disabled>Copiar lista</button>
@@ -104,40 +115,58 @@
       </section>
 
       <section class="painel">
-        <h2 style="margin-top:0">Pedidos salvos</h2>
-        <p class="legenda">Os pedidos mais recentes. Use "Ver texto" para copiar de novo, ou "Excluir" se salvou por engano.</p>
-        <div id="lista-pedidos-salvos"><p class="mensagem-vazio">Carregando…</p></div>
+        <h2 style="margin-top:0">Vistorias salvas</h2>
+        <p class="legenda">As mais recentes. Use "Ver texto" para copiar de novo, ou "Excluir" se salvou por engano.</p>
+        <div id="lista-vistorias-salvas"><p class="mensagem-vazio">Carregando…</p></div>
       </section>
     </section>
 
     <!-- ===== DASHBOARD ===== -->
     <section id="secao-dashboard" hidden>
-      <div class="filtros">
-        <select id="filtro-periodo-cozinha" aria-label="Período da análise">
+      <section class="painel">
+        <h2 style="margin-top:0">Filtros</h2>
+        <label for="filtro-periodo-cozinha">Período</label>
+        <select id="filtro-periodo-cozinha">
           <option value="7">Últimos 7 dias</option>
           <option value="30" selected>Últimos 30 dias</option>
           <option value="90">Últimos 90 dias</option>
+          <option value="365">Último ano</option>
+          <option value="custom">Escolher datas…</option>
         </select>
-        <select id="filtro-produto-cozinha" aria-label="Filtrar por produto">
-          <option value="todos">Todos os produtos (total)</option>
-        </select>
-      </div>
+        <div class="cozinha-periodo-custom" id="periodo-custom" hidden>
+          <div><label for="data-de">De</label><input type="date" id="data-de" /></div>
+          <div><label for="data-ate">Até</label><input type="date" id="data-ate" /></div>
+        </div>
+
+        <div class="filtro-lista">
+          <div class="filtro-lista-grupo">
+            <div class="filtro-lista-titulo">Grupo <small>(toque em um ou mais)</small></div>
+            <div class="filtro-chips" id="chips-grupo-cozinha" role="group" aria-label="Filtrar por grupo"></div>
+          </div>
+          <div class="filtro-lista-grupo">
+            <div class="filtro-lista-titulo">Produtos no gráfico de linhas <small>(até 8; sem escolher, mostra o total)</small></div>
+            <div class="filtro-chips" id="chips-produto-cozinha" role="group" aria-label="Escolher produtos"></div>
+          </div>
+          <p class="legenda filtro-lista-resumo" id="resumo-filtros-cozinha">Mostrando: todos os grupos · total</p>
+          <button type="button" class="btn-texto" id="btn-limpar-filtros-cozinha" hidden>Limpar filtros</button>
+        </div>
+      </section>
 
       <div class="vencimento-resumo-grid" aria-live="polite">
         <article class="vencimento-indicador">
-          <span>Pedidos salvos</span>
-          <strong id="dash-pedidos">—</strong>
-          <small id="dash-pedidos-legenda">No período</small>
+          <span>Vistorias salvas</span>
+          <strong id="dash-vistorias">—</strong>
+          <small id="dash-vistorias-legenda">No período</small>
         </article>
         <article class="vencimento-indicador">
-          <span>Unidades pedidas</span>
-          <strong id="dash-unidades-periodo">—</strong>
-          <small id="dash-unidades-legenda">No período</small>
+          <span>Última vistoria</span>
+          <strong id="dash-ultima">—</strong>
+          <small id="dash-ultima-legenda">—</small>
         </article>
-        <article class="vencimento-indicador">
-          <span>Último pedido</span>
-          <strong id="dash-ultimo">—</strong>
-          <small id="dash-ultimo-legenda">—</small>
+        <article class="vencimento-indicador vencimento-indicador--perda">
+          <span>Baixos ou zerados</span>
+          <strong id="dash-baixos">—</strong>
+          <small>Última contagem conferida</small>
         </article>
         <article class="vencimento-indicador">
           <span>Itens na lista</span>
@@ -147,25 +176,43 @@
       </div>
 
       <section class="painel">
-        <h2 style="margin-top:0">Pedidos ao longo do tempo</h2>
-        <p class="legenda" id="legenda-linha">Unidades pedidas em cada dia com pedido salvo.</p>
-        <div style="height:260px;position:relative"><canvas id="grafico-cozinha-linha"></canvas></div>
-        <p class="mensagem-vazio" id="sem-dados-linha" hidden>Nenhum pedido salvo neste período.</p>
+        <h2 style="margin-top:0">Estoque ao longo do tempo</h2>
+        <p class="legenda" id="legenda-linha">Quantidade em cada vistoria salva.</p>
+        <div style="height:280px;position:relative"><canvas id="grafico-cozinha-linha"></canvas></div>
+        <p class="mensagem-vazio" id="sem-dados-linha" hidden>Nenhuma vistoria salva neste período.</p>
+        <p class="legenda" id="aviso-poucos-dados" hidden>Só há uma vistoria no período. A linha aparece a partir da segunda.</p>
       </section>
 
       <section class="painel">
-        <h2 style="margin-top:0">Itens mais pedidos</h2>
-        <p class="legenda">Ranking por unidades nos pedidos salvos do período (considera todos os produtos).</p>
-        <div id="area-grafico-cozinha-itens" style="position:relative;min-height:200px"><canvas id="grafico-cozinha-itens"></canvas></div>
-        <p class="mensagem-vazio" id="sem-dados-itens" hidden>Nenhum pedido salvo neste período.</p>
+        <h2 style="margin-top:0">Estoque atual</h2>
+        <p class="legenda">Última contagem conferida de cada item (vermelho: acabou · laranja: no mínimo ou abaixo).</p>
+        <label class="produtos-filtro-incompletos">
+          <input type="checkbox" id="so-baixos" />
+          Mostrar só itens baixos ou zerados
+        </label>
+        <div id="area-grafico-estoque" style="position:relative;min-height:200px"><canvas id="grafico-cozinha-estoque"></canvas></div>
+        <p class="mensagem-vazio" id="sem-dados-estoque" hidden>Nenhum item para mostrar.</p>
       </section>
 
       <section class="painel">
-        <h2 style="margin-top:0">Último pedido salvo</h2>
-        <div id="dash-lista-ultimo"><p class="mensagem-vazio">Carregando…</p></div>
+        <h2 style="margin-top:0">Consumo médio por dia</h2>
+        <p class="legenda">Estimativa a partir de vistorias conferidas seguidas. Intervalos em que o estoque subiu além da entrada informada são ignorados.</p>
+        <div id="area-grafico-consumo" style="position:relative;min-height:200px"><canvas id="grafico-cozinha-consumo"></canvas></div>
+        <p class="mensagem-vazio" id="sem-dados-consumo" hidden>Ainda não há dados suficientes. É preciso de pelo menos duas vistorias conferidas do mesmo item, sem reposição no meio.</p>
       </section>
 
-      <p class="legenda">O gráfico usa apenas pedidos salvos: cada ponto é um dia com pedido. Se houver mais de um pedido no mesmo dia, as quantidades são somadas. Itens removidos da lista continuam no histórico.</p>
+      <section class="painel">
+        <h2 style="margin-top:0">Atenção</h2>
+        <p class="legenda">Itens zerados, abaixo do mínimo ou sem nenhuma contagem (ignora os filtros acima).</p>
+        <div id="dash-lista-atencao"><p class="mensagem-vazio">Carregando…</p></div>
+      </section>
+
+      <section class="painel">
+        <h2 style="margin-top:0">Última vistoria salva</h2>
+        <div id="dash-lista-ultima"><p class="mensagem-vazio">Carregando…</p></div>
+      </section>
+
+      <p class="legenda">Os gráficos usam apenas vistorias salvas e itens conferidos. Se houver mais de uma vistoria no mesmo dia, vale a mais recente. Com grupos escolhidos e nenhum produto marcado, a linha é a soma dos itens conferidos do grupo.</p>
     </section>
   </main>
 
