@@ -1,9 +1,9 @@
-/* ---------- Página Cozinha ---------- */
+/* ---------- Página Cozinha (estoque) ---------- */
 
 .cozinha-resumo-topo { margin-bottom: 1rem; }
 .cozinha-resumo-wa { grid-template-columns: repeat(2, minmax(0, 1fr)); margin: .8rem 0 .6rem; }
 
-/* Aviso do pedido em andamento (ainda não salvo) */
+/* Aviso da vistoria em andamento (ainda não salva) */
 .cozinha-aviso {
   display: flex;
   align-items: center;
@@ -16,13 +16,19 @@
 .cozinha-aviso span { font-size: .88rem; font-weight: 600; color: #80520b; flex: 1; min-width: 12rem; }
 .cozinha-aviso .btn { margin-top: 0; }
 
+.cozinha-controles { display: flex; gap: .6rem; margin-bottom: 1rem; flex-wrap: wrap; }
+.cozinha-controles input[type="search"] { flex: 1; min-width: 10rem; }
+.cozinha-controles .btn-secundario { margin-top: 0; padding: .55rem .8rem; font-size: .85rem; }
+
 .cozinha-salvar .btn { width: 100%; margin-top: 0; }
 .cozinha-salvar .btn-texto { margin-top: .5rem; }
 
+/* Cartão de item */
 .cozinha-item {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
-  gap: .8rem;
+  gap: .6rem .8rem;
   background: var(--surface);
   border: 1px solid var(--steel-light);
   border-left: 5px solid var(--steel-light);
@@ -30,18 +36,33 @@
   padding: .7rem .8rem;
   margin-bottom: .55rem;
 }
-.cozinha-item--pedido { border-left-color: var(--atencao); }
+.cozinha-item--conferido { border-left-color: var(--normal); }
+.cozinha-item--baixo { border-left-color: var(--atencao); }
+.cozinha-item--zerado { border-left-color: var(--vencido); }
+
 .cozinha-item-info { flex: 1; min-width: 0; }
 .cozinha-item-nome { font-weight: 600; font-size: .96rem; overflow-wrap: anywhere; }
-.cozinha-item-unidade { color: var(--ink-soft); font-size: .78rem; margin-top: .1rem; }
+.cozinha-item-nome .selo { margin-left: .4rem; }
+.cozinha-item-meta { color: var(--ink-soft); font-size: .78rem; margin-top: .15rem; }
 
 .cozinha-item .stepper input { font-size: 1.05rem; }
-.cozinha-item--pedido .stepper input { color: var(--atencao); }
 
-.cozinha-item-acoes { display: none; gap: .8rem; margin-top: .35rem; }
-.modo-edicao .cozinha-item-acoes { display: flex; }
+.cozinha-item-acoes { display: flex; gap: .9rem; flex-wrap: wrap; margin-top: .35rem; align-items: center; }
+.cozinha-item-acoes--edicao { display: none; }
+.modo-edicao .cozinha-item-acoes--edicao { display: flex; }
 
-.cozinha-form-novo { display: grid; grid-template-columns: minmax(0, 2fr) minmax(0, 1fr); gap: .7rem; }
+.cozinha-entrada-linha { display: flex; align-items: center; gap: .5rem; margin-top: .4rem; flex-wrap: wrap; }
+.cozinha-entrada-linha label { margin: 0; font-size: .78rem; color: var(--ink-soft); }
+.cozinha-entrada-linha input { width: 5.5rem; padding: .35rem .5rem; }
+
+.cozinha-item-form {
+  flex: 1 1 100%;
+  border-top: 1px dashed var(--steel-light);
+  padding-top: .7rem;
+}
+.cozinha-item-form .stock-review-actions { margin-top: .6rem; }
+
+.cozinha-form-novo { display: grid; grid-template-columns: minmax(0, 2fr) minmax(0, 1fr) minmax(0, 1fr); gap: .7rem; }
 
 .cozinha-colar { margin-top: 1.1rem; border-top: 1px dashed var(--steel-light); padding-top: .8rem; }
 .cozinha-colar summary { cursor: pointer; font-weight: 600; font-size: .9rem; color: var(--primary); }
@@ -63,8 +84,8 @@
 .cozinha-link-wa { text-decoration: none; text-align: center; flex: 1; }
 .cozinha-link-wa[aria-disabled="true"] { opacity: .45; pointer-events: none; }
 
-/* Pedidos salvos */
-.cozinha-pedido-salvo {
+/* Vistorias salvas */
+.cozinha-vistoria-salva {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -72,10 +93,13 @@
   padding: .65rem 0;
   border-bottom: 1px solid var(--steel-light);
 }
-.cozinha-pedido-salvo:last-child { border-bottom: none; }
-.cozinha-pedido-salvo strong { display: block; font-size: .92rem; }
-.cozinha-pedido-salvo small { color: var(--ink-soft); font-size: .78rem; }
-.cozinha-pedido-acoes { display: flex; gap: .8rem; flex-shrink: 0; }
+.cozinha-vistoria-salva:last-child { border-bottom: none; }
+.cozinha-vistoria-salva strong { display: block; font-size: .92rem; }
+.cozinha-vistoria-salva small { color: var(--ink-soft); font-size: .78rem; }
+.cozinha-vistoria-acoes { display: flex; gap: .8rem; flex-shrink: 0; }
+
+/* Dashboard */
+.cozinha-periodo-custom { display: grid; grid-template-columns: 1fr 1fr; gap: .7rem; margin-top: .4rem; }
 
 .cozinha-linha-atual {
   display: flex;
@@ -86,13 +110,17 @@
   border-bottom: 1px solid var(--steel-light);
 }
 .cozinha-linha-atual:last-child { border-bottom: none; }
+.cozinha-linha-atual span:first-child { min-width: 0; overflow-wrap: anywhere; }
 .cozinha-linha-atual span:last-child {
   font-family: var(--font-mono);
   font-weight: 700;
   color: var(--primary);
   white-space: nowrap;
 }
+.cozinha-linha-atual .nao-conf { color: var(--ink-soft); font-weight: 500; }
+.cozinha-linha-atual .selo { margin-left: .4rem; }
 
 @media (max-width: 520px) {
   .cozinha-form-novo { grid-template-columns: 1fr; }
-}
+  .cozinha-controles .btn-secundario { width: 100%; }
+  }
