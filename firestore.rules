@@ -2,40 +2,106 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // "estabelecimentos" e "lotes" têm leitura pública porque a página da
-    // gerente (gerente.html) acessa via link com token, sem login. O nome e
-    // preço de custo do produto ficam gravados diretamente no lote
-    // (denormalizado) — assim a gerente nunca precisa ler "produtos", que é
-    // restrita.
+    // O acesso aos dados é limitado ao proprietário do estabelecimento.
+    // As páginas da gerente também exigem autenticação em auth-guard.js.
+    function autenticado() {
+      return request.auth != null;
+    }
+
+    function donoDoEstabelecimento(estabelecimentoId) {
+      return autenticado()
+        && estabelecimentoId is string
+        && exists(/databases/$(database)/documents/estabelecimentos/$(estabelecimentoId))
+        && get(/databases/$(database)/documents/estabelecimentos/$(estabelecimentoId)).data.ownerId == request.auth.uid;
+    }
+
+    // O usuário só pode criar estabelecimentos em seu próprio nome,
+    // consultar os seus e atualizar os dados sem transferir a propriedade.
     match /estabelecimentos/{id} {
-      allow read: if true;
-      allow write: if request.auth != null;
+      allow read: if autenticado() && resource.data.ownerId == request.auth.uid;
+      allow create: if autenticado() && request.resource.data.ownerId == request.auth.uid;
+      allow update: if autenticado()
+        && resource.data.ownerId == request.auth.uid
+        && request.resource.data.ownerId == resource.data.ownerId;
+      allow delete: if autenticado() && resource.data.ownerId == request.auth.uid;
+    }
+
+    // Regras comuns às coleções que guardam estabelecimentoId.
+    // Não permitir que uma atualização mova um documento para outro estabelecimento.
+    match /produtos/{id} {
+      allow read: if donoDoEstabelecimento(resource.data.estabelecimentoId);
+      allow create: if donoDoEstabelecimento(request.resource.data.estabelecimentoId);
+      allow update: if donoDoEstabelecimento(resource.data.estabelecimentoId)
+        && request.resource.data.estabelecimentoId == resource.data.estabelecimentoId;
+      allow delete: if donoDoEstabelecimento(resource.data.estabelecimentoId);
     }
 
     match /lotes/{id} {
-      allow read: if true;
-      // A gerente (sem login) pode ajustar só o valor de venda promocional
-      // de um item que vai vencer — nunca quantidade, vencimento ou outro
-      // campo. Qualquer outra alteração continua exigindo login.
-      allow update: if request.auth != null ||
-        request.resource.data.diff(resource.data).affectedKeys().hasOnly(["precoPromocional", "promocaoAtiva"]);
-      allow create, delete: if request.auth != null;
+      allow read: if donoDoEstabelecimento(resource.data.estabelecimentoId);
+      allow create: if donoDoEstabelecimento(request.resource.data.estabelecimentoId);
+      allow update: if donoDoEstabelecimento(resource.data.estabelecimentoId)
+        && request.resource.data.estabelecimentoId == resource.data.estabelecimentoId;
+      allow delete: if donoDoEstabelecimento(resource.data.estabelecimentoId);
     }
 
-    // Produtos (custo, código de barras) e vistorias ficam restritos ao
-    // operador logado.
-    match /produtos/{id} {
-      allow read, write: if request.auth != null;
+    match /estoque/{id} {
+      allow read: if donoDoEstabelecimento(resource.data.estabelecimentoId);
+      allow create: if donoDoEstabelecimento(request.resource.data.estabelecimentoId);
+      allow update: if donoDoEstabelecimento(resource.data.estabelecimentoId)
+        && request.resource.data.estabelecimentoId == resource.data.estabelecimentoId;
+      allow delete: if donoDoEstabelecimento(resource.data.estabelecimentoId);
+    }
+
+    match /movimentosEstoque/{id} {
+      allow read: if donoDoEstabelecimento(resource.data.estabelecimentoId);
+      allow create: if donoDoEstabelecimento(request.resource.data.estabelecimentoId);
+      allow update: if donoDoEstabelecimento(resource.data.estabelecimentoId)
+        && request.resource.data.estabelecimentoId == resource.data.estabelecimentoId;
+      allow delete: if donoDoEstabelecimento(resource.data.estabelecimentoId);
     }
 
     match /vistorias/{id} {
-      allow read, write: if request.auth != null;
+      allow read: if donoDoEstabelecimento(resource.data.estabelecimentoId);
+      allow create: if donoDoEstabelecimento(request.resource.data.estabelecimentoId);
+      allow update: if donoDoEstabelecimento(resource.data.estabelecimentoId)
+        && request.resource.data.estabelecimentoId == resource.data.estabelecimentoId;
+      allow delete: if donoDoEstabelecimento(resource.data.estabelecimentoId);
     }
 
-    // Coleção única para "saiu do estoque ativo" (vendido ou vencido),
-    // substituindo as antigas "excluidos" e "perdas".
-    match /saidas/{id} {
-      allow read, write: if request.auth != null;
+    match /vistoriasEstoque/{id} {
+      allow read: if donoDoEstabelecimento(resource.data.estabelecimentoId);
+      allow create: if donoDoEstabelecimento(request.resource.data.estabelecimentoId);
+      allow update: if donoDoEstabelecimento(resource.data.estabelecimentoId)
+        && request.resource.data.estabelecimentoId == resource.data.estabelecimentoId;
+      allow delete: if donoDoEstabelecimento(resource.data.estabelecimentoId);
     }
+
+    match /contagensEstoque/{id} {
+      allow read: if donoDoEstabelecimento(resource.data.estabelecimentoId);
+      allow create: if donoDoEstabelecimento(request.resource.data.estabelecimentoId);
+      allow update: if donoDoEstabelecimento(resource.data.estabelecimentoId)
+        && request.resource.data.estabelecimentoId == resource.data.estabelecimentoId;
+      allow delete: if donoDoEstabelecimento(resource.data.estabelecimentoId);
+    }
+
+    match /saidas/{id} {
+      allow read: if donoDoEstabelecimento(resource.data.estabelecimentoId);
+      allow create: if donoDoEstabelecimento(request.resource.data.estabelecimentoId);
+      allow update: if donoDoEstabelecimento(resource.data.estabelecimentoId)
+        && request.resource.data.estabelecimentoId == resource.data.estabelecimentoId;
+      allow delete: if donoDoEstabelecimento(resource.data.estabelecimentoId);
+    }
+
+    // Compatibilidade de leitura com registros antigos; a aplicação atual
+    // grava novas saídas na coleção "saidas".
+    match /perdas/{id} {
+      allow read: if donoDoEstabelecimento(resource.data.estabelecimentoId);
+      allow create: if donoDoEstabelecimento(request.resource.data.estabelecimentoId);
+      allow update: if donoDoEstabelecimento(resource.data.estabelecimentoId)
+        && request.resource.data.estabelecimentoId == resource.data.estabelecimentoId;
+      allow delete: if donoDoEstabelecimento(resource.data.estabelecimentoId);
+    }
+
+    // Qualquer coleção não declarada acima fica negada por padrão.
   }
 }
