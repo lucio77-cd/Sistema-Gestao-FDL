@@ -52,6 +52,7 @@ function camposFaltantes(p) {
   const campos = [
     ["marca", "Marca"],
     ["categoria", "Categoria"],
+    ["localEstoque", "Local do estoque"],
     ["variante", "Sabor/variante"],
     ["embalagem", "Embalagem"],
     ["volume", "Volume/medida"],
@@ -128,6 +129,7 @@ function renderizarProdutos() {
           <div><label>Nome do produto *</label><input type="text" class="pe-nome" value="${esc(valorCampo(p.nome))}" required /></div>
           <div><label>Marca</label><input type="text" class="pe-marca" value="${esc(valorCampo(p.marca))}" /></div>
           <div><label>Categoria</label><select class="pe-categoria">${opcoesSelect(p.categoria, OPCOES_CATEGORIA)}</select></div>
+          <div><label>Local do estoque *</label><select class="pe-local-estoque"><option value="">Escolha o local</option><option value="geladeira"${p.localEstoque === "geladeira" ? " selected" : ""}>Geladeira</option><option value="seco"${p.localEstoque === "seco" ? " selected" : ""}>Parte seca</option></select></div>
           <div><label>Sabor/variante</label><input type="text" class="pe-variante" value="${esc(valorCampo(p.variante))}" placeholder="Ex.: Original, Zero, Laranja" /></div>
           <div><label>Embalagem</label><select class="pe-embalagem">${opcoesSelect(p.embalagem, OPCOES_EMBALAGEM)}</select></div>
           <div><label>Volume/medida</label><select class="pe-volume">${opcoesSelect(p.volume, OPCOES_VOLUME)}</select></div>
@@ -316,6 +318,7 @@ async function salvarProduto(btn) {
     nome,
     marca: ler(".pe-marca"),
     categoria: ler(".pe-categoria"),
+    localEstoque: ler(".pe-local-estoque") || null,
     variante: ler(".pe-variante"),
     embalagem: ler(".pe-embalagem"),
     volume: ler(".pe-volume"),
