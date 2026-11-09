@@ -157,14 +157,14 @@ function renderizarEstoqueBaixo() {
   if (!totalEl || !listaEl) return;
 
   const itens = produtos
-    .filter(p => p.ativo !== false && p.estoqueMinimo !== undefined && p.estoqueMinimo !== null && p.estoqueMinimo !== "")
+    .filter(p => p.ativo !== false && ["geladeira","seco"].includes(p.localEstoque) && p.estoqueMinimo !== undefined && p.estoqueMinimo !== null && p.estoqueMinimo !== "")
     .map(p => {
       const saldo = estoqueMap[p.id] || {};
       const geladeira = numero(saldo.geladeira);
       const seco = numero(saldo.seco);
-      const total = geladeira + seco;
+      const total = p.localEstoque === "geladeira" ? geladeira : seco;
       const minimo = numero(p.estoqueMinimo);
-      return { produto:p, geladeira, seco, total, minimo };
+      return { produto:p, total, minimo, local:ROTULO_LOCAL[p.localEstoque] };
     })
     .filter(i => i.total <= i.minimo)
     .sort((a,b) => (a.total-a.minimo) - (b.total-b.minimo) || nomeApresentacao(a.produto).localeCompare(nomeApresentacao(b.produto), "pt-BR", {sensitivity:"base"}));
@@ -180,7 +180,7 @@ function renderizarEstoqueBaixo() {
     const item = document.createElement("article");
     item.className = "stock-item";
     item.innerHTML = '<div class="stock-item-head"><div><strong>' + esc(nomeApresentacao(i.produto)) + '</strong><small>Estoque mínimo: ' + i.minimo + ' un.</small></div><span class="selo selo--atencao">' + (i.total === 0 ? "Sem estoque" : "Estoque baixo") + '</span></div>' +
-      '<div class="stock-item-meta">Total: <strong>' + i.total + ' un.</strong> · Geladeira: ' + i.geladeira + ' · Parte seca: ' + i.seco + '</div>';
+      '<div class="stock-item-meta">Saldo em ' + esc(i.local) + ': <strong>' + i.total + ' un.</strong></div>';
     listaEl.appendChild(item);
   });
 }
