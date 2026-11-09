@@ -2,6 +2,7 @@ import { db } from "./firebase-config.js";
 import { protegerPagina } from "./auth-guard.js";
 import { iniciarNavegacao } from "./nav.js";
 import { collection, query, where, getDocs } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+import { OPCOES_CATEGORIA, OPCOES_EMBALAGEM, CHAVE_SEM_VALOR, chaveOpcao, rotuloPadronizado } from "./opcoes-produto.js";
 
 iniciarNavegacao();
 
@@ -13,6 +14,11 @@ let sessoesHistorico = [];
 let contagensHistorico = [];
 let produtosHistorico = [];
 let chartHistorico = null;
+let produtosEstoqueGrafico = [];
+let saldosEstoqueGrafico = {};
+let localEstoqueGrafico = "geladeira";
+let chartEstoqueGerente = null;
+const filtrosEstoqueGrafico = { categoria: new Set(), embalagem: new Set() };
 
 protegerPagina(async ({ estabelecimento }) => {
   document.getElementById("nome-estabelecimento").textContent = estabelecimento.nome;
@@ -45,6 +51,8 @@ protegerPagina(async ({ estabelecimento }) => {
         "Histórico indisponível. Verifique as permissões de leitura de vistoriasEstoque, contagensEstoque e produtos no Firestore.";
       document.getElementById("area-grafico-historico-vistorias").hidden = true;
     }
+
+    await carregarEstoqueParaGrafico(estabelecimento.id);
   } catch (erro) {
     console.error(erro);
     document.getElementById("sem-vendas-dia").hidden = false;
@@ -265,4 +273,217 @@ function renderizarHistoricoVistorias() {
       }
     }
   });
+}
+
+
+// ---------- Gráfico de estoque para compartilhar com o gerente ----------
+
+async function carregarEstoqueParaGrafico(estabelecimentoId) {
+  const resumo = document.getElementById("resumo-grafico-estoque");
+  try {
+    const [produtosSnap, estoqueSnap] = await Promise.all([
+      getDocs(query(collection(db, "produtos"), where("estabelecimentoId", "==", estabelecimentoId))),
+      getDocs(query(collection(db, "estoque"), where("estabelecimentoId", "==", estabelecimentoId)))
+    ]);
+    produtosEstoqueGrafico = produtosSnap.docs.map(d => ({ id:d.id, ...d.data() }));
+    saldosEstoqueGrafico = {};
+    estoqueSnap.docs.forEach(d => {
+      const dado = d.data();
+      saldosEstoqueGrafico[dado.produtoId || d.id] = dado;
+    });
+    iniciarFiltrosGraficoEstoque();
+    renderizarGraficoEstoqueGerente();
+  } catch (erro) {
+    console.error("Não foi possível carregar o estoque para o gráfico:", erro);
+    resumo.textContent = "Não foi possível carregar o estoque. Verifique as permissões de leitura das coleções produtos e estoque no Firestore.";
+    document.getElementById("area-grafico-estoque-gerente").hidden = true;
+    document.getElementById("btn-baixar-grafico-estoque").disabled = true;
+  }
+}
+
+function chaveFiltroEstoqueGrafico(produto, grupo) {
+  const valor = grupo === "categoria" ? produto.categoria : produto.embalagem;
+  return chaveOpcao(valor) || CHAVE_SEM_VALOR;
+}
+
+function opcoesFiltroEstoqueGrafico(grupo) {
+  const campo = grupo === "categoria" ? "categoria" : "embalagem";
+  const opcoes = grupo === "categoria" ? OPCOES_CATEGORIA : OPCOES_EMBALAGEM;
+  const mapa = new Map();
+  produtosEstoqueGrafico.filter(p => p.ativo !== false).forEach(p => {
+    const chave = chaveFiltroEstoqueGrafico(p, grupo);
+    if (!mapa.has(chave)) {
+      mapa.set(chave, chave === CHAVE_SEM_VALOR
+        ? (grupo === "categoria" ? "Sem categoria" : "Sem embalagem")
+        : rotuloPadronizado(p[campo], opcoes));
+    }
+  });
+  return [...mapa.entries()].map(([chave, rotulo]) => ({chave,rotulo})).sort((a,b) => {
+    if (a.chave === CHAVE_SEM_VALOR) return 1;
+    if (b.chave === CHAVE_SEM_VALOR) return -1;
+    return a.rotulo.localeCompare(b.rotulo, "pt-BR", {sensitivity:"base"});
+  });
+}
+
+function iniciarFiltrosGraficoEstoque() {
+  ["categoria","embalagem"].forEach(grupo => {
+    const container = document.getElementById(grupo === "categoria" ? "filtros-grafico-tipo" : "filtros-grafico-embalagem");
+    const itens = opcoesFiltroEstoqueGrafico(grupo);
+    container.innerHTML = itens.length ? itens.map(item =>
+      '<button type="button" class="chip-filtro" data-grupo="' + grupo + '" data-chave="' + item.chave.replace(/&/g,"&amp;").replace(/"/g,"&quot;") + '" aria-pressed="false">' + item.rotulo.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;") + '</button>'
+    ).join("") : '<span class="legenda">Nenhuma opção cadastrada.</span>';
+  });
+
+  document.getElementById("painel-grafico-estoque-gerente").addEventListener("click", event => {
+    const localBtn = event.target.closest(".btn-local-grafico");
+    if (localBtn) {
+      localEstoqueGrafico = localBtn.dataset.local;
+      document.querySelectorAll(".btn-local-grafico").forEach(btn => {
+        const ativo = btn.dataset.local === localEstoqueGrafico;
+        btn.classList.toggle("ativo", ativo);
+        btn.setAttribute("aria-pressed", String(ativo));
+      });
+      renderizarGraficoEstoqueGerente();
+      return;
+    }
+
+    const chip = event.target.closest(".chip-filtro[data-grupo]");
+    if (!chip) return;
+    const grupo = chip.dataset.grupo;
+    const chave = chip.dataset.chave;
+    const conjunto = filtrosEstoqueGrafico[grupo];
+    if (conjunto.has(chave)) conjunto.delete(chave);
+    else conjunto.add(chave);
+    const ativo = conjunto.has(chave);
+    chip.classList.toggle("chip-filtro--ativo", ativo);
+    chip.setAttribute("aria-pressed", String(ativo));
+    renderizarGraficoEstoqueGerente();
+  });
+
+  document.getElementById("btn-baixar-grafico-estoque").addEventListener("click", baixarGraficoEstoquePNG);
+}
+
+function nomeCurtoGraficoEstoque(produto, todosProdutos) {
+  const marca = String(produto.marca || "").trim();
+  const nome = String(produto.nome || "").trim();
+  const volume = String(produto.volume || "").trim();
+  const variante = String(produto.variante || "").trim();
+  let principal = nome || marca || "Produto";
+  if (marca && nome.toLocaleLowerCase("pt-BR").includes(marca.toLocaleLowerCase("pt-BR"))) principal = marca;
+  else if (marca && nome) principal = marca + " " + nome;
+  let curto = [principal, volume].filter(Boolean).join(" ");
+  const iguais = todosProdutos.filter(p => {
+    const outraMarca = String(p.marca || "").trim();
+    const outroNome = String(p.nome || "").trim();
+    let outroPrincipal = outroNome || outraMarca || "Produto";
+    if (outraMarca && outroNome.toLocaleLowerCase("pt-BR").includes(outraMarca.toLocaleLowerCase("pt-BR"))) outroPrincipal = outraMarca;
+    else if (outraMarca && outroNome) outroPrincipal = outraMarca + " " + outroNome;
+    return [outroPrincipal, String(p.volume || "").trim()].filter(Boolean).join(" ").toLocaleLowerCase("pt-BR") === curto.toLocaleLowerCase("pt-BR");
+  });
+  if (iguais.length > 1 && variante) curto = [principal, variante, volume].filter(Boolean).join(" ");
+  if (iguais.length > 1 && !variante) curto = [principal, nome !== principal ? nome : "", volume].filter(Boolean).join(" ");
+  return curto;
+}
+
+function renderizarGraficoEstoqueGerente() {
+  const canvas = document.getElementById("grafico-estoque-gerente");
+  const area = document.getElementById("area-grafico-estoque-gerente");
+  const vazio = document.getElementById("sem-grafico-estoque-gerente");
+  const resumo = document.getElementById("resumo-grafico-estoque");
+  const botao = document.getElementById("btn-baixar-grafico-estoque");
+
+  if (chartEstoqueGerente) {
+    chartEstoqueGerente.destroy();
+    chartEstoqueGerente = null;
+  }
+
+  const produtosAtivos = produtosEstoqueGrafico.filter(p =>
+    p.ativo !== false && p.localEstoque === localEstoqueGrafico &&
+    ["categoria","embalagem"].every(grupo => {
+      const marcados = filtrosEstoqueGrafico[grupo];
+      return marcados.size === 0 || marcados.has(chaveFiltroEstoqueGrafico(p, grupo));
+    })
+  );
+
+  const itens = produtosAtivos.map(p => ({
+    produto:p,
+    quantidade:Number((saldosEstoqueGrafico[p.id] || {})[localEstoqueGrafico]) || 0
+  })).filter(i => i.quantidade > 0)
+    .sort((a,b) => nomeCurtoGraficoEstoque(a.produto, produtosEstoqueGrafico).localeCompare(nomeCurtoGraficoEstoque(b.produto, produtosEstoqueGrafico), "pt-BR", {sensitivity:"base"}));
+
+  const rotuloLocal = localEstoqueGrafico === "seco" ? "Parte seca" : "Geladeira";
+  const filtrosAtivos = ["categoria","embalagem"].flatMap(grupo =>
+    opcoesFiltroEstoqueGrafico(grupo).filter(item => filtrosEstoqueGrafico[grupo].has(item.chave)).map(item => item.rotulo)
+  );
+  resumo.textContent = rotuloLocal + " · " + itens.length + " produto(s) com saldo" +
+    (filtrosAtivos.length ? " · Filtros: " + filtrosAtivos.join(", ") : " · Todos os tipos e embalagens") +
+    " · Atualizado em " + new Date().toLocaleString("pt-BR");
+
+  if (!itens.length) {
+    area.hidden = true;
+    vazio.hidden = false;
+    botao.disabled = true;
+    return;
+  }
+
+  area.hidden = false;
+  vazio.hidden = true;
+  botao.disabled = false;
+  area.style.height = Math.max(300, itens.length * 38 + 90) + "px";
+
+  const rotuloData = new Date().toLocaleString("pt-BR");
+  chartEstoqueGerente = new Chart(canvas, {
+    type:"bar",
+    data:{
+      labels:itens.map(i => nomeCurtoGraficoEstoque(i.produto, produtosEstoqueGrafico)),
+      datasets:[{
+        label:"Quantidade em estoque",
+        data:itens.map(i => i.quantidade),
+        borderRadius:4,
+        backgroundColor:"#3478b8"
+      }]
+    },
+    options:{
+      indexAxis:"y",
+      responsive:true,
+      maintainAspectRatio:false,
+      animation:false,
+      layout:{padding:{right:28}},
+      plugins:{
+        legend:{display:false},
+        title:{display:true,text:["ESTOQUE — " + rotuloLocal.toLocaleUpperCase("pt-BR"), rotuloData],font:{size:15}},
+        tooltip:{callbacks:{label:ctx => ctx.parsed.x + " un."}}
+      },
+      scales:{
+        x:{beginAtZero:true,ticks:{precision:0},title:{display:true,text:"Quantidade (unidades)"}},
+        y:{ticks:{autoSkip:false}}
+      }
+    },
+    plugins:[{
+      id:"rotulos-quantidade-estoque",
+      afterDatasetsDraw(chart) {
+        const {ctx} = chart;
+        ctx.save();
+        ctx.font="bold 12px Arial";
+        ctx.fillStyle="#222";
+        ctx.textAlign="left";
+        ctx.textBaseline="middle";
+        chart.getDatasetMeta(0).data.forEach((bar,index) => {
+          const valor=itens[index].quantidade;
+          ctx.fillText(String(valor),bar.x+6,bar.y);
+        });
+        ctx.restore();
+      }
+    }]
+  });
+}
+
+function baixarGraficoEstoquePNG() {
+  if (!chartEstoqueGerente) return;
+  const local = localEstoqueGrafico === "seco" ? "parte-seca" : "geladeira";
+  const data = new Date().toISOString().slice(0,10);
+  const link = document.createElement("a");
+  link.href = chartEstoqueGerente.toBase64Image("image/png", 1);
+  link.download = "estoque-" + local + "-" + data + ".png";
+  link.click();
 }
