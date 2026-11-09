@@ -63,6 +63,33 @@
     </div>
     <p id="sem-historico-vistorias" class="mensagem-vazio" hidden>Nenhuma vistoria finalizada encontrada para este produto.</p>
   </section>
+  <section class="painel" id="painel-grafico-estoque-gerente">
+    <h2>Estoque para enviar ao gerente</h2>
+    <p class="legenda">Visualização em barras com os mesmos filtros da lista do WhatsApp. O gráfico mostra somente produtos ativos com saldo maior que zero.</p>
+    <div class="stock-form-grid">
+      <div>
+        <label>Local</label>
+        <div class="botoes-filtro-local">
+          <button type="button" class="btn btn-secundario btn-local-grafico ativo" data-local="geladeira" aria-pressed="true">Geladeira</button>
+          <button type="button" class="btn btn-secundario btn-local-grafico" data-local="seco" aria-pressed="false">Parte seca</button>
+        </div>
+      </div>
+      <div>
+        <label>Tipo</label>
+        <div id="filtros-grafico-tipo" class="chips-filtros-grafico"></div>
+      </div>
+      <div>
+        <label>Embalagem</label>
+        <div id="filtros-grafico-embalagem" class="chips-filtros-grafico"></div>
+      </div>
+    </div>
+    <p class="legenda" id="resumo-grafico-estoque">Carregando estoque…</p>
+    <div id="area-grafico-estoque-gerente" style="height:420px;position:relative">
+      <canvas id="grafico-estoque-gerente"></canvas>
+    </div>
+    <p id="sem-grafico-estoque-gerente" class="mensagem-vazio" hidden>Nenhum produto com saldo corresponde aos filtros selecionados.</p>
+    <button type="button" class="btn" id="btn-baixar-grafico-estoque" disabled>Baixar gráfico em PNG</button>
+  </section>
   <p class="legenda">Importante: estes gráficos usam somente vendas registradas pelo Caixa. O sistema registra essas vendas como local “geral”, então os dados incluem a operação da geladeira e da parte seca, mas ainda não permitem separar as vendas por local. A vistoria física não é contabilizada como venda. Este relatório mostra unidades, não faturamento, pois o registro atual de venda não grava o preço efetivamente cobrado.</p>
 </main>
 <nav class="tabbar" aria-label="Navegação principal">
