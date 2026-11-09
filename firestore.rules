@@ -2,40 +2,127 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // "estabelecimentos" e "lotes" têm leitura pública porque a página da
-    // gerente (gerente.html) acessa via link com token, sem login. O nome e
-    // preço de custo do produto ficam gravados diretamente no lote
-    // (denormalizado) — assim a gerente nunca precisa ler "produtos", que é
-    // restrita.
+    // O acesso é limitado ao proprietário do estabelecimento associado.
+    // As consultas do aplicativo devem continuar filtrando por estabelecimentoId.
+    function autenticado() {
+      return request.auth != null;
+    }
+
+    function donoDoEstabelecimento(estabelecimentoId) {
+      return autenticado()
+        && estabelecimentoId is string
+        && exists(/databases/$(database)/documents/estabelecimentos/$(estabelecimentoId))
+        && get(/databases/$(database)/documents/estabelecimentos/$(estabelecimentoId)).data.ownerId == request.auth.uid;
+    }
+
+    function dadosDoProprioEstabelecimento(dados) {
+      return dados.keys().hasAll(['estabelecimentoId'])
+        && donoDoEstabelecimento(dados.estabelecimentoId);
+    }
+
+    function atualizacaoNoMesmoEstabelecimento() {
+      return dadosDoProprioEstabelecimento(resource.data)
+        && dadosDoProprioEstabelecimento(request.resource.data)
+        && request.resource.data.estabelecimentoId == resource.data.estabelecimentoId;
+    }
+
+    // O estabelecimento só pode ser consultado e administrado pelo proprietário.
     match /estabelecimentos/{id} {
-      allow read: if true;
-      allow write: if request.auth != null;
+      allow read: if autenticado() && resource.data.ownerId == request.auth.uid;
+
+      allow create: if autenticado()
+        && request.resource.data.ownerId == request.auth.uid;
+
+      allow update: if autenticado()
+        && resource.data.ownerId == request.auth.uid
+        && request.resource.data.ownerId == resource.data.ownerId;
+
+      allow delete: if false;
     }
 
-    match /lotes/{id} {
-      allow read: if true;
-      // A gerente (sem login) pode ajustar só o valor de venda promocional
-      // de um item que vai vencer — nunca quantidade, vencimento ou outro
-      // campo. Qualquer outra alteração continua exigindo login.
-      allow update: if request.auth != null ||
-        request.resource.data.diff(resource.data).affectedKeys().hasOnly(["precoPromocional", "promocaoAtiva"]);
-      allow create, delete: if request.auth != null;
-    }
-
-    // Produtos (custo, código de barras) e vistorias ficam restritos ao
-    // operador logado.
+    // Cadastro de produtos: exclusão física bloqueada para preservar referências históricas.
     match /produtos/{id} {
-      allow read, write: if request.auth != null;
+      allow read: if dadosDoProprioEstabelecimento(resource.data);
+      allow create: if dadosDoProprioEstabelecimento(request.resource.data);
+      allow update: if atualizacaoNoMesmoEstabelecimento();
+      allow delete: if false;
     }
 
+    // Lotes: exclusão é necessária quando um lote zera por venda ou baixa de vencimento.
+    match /lotes/{id} {
+      allow read: if dadosDoProprioEstabelecimento(resource.data);
+      allow create: if dadosDoProprioEstabelecimento(request.resource.data);
+      allow update: if atualizacaoNoMesmoEstabelecimento();
+      allow delete: if dadosDoProprioEstabelecimento(resource.data);
+    }
+
+    // Saldo agregado por produto e local.
+    match /estoque/{id} {
+      allow read: if dadosDoProprioEstabelecimento(resource.data);
+      allow create: if dadosDoProprioEstabelecimento(request.resource.data);
+      allow update: if atualizacaoNoMesmoEstabelecimento();
+      allow delete: if false;
+    }
+
+    // Histórico de movimentações: o cliente cria e consulta, mas não altera ou apaga.
+    match /movimentosEstoque/{id} {
+      allow read: if dadosDoProprioEstabelecimento(resource.data);
+      allow create: if dadosDoProprioEstabelecimento(request.resource.data);
+      allow update, delete: if false;
+    }
+
+    // Sessões de vistoria física: podem avançar de estado, mas não ser apagadas pelo cliente.
+    match /vistoriasEstoque/{id} {
+      allow read: if dadosDoProprioEstabelecimento(resource.data);
+      allow create: if dadosDoProprioEstabelecimento(request.resource.data);
+      allow update: if atualizacaoNoMesmoEstabelecimento();
+      allow delete: if false;
+    }
+
+    // Contagens vinculadas a uma sessão de vistoria.
+    match /contagensEstoque/{id} {
+      allow read: if dadosDoProprioEstabelecimento(resource.data);
+      allow create: if dadosDoProprioEstabelecimento(request.resource.data);
+      allow update: if atualizacaoNoMesmoEstabelecimento();
+      allow delete: if false;
+    }
+
+    // Histórico de vistorias de lotes: somente leitura e criação.
     match /vistorias/{id} {
-      allow read, write: if request.auth != null;
+      allow read: if dadosDoProprioEstabelecimento(resource.data);
+      allow create: if dadosDoProprioEstabelecimento(request.resource.data);
+      allow update, delete: if false;
     }
 
-    // Coleção única para "saiu do estoque ativo" (vendido ou vencido),
-    // substituindo as antigas "excluidos" e "perdas".
+    // Saídas: histórico de vendas, vencimentos e encerramentos de lotes.
     match /saidas/{id} {
-      allow read, write: if request.auth != null;
+      allow read: if dadosDoProprioEstabelecimento(resource.data);
+      allow create: if dadosDoProprioEstabelecimento(request.resource.data);
+      allow update, delete: if false;
     }
+
+    // Itens da cozinha: exclusão lógica é feita pelo campo ativo.
+    match /cozinhaItens/{id} {
+      allow read: if dadosDoProprioEstabelecimento(resource.data);
+      allow create: if dadosDoProprioEstabelecimento(request.resource.data);
+      allow update: if atualizacaoNoMesmoEstabelecimento();
+      allow delete: if false;
+    }
+
+    // Vistorias da cozinha: o código permite exclusão explícita pelo proprietário.
+    match /cozinhaVistorias/{id} {
+      allow read: if dadosDoProprioEstabelecimento(resource.data);
+      allow create: if dadosDoProprioEstabelecimento(request.resource.data);
+      allow update: if atualizacaoNoMesmoEstabelecimento();
+      allow delete: if dadosDoProprioEstabelecimento(resource.data);
+    }
+
+    // Compatibilidade de leitura para registros antigos de perdas.
+    match /perdas/{id} {
+      allow read: if dadosDoProprioEstabelecimento(resource.data);
+      allow create, update, delete: if false;
+    }
+
+    // Coleções não declaradas permanecem negadas por padrão.
   }
 }
