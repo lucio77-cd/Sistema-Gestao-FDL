@@ -53,6 +53,9 @@ function dataMillis(v) {
 function nomeApresentacao(p) {
   return [p.marca, p.nome, p.variante, p.embalagem, p.volume].filter(Boolean).join(" · ");
 }
+function produtosDoLocal() {
+  return produtos.filter(p => p.ativo !== false && p.localEstoque === localAtual);
+}
 function obterSessaoLocal() {
   return sessoes.filter(s => s.local === localAtual && s.status !== "finalizada")
     .sort((a,b) => dataMillis(b.updatedAt || b.createdAt) - dataMillis(a.updatedAt || a.createdAt))[0] || null;
@@ -97,6 +100,8 @@ campoBusca.addEventListener("input", renderizarLista);
 
 async function mudarLocal(local) {
   localAtual = local;
+  const seletorLocal = document.getElementById("np-local-estoque");
+  if (seletorLocal) seletorLocal.value = local;
   segGeladeira.classList.toggle("ativo", local === "geladeira");
   segGeladeira.setAttribute("aria-selected", String(local === "geladeira"));
   segSeco.classList.toggle("ativo", local === "seco");
@@ -287,6 +292,7 @@ function gerarListaWhatsApp(local) {
   localListaWhatsApp = local;
   const rotulo = ROTULO_LOCAL[local];
   const itens = produtos
+    .filter(p => p.ativo !== false && p.localEstoque === local)
     .filter(produtoPassaNoFiltro)
     .map(p => ({ produto: p, quantidade: numero((estoqueMap[p.id] || {})[local]) }))
     .filter(i => i.quantidade > 0)
@@ -355,8 +361,10 @@ document.getElementById("btn-copiar-lista").addEventListener("click", async () =
 });
 
 function atualizarResumo() {
-  document.getElementById("resumo-produtos").textContent = String(produtos.length);
-  document.getElementById("resumo-contados").textContent = String(Object.keys(contagens).length);
+  const produtosLocais = produtosDoLocal();
+  const contadosLocais = Object.values(contagens).filter(c => c.local === localAtual && produtosLocais.some(p => p.id === c.produtoId)).length;
+  document.getElementById("resumo-produtos").textContent = String(produtosLocais.length);
+  document.getElementById("resumo-contados").textContent = String(contadosLocais);
   document.getElementById("resumo-data").textContent = sessaoAtual
     ? "Sessão atual: " + ROTULO_LOCAL[localAtual] + ". Confira os itens pendentes antes de finalizar."
     : "Nenhuma contagem em andamento. Inicie uma vistoria física para registrar as quantidades reais.";
@@ -370,9 +378,10 @@ function renderizarSessao() {
     document.getElementById("btn-iniciar").addEventListener("click", iniciarSessao);
     return;
   }
-  const contados = Object.keys(contagens).length;
+  const produtosLocais = produtosDoLocal();
+  const contados = Object.values(contagens).filter(c => c.local === localAtual && produtosLocais.some(p => p.id === c.produtoId)).length;
   painelSessao.innerHTML = '<h2>Vistoria: ' + esc(ROTULO_LOCAL[localAtual]) + '</h2>' +
-    '<p class="legenda">Iniciada em ' + formatarDataHora(sessaoAtual.createdAt) + ' · ' + contados + ' de ' + produtos.length + ' apresentações contadas.</p>' +
+    '<p class="legenda">Iniciada em ' + formatarDataHora(sessaoAtual.createdAt) + ' · ' + contados + ' de ' + produtosLocais.length + ' apresentações contadas.</p>' +
     '<p><span class="selo ' + (sessaoAtual.status === "aguardando_revisao" ? "selo--atencao" : "selo--normal") + '">' + (sessaoAtual.status === "aguardando_revisao" ? "Aguardando revisão" : "Em andamento") + '</span></p>';
   if (sessaoAtual.status === "aguardando_revisao") {
     painelRevisao.hidden = false;
@@ -412,12 +421,15 @@ function renderizarLista() {
     return;
   }
   const busca = campoBusca.value.trim().toLocaleLowerCase("pt-BR");
-  const visiveis = produtos.filter(p => nomeApresentacao(p).toLocaleLowerCase("pt-BR").includes(busca) || String(p.codigoBarras || "").includes(busca));
+  const semLocal = produtos.filter(p => p.ativo !== false && !["geladeira","seco"].includes(p.localEstoque));
+  const visiveis = produtosDoLocal().filter(p => nomeApresentacao(p).toLocaleLowerCase("pt-BR").includes(busca) || String(p.codigoBarras || "").includes(busca));
+  lista.innerHTML = semLocal.length
+    ? '<p class="mensagem-vazio">' + semLocal.length + ' produto(s) ainda sem local definido. Escolha Geladeira ou Parte seca na <a href="produtos.html">aba Produtos</a>.</p>'
+    : "";
   if (!visiveis.length) {
-    lista.innerHTML = '<p class="mensagem-vazio">Nenhum produto encontrado. Use o cadastro rápido abaixo para adicionar um novo.</p>';
+    lista.insertAdjacentHTML("beforeend", '<p class="mensagem-vazio">Nenhum produto deste local encontrado. Confira o cadastro ou use o cadastro rápido abaixo.</p>');
     return;
   }
-  lista.innerHTML = "";
   visiveis.forEach(p => {
     const count = contagens[p.id];
     const old = estoqueMap[p.id] || {geladeira:0,seco:0};
@@ -425,12 +437,13 @@ function renderizarLista() {
     row.className = "stock-item" + (count ? " stock-item--contado" : "");
     row.innerHTML = '<div class="stock-item-head"><div><strong>' + esc(nomeApresentacao(p)) + '</strong><small>' + esc(p.categoria || "Sem categoria") + '</small></div><span class="selo ' + (count ? "selo--normal" : "selo--sem-validade") + '">' + (count ? "Contado" : "Pendente") + '</span></div>' +
       '<div class="stock-item-meta">Saldo anterior em ' + esc(ROTULO_LOCAL[localAtual]) + ': ' + numero(old[localAtual]) + (p.estoqueMinimo != null ? ' · Mínimo: ' + numero(p.estoqueMinimo) : '') + '</div>' +
-      '<div class="stock-item-controls"><label for="q-' + esc(p.id) + '">Quantidade física</label><input id="q-' + esc(p.id) + '" type="number" min="0" step="1" inputmode="numeric" value="' + (count ? numero(count.quantidade) : '') + '" placeholder="Não contado" /><button type="button" class="btn stock-save-count" data-id="' + esc(p.id) + '">' + (count ? "Atualizar contagem" : "Salvar contagem") + '</button></div>' +
+      '<div class="stock-item-controls"><label for="q-' + esc(p.id) + '">Quantidade física</label><input id="q-' + esc(p.id) + '" type="number" min="0" step="1" inputmode="numeric" value="' + (count ? numero(count.quantidade) : '') + '" placeholder="Não contado" /><button type="button" class="btn stock-save-count" data-id="' + esc(p.id) + '">' + (count ? "Atualizar contagem" : "Salvar contagem") + '</button><button type="button" class="btn-secundario stock-zero-count" data-id="' + esc(p.id) + '">Zerou</button></div>' +
       '<button type="button" class="btn-texto stock-entry-toggle" data-id="' + esc(p.id) + '">Registrar entrada (+)</button>' +
       '<div class="stock-entry-form" data-form-id="' + esc(p.id) + '" hidden><label>Quantidade recebida</label><input class="stock-entry-q" type="number" min="1" step="1" inputmode="numeric" placeholder="Ex.: 12" /><label>Vencimento (opcional)</label><input class="stock-entry-date" type="date" /><button type="button" class="btn stock-entry-save" data-id="' + esc(p.id) + '">Salvar entrada</button></div>';
     lista.appendChild(row);
   });
   lista.querySelectorAll(".stock-save-count").forEach(btn => btn.addEventListener("click", () => salvarContagem(btn.dataset.id, btn)));
+  lista.querySelectorAll(".stock-zero-count").forEach(btn => btn.addEventListener("click", () => salvarContagem(btn.dataset.id, btn, 0)));
   lista.querySelectorAll(".stock-entry-toggle").forEach(btn => btn.addEventListener("click", () => {
     const form = lista.querySelector('[data-form-id="' + btn.dataset.id + '"]');
     form.hidden = !form.hidden;
@@ -439,14 +452,16 @@ function renderizarLista() {
   lista.querySelectorAll(".stock-entry-save").forEach(btn => btn.addEventListener("click", () => salvarEntradaDaLinha(btn.dataset.id, btn)));
 }
 
-async function salvarContagem(produtoId, botao) {
+async function salvarContagem(produtoId, botao, quantidadeForcada = null) {
   const produto = produtos.find(p => p.id === produtoId);
   const input = document.getElementById("q-" + produtoId);
-  if (!produto || input.value === "" || !Number.isInteger(Number(input.value)) || Number(input.value) < 0) {
+  const valorInformado = quantidadeForcada === null ? input?.value : quantidadeForcada;
+  if (!produto || valorInformado === "" || !Number.isInteger(Number(valorInformado)) || Number(valorInformado) < 0) {
     mostrarToast("Informe uma quantidade inteira igual ou maior que zero.", "erro");
     input?.focus();
     return;
   }
+  const quantidadeContada = Number(valorInformado);
   botao.disabled = true;
   const original = botao.textContent;
   botao.textContent = "Salvando…";
@@ -455,11 +470,11 @@ async function salvarContagem(produtoId, botao) {
   try {
     await setDoc(doc(db, "contagensEstoque", id), {
       estabelecimentoId:estabelecimentoAtual.id, sessaoId:sessaoAtual.id, produtoId,
-      produtoNome:nomeApresentacao(produto), local:localAtual, quantidade:Number(input.value),
+      produtoNome:nomeApresentacao(produto), local:localAtual, quantidade:quantidadeContada,
       contadoEm, contadoPor:usuarioAtual?.uid || null, atualizadoEm:serverTimestamp()
     });
     await updateDoc(doc(db, "vistoriasEstoque", sessaoAtual.id), {updatedAt:serverTimestamp(), status:"em_andamento"});
-    contagens[produtoId] = {id, estabelecimentoId:estabelecimentoAtual.id, sessaoId:sessaoAtual.id, produtoId, produtoNome:nomeApresentacao(produto), local:localAtual, quantidade:Number(input.value), contadoEm};
+    contagens[produtoId] = {id, estabelecimentoId:estabelecimentoAtual.id, sessaoId:sessaoAtual.id, produtoId, produtoNome:nomeApresentacao(produto), local:localAtual, quantidade:quantidadeContada, contadoEm};
     sessaoAtual.status = "em_andamento";
     mostrarToast("Contagem salva. Você pode continuar depois.", "ok");
     renderizarTudo();
@@ -473,7 +488,14 @@ async function salvarContagem(produtoId, botao) {
 
 document.getElementById("btn-revisar").addEventListener("click", async () => {
   if (!sessaoAtual) { mostrarToast("Inicie uma vistoria antes de revisar.", "erro"); return; }
-  if (!Object.keys(contagens).length) { mostrarToast("Conte pelo menos um produto antes de revisar.", "erro"); return; }
+  const esperados = produtosDoLocal();
+  const idsContados = new Set(Object.values(contagens).filter(c => c.local === localAtual).map(c => c.produtoId));
+  const pendentes = esperados.filter(p => !idsContados.has(p.id));
+  if (!esperados.length) { mostrarToast("Não há produtos ativos com este local definido. Revise os cadastros na aba Produtos.", "erro"); return; }
+  if (pendentes.length) {
+    mostrarToast("Ainda faltam " + pendentes.length + " produto(s). Conte a quantidade ou use Zerou: " + pendentes.slice(0,3).map(nomeApresentacao).join(", "), "erro");
+    return;
+  }
   try {
     await updateDoc(doc(db,"vistoriasEstoque",sessaoAtual.id), {status:"aguardando_revisao", updatedAt:serverTimestamp()});
     sessaoAtual.status = "aguardando_revisao";
@@ -495,10 +517,12 @@ document.getElementById("btn-voltar-contagem").addEventListener("click", async (
 
 function renderizarRevisao() {
   if (!sessaoAtual) return;
-  const itens = Object.values(contagens);
+  const esperados = produtosDoLocal();
+  const idsEsperados = new Set(esperados.map(p => p.id));
+  const itens = Object.values(contagens).filter(c => c.local === localAtual && idsEsperados.has(c.produtoId));
   const ids = new Set(itens.map(c => c.produtoId));
-  const pendentes = produtos.filter(p => !ids.has(p.id));
-  document.getElementById("texto-revisao").textContent = "Revise antes de aplicar. Produtos pendentes mantêm o saldo anterior; zero só é aplicado quando você contou explicitamente zero.";
+  const pendentes = esperados.filter(p => !ids.has(p.id));
+  document.getElementById("texto-revisao").textContent = "Confira as quantidades. Todos os produtos deste local precisam ter uma contagem explícita; use Zerou quando não houver unidades.";
   const box = document.getElementById("resumo-revisao");
   box.innerHTML = '<div class="stock-review-stats"><strong>' + itens.length + ' contados</strong><strong>' + pendentes.length + ' pendentes</strong><strong>' + itens.filter(c => numero(c.quantidade) === 0).length + ' com zero</strong></div>';
   itens.sort((a,b) => String(a.produtoNome).localeCompare(String(b.produtoNome),"pt-BR")).forEach(c => {
@@ -511,8 +535,8 @@ function renderizarRevisao() {
   });
   if (pendentes.length) {
     const p = document.createElement("p");
-    p.className = "legenda";
-    p.textContent = "Pendentes; saldo anterior preservado: " + pendentes.map(nomeApresentacao).join(", ");
+    p.className = "aviso-erro";
+    p.textContent = "Ainda não contados: " + pendentes.map(nomeApresentacao).join(", ") + ". Volte à contagem e informe a quantidade ou use Zerou.";
     box.appendChild(p);
   }
 }
@@ -521,9 +545,14 @@ document.getElementById("btn-finalizar").addEventListener("click", finalizarSess
 
 async function finalizarSessao() {
   if (!sessaoAtual || sessaoAtual.status !== "aguardando_revisao") return;
-  const itens = Object.values(contagens);
+  const esperados = produtosDoLocal();
+  const idsEsperados = new Set(esperados.map(p => p.id));
+  const itens = Object.values(contagens).filter(c => c.local === localAtual && idsEsperados.has(c.produtoId));
+  const idsContados = new Set(itens.map(c => c.produtoId));
+  const pendentes = esperados.filter(p => !idsContados.has(p.id));
   if (!itens.length) { mostrarToast("Nenhum produto foi contado nesta vistoria.", "erro"); return; }
-  if (!window.confirm("Aplicar " + itens.length + " contagens à " + ROTULO_LOCAL[localAtual].toLowerCase() + "? Produtos pendentes manterão os saldos anteriores.")) return;
+  if (pendentes.length) { mostrarToast("Não é possível finalizar: ainda faltam " + pendentes.length + " produto(s) sem contagem explícita.", "erro"); return; }
+  if (!window.confirm("Aplicar " + itens.length + " contagens à " + ROTULO_LOCAL[localAtual].toLowerCase() + "?")) return;
   const botao = document.getElementById("btn-finalizar");
   botao.disabled = true;
   botao.textContent = "Aplicando…";
@@ -580,6 +609,12 @@ document.getElementById("form-novo-produto-estoque").addEventListener("submit", 
     minimoEl.focus();
     return;
   }
+  const localProduto = document.getElementById("np-local-estoque").value;
+  if (!["geladeira","seco"].includes(localProduto)) {
+    mostrarToast("Escolha o local deste produto.", "erro");
+    document.getElementById("np-local-estoque").focus();
+    return;
+  }
   const dados = {
     estabelecimentoId:estabelecimentoAtual.id, nome,
     marca:document.getElementById("np-marca").value.trim(),
@@ -589,6 +624,7 @@ document.getElementById("form-novo-produto-estoque").addEventListener("submit", 
     volume:document.getElementById("np-volume").value.trim(),
     codigoBarras:document.getElementById("np-codigo").value.trim(),
     precoCusto:0, precoVenda:0, ativo:true,
+    localEstoque:localProduto,
     ...(minimoTexto !== "" ? { estoqueMinimo:Number(minimoTexto) } : {})
   };
   const chave = [dados.nome,dados.marca,dados.variante,dados.embalagem,dados.volume].join("|").toLocaleLowerCase("pt-BR");
