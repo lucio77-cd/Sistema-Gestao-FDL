@@ -461,6 +461,13 @@ function renderizarGraficoEstoqueGerente() {
     },
     plugins:[{
       id:"rotulos-quantidade-estoque",
+      beforeDraw(chart) {
+        const {ctx, width, height} = chart;
+        ctx.save();
+        ctx.fillStyle = "#ffffff";
+        ctx.fillRect(0, 0, width, height);
+        ctx.restore();
+      },
       afterDatasetsDraw(chart) {
         const {ctx} = chart;
         ctx.save();
