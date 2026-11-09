@@ -40,6 +40,29 @@
     <div id="area-grafico-produtos" style="height:320px;position:relative"><canvas id="grafico-produtos-vendidos"></canvas></div>
     <p id="sem-vendas-produtos" class="mensagem-vazio" hidden>Nenhum produto vendido neste período.</p>
   </section>
+  <section class="painel" id="painel-historico-vistorias">
+    <h2>Histórico das vistorias</h2>
+    <p class="legenda">Compare a quantidade física de um produto em cada vistoria finalizada. Os filtros consideram o tipo e a embalagem cadastrados no produto.</p>
+    <div class="stock-form-grid">
+      <div>
+        <label for="filtro-historico-tipo">Tipo</label>
+        <select id="filtro-historico-tipo"><option value="">Todos os tipos</option></select>
+      </div>
+      <div>
+        <label for="filtro-historico-embalagem">Embalagem</label>
+        <select id="filtro-historico-embalagem"><option value="">Todas as embalagens</option></select>
+      </div>
+      <div style="grid-column:1/-1">
+        <label for="filtro-historico-produto">Produto</label>
+        <select id="filtro-historico-produto"><option value="">Selecione um produto</option></select>
+      </div>
+    </div>
+    <p class="legenda" id="resumo-historico-vistorias">Selecione os filtros e um produto para visualizar o histórico.</p>
+    <div id="area-grafico-historico-vistorias" style="height:320px;position:relative">
+      <canvas id="grafico-historico-vistorias"></canvas>
+    </div>
+    <p id="sem-historico-vistorias" class="mensagem-vazio" hidden>Nenhuma vistoria finalizada encontrada para este produto.</p>
+  </section>
   <p class="legenda">Importante: estes gráficos usam somente vendas registradas pelo Caixa. O sistema registra essas vendas como local “geral”, então os dados incluem a operação da geladeira e da parte seca, mas ainda não permitem separar as vendas por local. A vistoria física não é contabilizada como venda. Este relatório mostra unidades, não faturamento, pois o registro atual de venda não grava o preço efetivamente cobrado.</p>
 </main>
 <nav class="tabbar" aria-label="Navegação principal">
