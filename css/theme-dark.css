@@ -220,13 +220,13 @@ dialog, .modal, .modal-conteudo, .scanner-modal {
 .caixa-topo-separador { color: #60706A; }
 :focus-visible { outline-color: #75C49A; }
 @media (min-width: 900px) {
-  body:not(.pagina-caixa) > .topo {
+  body:has(> .tabbar):not(.pagina-caixa) > .topo {
     position: sticky;
     top: 0;
     margin-left: 224px;
     z-index: 15;
   }
-  body:not(.pagina-caixa) > .tabbar {
+  body:has(> .tabbar):not(.pagina-caixa) > .tabbar {
     top: 0;
     bottom: 0;
     left: 0;
@@ -240,7 +240,7 @@ dialog, .modal, .modal-conteudo, .scanner-modal {
     border-top: 0;
     border-right: 1px solid var(--steel-light);
   }
-  body:not(.pagina-caixa) > .tabbar::before {
+  body:has(> .tabbar):not(.pagina-caixa) > .tabbar::before {
     content: "FDL  /  GESTÃO";
     display: block;
     color: #8BC9A8;
@@ -249,7 +249,7 @@ dialog, .modal, .modal-conteudo, .scanner-modal {
     letter-spacing: .12em;
     padding: .75rem .85rem 1.4rem;
   }
-  body:not(.pagina-caixa) .tabbar-item {
+  body:has(> .tabbar):not(.pagina-caixa) .tabbar-item {
     flex: 0 0 auto;
     flex-direction: row;
     justify-content: flex-start;
@@ -260,23 +260,23 @@ dialog, .modal, .modal-conteudo, .scanner-modal {
     font-size: .84rem;
     text-align: left;
   }
-  body:not(.pagina-caixa) .tabbar-item.ativo {
+  body:has(> .tabbar):not(.pagina-caixa) .tabbar-item.ativo {
     background: #263B32;
     color: #9AD9B4;
   }
-  body:not(.pagina-caixa) .tabbar-item.ativo::before { display: none; }
-  body:not(.pagina-caixa) > main {
+  body:has(> .tabbar):not(.pagina-caixa) .tabbar-item.ativo::before { display: none; }
+  body:has(> .tabbar):not(.pagina-caixa) > main {
     margin-left: 224px;
     max-width: none;
     padding: 2rem clamp(1.5rem, 3vw, 3.5rem) 3rem;
   }
-  body:not(.pagina-caixa) > .menu-mais {
+  body:has(> .tabbar):not(.pagina-caixa) > .menu-mais {
     left: 232px;
     right: auto;
     bottom: auto;
     top: 5rem;
   }
-  body:not(.pagina-caixa) .menu-mais a, body:not(.pagina-caixa) .menu-mais button {
+  body:has(> .tabbar):not(.pagina-caixa) .menu-mais a, body:has(> .tabbar):not(.pagina-caixa) .menu-mais button {
     padding: .7rem 1rem;
   }
 }
@@ -291,4 +291,29 @@ dialog, .modal, .modal-conteudo, .scanner-modal {
 }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { scroll-behavior: auto !important; animation-duration: .01ms !important; transition-duration: .01ms !important; }
+}
+/* Páginas sem navegação inferior (login, gerente e consulta isolada). */
+@media (min-width: 900px) {
+  body:not(:has(> .tabbar)) > main {
+    max-width: 760px;
+    margin-left: auto;
+    margin-right: auto;
+  }
+  body:not(:has(> .tabbar)) > .topo { margin-left: 0; }
+  body:not(:has(> .tabbar)) .nav {
+    margin: 0;
+    padding: .65rem 1.25rem;
+    border-bottom: 1px solid var(--steel-light);
+  }
+  body:not(:has(> .tabbar)) .nav a {
+    display: inline-block;
+    padding: .35rem .65rem;
+    text-decoration: none;
+  }
+  body:not(:has(> .tabbar)) .cartao-login {
+    max-width: 460px;
+    margin: 8vh auto;
+    padding: 2rem;
+    border-radius: 10px;
+  }
 }
