@@ -19,6 +19,8 @@ let produtos = [];
 let estoqueMap = {};
 let movimentos = [];
 let movimentosDisponiveis = true;
+let sessoesDisponiveis = true;
+let contagensDisponiveis = true;
 let sessoes = [];
 let sessaoAtual = null;
 let contagens = {};
@@ -113,23 +115,27 @@ async function mudarLocal(local) {
   segSeco.classList.toggle("ativo", local === "seco");
   segSeco.setAttribute("aria-selected", String(local === "seco"));
   sessaoAtual = obterSessaoLocal();
+  contagensDisponiveis = true;
   try {
     await carregarContagensDaSessao();
-    renderizarTudo();
   } catch (erro) {
-    console.error(erro);
-    mostrarToast("Não foi possível carregar a vistoria deste local.", "erro");
+    contagensDisponiveis = false;
+    contagens = {};
+    console.error("Contagens da vistoria indisponíveis:", erro);
+    mostrarToast("Não foi possível ler as contagens existentes. A vistoria foi bloqueada para evitar sobrescrever dados.", "erro");
   }
+  renderizarTudo();
 }
 
 async function carregarTudo() {
   // Produtos, saldos e sessões são dados essenciais para operar a tela.
   // O histórico de movimentos é carregado separadamente: uma falha nele não
   // deve apagar visualmente todo o estoque já salvo.
-  const [prodSnap, estoqueSnap, sessoesSnap] = await Promise.all([
+  // Produtos e saldos são o núcleo da tela. Carregue-os primeiro, sem
+  // acoplar sua exibição à disponibilidade das coleções auxiliares.
+  const [prodSnap, estoqueSnap] = await Promise.all([
     getDocs(query(collection(db, "produtos"), where("estabelecimentoId", "==", estabelecimentoAtual.id))),
-    getDocs(query(collection(db, "estoque"), where("estabelecimentoId", "==", estabelecimentoAtual.id))),
-    getDocs(query(collection(db, "vistoriasEstoque"), where("estabelecimentoId", "==", estabelecimentoAtual.id)))
+    getDocs(query(collection(db, "estoque"), where("estabelecimentoId", "==", estabelecimentoAtual.id)))
   ]);
 
   produtos = prodSnap.docs.map(d => ({ id:d.id, ...d.data() }))
@@ -139,7 +145,20 @@ async function carregarTudo() {
     const e = d.data();
     estoqueMap[d.id] = { id:d.id, ...e, geladeira:numero(e.geladeira), seco:numero(e.seco) };
   });
-  sessoes = sessoesSnap.docs.map(d => ({ id:d.id, ...d.data() }));
+
+  // Uma falha nas vistorias não pode apagar o estoque visível.
+  sessoesDisponiveis = true;
+  try {
+    const sessoesSnap = await getDocs(query(
+      collection(db, "vistoriasEstoque"),
+      where("estabelecimentoId", "==", estabelecimentoAtual.id)
+    ));
+    sessoes = sessoesSnap.docs.map(d => ({ id:d.id, ...d.data() }));
+  } catch (erro) {
+    sessoesDisponiveis = false;
+    sessoes = [];
+    console.error("Sessões de vistoria indisponíveis:", erro);
+  }
 
   movimentosDisponiveis = true;
   try {
@@ -155,9 +174,21 @@ async function carregarTudo() {
   }
 
   sessaoAtual = obterSessaoLocal();
-  await carregarContagensDaSessao();
+  contagensDisponiveis = true;
+  try {
+    await carregarContagensDaSessao();
+  } catch (erro) {
+    contagensDisponiveis = false;
+    contagens = {};
+    console.error("Contagens da vistoria indisponíveis:", erro);
+  }
   renderizarTudo();
 
+  if (!sessoesDisponiveis) {
+    mostrarToast("Estoque carregado. As vistorias estão indisponíveis; operações de contagem foram bloqueadas.", "erro");
+  } else if (!contagensDisponiveis) {
+    mostrarToast("Estoque carregado. Não foi possível ler as contagens existentes; esta vistoria ficará bloqueada para evitar sobrescritas.", "erro");
+  }
   if (!movimentosDisponiveis) {
     mostrarToast("Estoque carregado, mas o histórico de movimentos falhou. A finalização da vistoria ficará bloqueada até a conexão ser restabelecida.", "erro");
   }
@@ -408,6 +439,14 @@ function atualizarResumo() {
 function renderizarSessao() {
   secaoContagem.hidden = true;
   painelRevisao.hidden = true;
+  if (!sessoesDisponiveis) {
+    painelSessao.innerHTML = '<h2>Vistoria indisponível</h2><p class="mensagem-vazio">Não foi possível consultar as sessões salvas. O estoque existente continua visível, mas novas operações de vistoria foram bloqueadas.</p>';
+    return;
+  }
+  if (sessaoAtual && !contagensDisponiveis) {
+    painelSessao.innerHTML = '<h2>Vistoria protegida</h2><p class="mensagem-vazio">Não foi possível consultar as contagens já salvas. Nenhuma contagem pode ser alterada até a leitura ser restabelecida.</p>';
+    return;
+  }
   if (!sessaoAtual) {
     const ultimaFinalizada = obterUltimaSessaoFinalizadaLocal();
     const resumoAnterior = ultimaFinalizada
@@ -458,6 +497,10 @@ async function iniciarSessao() {
 }
 
 function renderizarLista() {
+  if (!sessoesDisponiveis || (sessaoAtual && !contagensDisponiveis)) {
+    lista.innerHTML = '<p class="mensagem-vazio">Contagem bloqueada enquanto não for possível confirmar a leitura dos dados já salvos.</p>';
+    return;
+  }
   if (!sessaoAtual || sessaoAtual.status !== "em_andamento") {
     lista.innerHTML = '<p class="mensagem-vazio">Inicie ou retome uma vistoria para contar produtos.</p>';
     return;
