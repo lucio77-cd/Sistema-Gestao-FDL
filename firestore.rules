@@ -7,9 +7,51 @@ service cloud.firestore {
     // preço de custo do produto ficam gravados diretamente no lote
     // (denormalizado) — assim a gerente nunca precisa ler "produtos", que é
     // restrita.
+    // O proprietário precisa corresponder ao ownerId do estabelecimento.
+    function donoDoEstabelecimento(estabelecimentoId) {
+      return request.auth != null
+        && estabelecimentoId is string
+        && exists(/databases/$(database)/documents/estabelecimentos/$(estabelecimentoId))
+        && get(/databases/$(database)/documents/estabelecimentos/$(estabelecimentoId)).data.ownerId == request.auth.uid;
+    }
+
     match /estabelecimentos/{id} {
       allow read: if true;
       allow write: if request.auth != null;
+    }
+
+    // Coleções que sustentam o estoque físico. A consulta do app filtra
+    // por estabelecimentoId; updates não podem transferir documentos.
+    match /estoque/{id} {
+      allow read: if donoDoEstabelecimento(resource.data.estabelecimentoId);
+      allow create: if donoDoEstabelecimento(request.resource.data.estabelecimentoId);
+      allow update: if donoDoEstabelecimento(resource.data.estabelecimentoId)
+        && request.resource.data.estabelecimentoId == resource.data.estabelecimentoId;
+      allow delete: if donoDoEstabelecimento(resource.data.estabelecimentoId);
+    }
+
+    match /movimentosEstoque/{id} {
+      allow read: if donoDoEstabelecimento(resource.data.estabelecimentoId);
+      allow create: if donoDoEstabelecimento(request.resource.data.estabelecimentoId);
+      allow update: if donoDoEstabelecimento(resource.data.estabelecimentoId)
+        && request.resource.data.estabelecimentoId == resource.data.estabelecimentoId;
+      allow delete: if donoDoEstabelecimento(resource.data.estabelecimentoId);
+    }
+
+    match /vistoriasEstoque/{id} {
+      allow read: if donoDoEstabelecimento(resource.data.estabelecimentoId);
+      allow create: if donoDoEstabelecimento(request.resource.data.estabelecimentoId);
+      allow update: if donoDoEstabelecimento(resource.data.estabelecimentoId)
+        && request.resource.data.estabelecimentoId == resource.data.estabelecimentoId;
+      allow delete: if donoDoEstabelecimento(resource.data.estabelecimentoId);
+    }
+
+    match /contagensEstoque/{id} {
+      allow read: if donoDoEstabelecimento(resource.data.estabelecimentoId);
+      allow create: if donoDoEstabelecimento(request.resource.data.estabelecimentoId);
+      allow update: if donoDoEstabelecimento(resource.data.estabelecimentoId)
+        && request.resource.data.estabelecimentoId == resource.data.estabelecimentoId;
+      allow delete: if donoDoEstabelecimento(resource.data.estabelecimentoId);
     }
 
     match /lotes/{id} {
