@@ -1284,3 +1284,6 @@ label.switch {
 .theme-option-copy strong{font-size:.84rem;}
 .theme-option-copy small,.aparencia-nota{color:var(--ink-soft);font-size:.75rem;line-height:1.35;}
 @media(max-width:520px){.theme-options{grid-template-columns:1fr;}.theme-option{display:grid;grid-template-columns:18px 72px minmax(0,1fr);align-items:center;}.theme-option-preview{height:42px;}}
+
+/* O atributo hidden deve prevalecer sobre o layout flex do submenu. */
+@media(min-width:900px){body:has(> .tabbar) .menu-mais[hidden]{display:none!important;}}
