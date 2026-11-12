@@ -338,3 +338,28 @@ dialog, .modal, .modal-conteudo, .scanner-modal {
 @media(min-width:900px){
  body:has(> .tabbar) .menu-mais{background:transparent;border:0;border-left:1px solid #46525D;border-radius:0;box-shadow:none;padding:.35rem 0 .35rem .65rem;}
 }
+
+
+/* ---------- Navegação lateral refinada: tema escuro ---------- */
+@media (min-width: 900px) {
+  body:has(> .tabbar):not(.pagina-caixa) > .tabbar,
+  body:has(> .tabbar):not(.pagina-caixa) > .menu-mais {
+    background: #20272E;
+    border-color: #39444E;
+    box-shadow: 8px 0 28px rgba(0, 0, 0, .14);
+  }
+  body:has(> .tabbar):not(.pagina-caixa) > .tabbar::before { color: #8BC9A8; }
+  body:has(> .tabbar):not(.pagina-caixa) .tabbar-item { color: #AEB8C1; }
+  body:has(> .tabbar):not(.pagina-caixa) .tabbar-item:hover { color: #F0F4F6; background: #2A343D; }
+  body:has(> .tabbar):not(.pagina-caixa) .tabbar-item.ativo,
+  body:has(> .tabbar):not(.pagina-caixa) #btn-mais[aria-expanded="true"] {
+    color: #A8E0BE;
+    background: #293B33;
+  }
+  body:has(> .tabbar):not(.pagina-caixa) > .menu-mais::before { color: #83919C; }
+  body:has(> .tabbar):not(.pagina-caixa) > .menu-mais a { color: #AEB8C1; }
+  body:has(> .tabbar):not(.pagina-caixa) > .menu-mais a:not(#link-sair)::before { background: #71808C; }
+  body:has(> .tabbar):not(.pagina-caixa) > .menu-mais a:hover { color: #F0F4F6; background: #2A343D; }
+  body:has(> .tabbar):not(.pagina-caixa) > .menu-mais a.ativo { color: #A8E0BE; background: #293B33; }
+  body:has(> .tabbar):not(.pagina-caixa) > .menu-mais #link-sair { border-color: #39444E; color: #E78A8A; }
+}
