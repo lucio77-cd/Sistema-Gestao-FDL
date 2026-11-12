@@ -334,3 +334,7 @@ dialog, .modal, .modal-conteudo, .scanner-modal {
 .painel-aparencia .theme-option{background:#1B2228;border-color:#46525D;}
 .painel-aparencia .theme-option:has(input:checked){border-color:#75C49A;}
 .painel-aparencia .theme-option-copy small,.painel-aparencia .aparencia-nota{color:#A4ADB7;}
+
+@media(min-width:900px){
+ body:has(> .tabbar) .menu-mais{background:transparent;border:0;border-left:1px solid #46525D;border-radius:0;box-shadow:none;padding:.35rem 0 .35rem .65rem;}
+}
