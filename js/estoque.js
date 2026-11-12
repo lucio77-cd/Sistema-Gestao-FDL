@@ -61,6 +61,11 @@ function obterSessaoLocal() {
   return sessoes.filter(s => s.local === localAtual && s.status !== "finalizada")
     .sort((a,b) => dataMillis(b.updatedAt || b.createdAt) - dataMillis(a.updatedAt || a.createdAt))[0] || null;
 }
+
+function obterUltimaSessaoFinalizadaLocal() {
+  return sessoes.filter(s => s.local === localAtual && s.status === "finalizada")
+    .sort((a,b) => dataMillis(b.finalizadaEm || b.updatedAt || b.createdAt) - dataMillis(a.finalizadaEm || a.updatedAt || a.createdAt))[0] || null;
+}
 function formatarDataHora(valor) {
   const ms = dataMillis(valor);
   return ms ? new Date(ms).toLocaleString("pt-BR", { dateStyle:"short", timeStyle:"short" }) : "agora";
@@ -404,7 +409,14 @@ function renderizarSessao() {
   secaoContagem.hidden = true;
   painelRevisao.hidden = true;
   if (!sessaoAtual) {
-    painelSessao.innerHTML = '<h2>Vistoria: ' + esc(ROTULO_LOCAL[localAtual]) + '</h2><p class="legenda">Nenhuma vistoria em andamento neste local.</p><button type="button" class="btn" id="btn-iniciar">Iniciar vistoria</button>';
+    const ultimaFinalizada = obterUltimaSessaoFinalizadaLocal();
+    const resumoAnterior = ultimaFinalizada
+      ? '<p class="legenda">Última vistoria finalizada em ' + formatarDataHora(ultimaFinalizada.finalizadaEm || ultimaFinalizada.updatedAt || ultimaFinalizada.createdAt) +
+        (Number.isFinite(Number(ultimaFinalizada.quantidadeItensContados)) ? ' · ' + Number(ultimaFinalizada.quantidadeItensContados) + ' produtos registrados.' : '.') +
+        '</p>'
+      : '<p class="legenda">Nenhuma vistoria anterior registrada neste local.</p>';
+    painelSessao.innerHTML = '<h2>Vistoria: ' + esc(ROTULO_LOCAL[localAtual]) + '</h2>' + resumoAnterior +
+      '<p class="legenda">Nenhuma vistoria em andamento neste local.</p><button type="button" class="btn" id="btn-iniciar">Iniciar vistoria</button>';
     document.getElementById("btn-iniciar").addEventListener("click", iniciarSessao);
     return;
   }
