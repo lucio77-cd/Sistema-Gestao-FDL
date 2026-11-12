@@ -18,6 +18,7 @@ let usuarioAtual = null;
 let produtos = [];
 let estoqueMap = {};
 let movimentos = [];
+let movimentosDisponiveis = true;
 let sessoes = [];
 let sessaoAtual = null;
 let contagens = {};
@@ -117,22 +118,51 @@ async function mudarLocal(local) {
 }
 
 async function carregarTudo() {
-  const [prodSnap, estoqueSnap, movSnap, sessoesSnap] = await Promise.all([
+  // Produtos, saldos e sessões são dados essenciais para operar a tela.
+  // O histórico de movimentos é carregado separadamente: uma falha nele não
+  // deve apagar visualmente todo o estoque já salvo.
+  const [prodSnap, estoqueSnap, sessoesSnap] = await Promise.all([
     getDocs(query(collection(db, "produtos"), where("estabelecimentoId", "==", estabelecimentoAtual.id))),
     getDocs(query(collection(db, "estoque"), where("estabelecimentoId", "==", estabelecimentoAtual.id))),
-    getDocs(query(collection(db, "movimentosEstoque"), where("estabelecimentoId", "==", estabelecimentoAtual.id))),
     getDocs(query(collection(db, "vistoriasEstoque"), where("estabelecimentoId", "==", estabelecimentoAtual.id)))
   ]);
+
   produtos = prodSnap.docs.map(d => ({ id:d.id, ...d.data() }))
     .sort((a,b) => nomeApresentacao(a).localeCompare(nomeApresentacao(b), "pt-BR", { sensitivity:"base" }));
   estoqueMap = {};
-  estoqueSnap.forEach(d => { const e=d.data(); estoqueMap[d.id] = { id:d.id, ...e, geladeira:numero(e.geladeira), seco:numero(e.seco) }; });
-  movimentos = movSnap.docs.map(d => ({ id:d.id, ...d.data() }));
+  estoqueSnap.forEach(d => {
+    const e = d.data();
+    estoqueMap[d.id] = { id:d.id, ...e, geladeira:numero(e.geladeira), seco:numero(e.seco) };
+  });
   sessoes = sessoesSnap.docs.map(d => ({ id:d.id, ...d.data() }));
+
+  movimentosDisponiveis = true;
+  try {
+    const movSnap = await getDocs(query(
+      collection(db, "movimentosEstoque"),
+      where("estabelecimentoId", "==", estabelecimentoAtual.id)
+    ));
+    movimentos = movSnap.docs.map(d => ({ id:d.id, ...d.data() }));
+  } catch (erro) {
+    movimentosDisponiveis = false;
+    movimentos = [];
+    console.error("Histórico de movimentos indisponível:", erro);
+  }
+
   sessaoAtual = obterSessaoLocal();
   await carregarContagensDaSessao();
   renderizarTudo();
-  await prepararImportacao();
+
+  if (!movimentosDisponiveis) {
+    mostrarToast("Estoque carregado, mas o histórico de movimentos falhou. A finalização da vistoria ficará bloqueada até a conexão ser restabelecida.", "erro");
+  }
+
+  try {
+    await prepararImportacao();
+  } catch (erro) {
+    console.error("Não foi possível preparar a importação de lotes:", erro);
+    mostrarToast("Estoque carregado, mas a verificação de lotes para importação falhou.", "erro");
+  }
 }
 
 async function carregarContagensDaSessao() {
@@ -545,6 +575,10 @@ document.getElementById("btn-finalizar").addEventListener("click", finalizarSess
 
 async function finalizarSessao() {
   if (!sessaoAtual || sessaoAtual.status !== "aguardando_revisao") return;
+  if (!movimentosDisponiveis) {
+    mostrarToast("Não é seguro finalizar sem consultar o histórico de movimentos. Atualize a página e tente novamente.", "erro");
+    return;
+  }
   const esperados = produtosDoLocal();
   const idsEsperados = new Set(esperados.map(p => p.id));
   const itens = Object.values(contagens).filter(c => c.local === localAtual && idsEsperados.has(c.produtoId));
@@ -577,7 +611,9 @@ async function finalizarSessao() {
           estabelecimentoId:estabelecimentoAtual.id, produtoId:c.produtoId, produtoNome:c.produtoNome,
           [localAtual]:c.quantidadeFinal, ultimaContagemEm:ultimaContagem, atualizadoEm:serverTimestamp()
         }, {merge:true});
-        batch.set(doc(collection(db,"movimentosEstoque")), {
+        // ID determinístico: se o lote de saldo for salvo e a atualização da sessão
+        // falhar, uma nova tentativa sobrescreve o mesmo movimento em vez de duplicá-lo.
+        batch.set(doc(db,"movimentosEstoque", sessaoAtual.id + "_" + c.produtoId), {
           estabelecimentoId:estabelecimentoAtual.id, produtoId:c.produtoId, produtoNome:c.produtoNome,
           local:localAtual, tipo:"contagem", delta:c.quantidadeFinal-numero(atual[localAtual]),
           quantidadeContada:numero(c.quantidade), deltaMovimentacoesPosteriores:c.deltaPosterior,
