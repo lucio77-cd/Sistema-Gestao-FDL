@@ -37,16 +37,18 @@ service cloud.firestore {
           "baixaAutomaticaAtiva",
           "ultimaVistoria"
         ])
-        && (!("nome" in request.resource.data)
+        && (!request.resource.data.diff(resource.data).affectedKeys().hasAny(["nome"])
           || (request.resource.data.nome is string
             && request.resource.data.nome.size() > 0
             && request.resource.data.nome.size() <= 120))
-        && (!("diasAlertaPadrao" in request.resource.data)
+        && (!request.resource.data.diff(resource.data).affectedKeys().hasAny(["diasAlertaPadrao"])
           || (request.resource.data.diasAlertaPadrao is number
             && request.resource.data.diasAlertaPadrao >= 0
             && request.resource.data.diasAlertaPadrao <= 365))
-        && (!("baixaAutomaticaAtiva" in request.resource.data)
-          || request.resource.data.baixaAutomaticaAtiva is bool);
+        && (!request.resource.data.diff(resource.data).affectedKeys().hasAny(["baixaAutomaticaAtiva"])
+          || request.resource.data.baixaAutomaticaAtiva is bool)
+        && (!request.resource.data.diff(resource.data).affectedKeys().hasAny(["ultimaVistoria"])
+          || request.resource.data.ultimaVistoria is timestamp);
 
       allow create, delete: if false;
     }
