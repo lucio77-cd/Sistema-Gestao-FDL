@@ -2,82 +2,121 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // "estabelecimentos" e "lotes" têm leitura pública porque a página da
-    // gerente (gerente.html) acessa via link com token, sem login. O nome e
-    // preço de custo do produto ficam gravados diretamente no lote
-    // (denormalizado) — assim a gerente nunca precisa ler "produtos", que é
-    // restrita.
-    // O proprietário precisa corresponder ao ownerId do estabelecimento.
+    // O estabelecimento e os lotes continuam com leitura pública porque
+    // gerente.html acessa dados por link/token, sem autenticação.
+    // Escritas no estabelecimento são restritas ao proprietário atual.
+    function autenticado() {
+      return request.auth != null;
+    }
+
     function donoDoEstabelecimento(estabelecimentoId) {
-      return request.auth != null
+      return autenticado()
         && estabelecimentoId is string
         && exists(/databases/$(database)/documents/estabelecimentos/$(estabelecimentoId))
         && get(/databases/$(database)/documents/estabelecimentos/$(estabelecimentoId)).data.ownerId == request.auth.uid;
     }
 
-    match /estabelecimentos/{id} {
-      allow read: if true;
-      allow write: if request.auth != null;
+    function mesmoEstabelecimento() {
+      return request.resource.data.estabelecimentoId is string
+        && request.resource.data.estabelecimentoId == resource.data.estabelecimentoId
+        && donoDoEstabelecimento(resource.data.estabelecimentoId);
     }
 
-    // Coleções que sustentam o estoque físico. A consulta do app filtra
-    // por estabelecimentoId; updates não podem transferir documentos.
+    match /estabelecimentos/{id} {
+      allow read: if true;
+
+      // O app só precisa atualizar estes campos operacionais/configuráveis.
+      // ownerId e demais campos de identidade/propriedade nunca podem ser
+      // alterados pelo cliente. Criação e exclusão ficam fora do fluxo cliente.
+      allow update: if autenticado()
+        && resource.data.ownerId == request.auth.uid
+        && request.resource.data.ownerId == resource.data.ownerId
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+          "nome",
+          "diasAlertaPadrao",
+          "baixaAutomaticaAtiva",
+          "ultimaVistoria"
+        ])
+        && (!("nome" in request.resource.data)
+          || (request.resource.data.nome is string
+            && request.resource.data.nome.size() > 0
+            && request.resource.data.nome.size() <= 120))
+        && (!("diasAlertaPadrao" in request.resource.data)
+          || (request.resource.data.diasAlertaPadrao is number
+            && request.resource.data.diasAlertaPadrao >= 0
+            && request.resource.data.diasAlertaPadrao <= 365))
+        && (!("baixaAutomaticaAtiva" in request.resource.data)
+          || request.resource.data.baixaAutomaticaAtiva is bool);
+
+      allow create, delete: if false;
+    }
+
+    // Saldos: o proprietário pode criar e atualizar, mas não apagar.
     match /estoque/{id} {
       allow read: if donoDoEstabelecimento(resource.data.estabelecimentoId);
       allow create: if donoDoEstabelecimento(request.resource.data.estabelecimentoId);
-      allow update: if donoDoEstabelecimento(resource.data.estabelecimentoId)
-        && request.resource.data.estabelecimentoId == resource.data.estabelecimentoId;
-      allow delete: if donoDoEstabelecimento(resource.data.estabelecimentoId);
+      allow update: if mesmoEstabelecimento();
+      allow delete: if false;
     }
 
+    // Livro de movimentos: append-only. Um movimento já registrado não pode
+    // ser editado nem apagado pelo cliente.
     match /movimentosEstoque/{id} {
       allow read: if donoDoEstabelecimento(resource.data.estabelecimentoId);
       allow create: if donoDoEstabelecimento(request.resource.data.estabelecimentoId);
-      allow update: if donoDoEstabelecimento(resource.data.estabelecimentoId)
-        && request.resource.data.estabelecimentoId == resource.data.estabelecimentoId;
-      allow delete: if donoDoEstabelecimento(resource.data.estabelecimentoId);
+      allow update, delete: if false;
     }
 
+    // Sessões podem mudar de estado durante a vistoria, sem trocar de dono.
+    // A exclusão de sessões históricas é bloqueada.
     match /vistoriasEstoque/{id} {
       allow read: if donoDoEstabelecimento(resource.data.estabelecimentoId);
       allow create: if donoDoEstabelecimento(request.resource.data.estabelecimentoId);
-      allow update: if donoDoEstabelecimento(resource.data.estabelecimentoId)
-        && request.resource.data.estabelecimentoId == resource.data.estabelecimentoId;
-      allow delete: if donoDoEstabelecimento(resource.data.estabelecimentoId);
+      allow update: if mesmoEstabelecimento();
+      allow delete: if false;
     }
 
+    // Contagens são atualizáveis durante a vistoria, mas não podem ser
+    // transferidas para outro estabelecimento ou excluídas pelo cliente.
     match /contagensEstoque/{id} {
       allow read: if donoDoEstabelecimento(resource.data.estabelecimentoId);
       allow create: if donoDoEstabelecimento(request.resource.data.estabelecimentoId);
-      allow update: if donoDoEstabelecimento(resource.data.estabelecimentoId)
-        && request.resource.data.estabelecimentoId == resource.data.estabelecimentoId;
-      allow delete: if donoDoEstabelecimento(resource.data.estabelecimentoId);
+      allow update: if mesmoEstabelecimento();
+      allow delete: if false;
     }
 
     match /lotes/{id} {
       allow read: if true;
-      // A gerente (sem login) pode ajustar só o valor de venda promocional
-      // de um item que vai vencer — nunca quantidade, vencimento ou outro
-      // campo. Qualquer outra alteração continua exigindo login.
-      allow update: if request.auth != null ||
-        request.resource.data.diff(resource.data).affectedKeys().hasOnly(["precoPromocional", "promocaoAtiva"]);
-      allow create, delete: if request.auth != null;
+      // A gerente sem login só pode alterar os campos promocionais.
+      // Operadores autenticados mantêm as operações atuais dos lotes.
+      allow update: if autenticado() ||
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+          "precoPromocional",
+          "promocaoAtiva"
+        ]);
+      allow create: if autenticado();
+      // Exclusões de lotes exigem operação administrativa fora do cliente.
+      allow delete: if false;
     }
 
-    // Produtos (custo, código de barras) e vistorias ficam restritos ao
-    // operador logado.
+    // Produtos são lidos/escritos pelo operador autenticado. Exclusão física
+    // é bloqueada; o fluxo usa desativação lógica (ativo=false).
     match /produtos/{id} {
-      allow read, write: if request.auth != null;
+      allow read, create, update: if autenticado();
+      allow delete: if false;
     }
 
+    // Histórico de vistorias: consulta e inclusão autenticadas; sem edição
+    // retroativa ou exclusão pelo cliente.
     match /vistorias/{id} {
-      allow read, write: if request.auth != null;
+      allow read, create: if autenticado();
+      allow update, delete: if false;
     }
 
-    // Coleção única para "saiu do estoque ativo" (vendido ou vencido),
-    // substituindo as antigas "excluidos" e "perdas".
+    // Saídas representam eventos históricos (venda/perda/vencimento).
     match /saidas/{id} {
-      allow read, write: if request.auth != null;
+      allow read, create: if autenticado();
+      allow update, delete: if false;
     }
   }
 }
