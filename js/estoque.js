@@ -18,6 +18,9 @@ let usuarioAtual = null;
 let produtos = [];
 let estoqueMap = {};
 let movimentos = [];
+let movimentosDisponiveis = true;
+let sessoesDisponiveis = true;
+let contagensDisponiveis = true;
 let sessoes = [];
 let sessaoAtual = null;
 let contagens = {};
@@ -59,6 +62,11 @@ function produtosDoLocal() {
 function obterSessaoLocal() {
   return sessoes.filter(s => s.local === localAtual && s.status !== "finalizada")
     .sort((a,b) => dataMillis(b.updatedAt || b.createdAt) - dataMillis(a.updatedAt || a.createdAt))[0] || null;
+}
+
+function obterUltimaSessaoFinalizadaLocal() {
+  return sessoes.filter(s => s.local === localAtual && s.status === "finalizada")
+    .sort((a,b) => dataMillis(b.finalizadaEm || b.updatedAt || b.createdAt) - dataMillis(a.finalizadaEm || a.updatedAt || a.createdAt))[0] || null;
 }
 function formatarDataHora(valor) {
   const ms = dataMillis(valor);
@@ -107,32 +115,90 @@ async function mudarLocal(local) {
   segSeco.classList.toggle("ativo", local === "seco");
   segSeco.setAttribute("aria-selected", String(local === "seco"));
   sessaoAtual = obterSessaoLocal();
+  contagensDisponiveis = true;
   try {
     await carregarContagensDaSessao();
-    renderizarTudo();
   } catch (erro) {
-    console.error(erro);
-    mostrarToast("Não foi possível carregar a vistoria deste local.", "erro");
+    contagensDisponiveis = false;
+    contagens = {};
+    console.error("Contagens da vistoria indisponíveis:", erro);
+    mostrarToast("Não foi possível ler as contagens existentes. A vistoria foi bloqueada para evitar sobrescrever dados.", "erro");
   }
+  renderizarTudo();
 }
 
 async function carregarTudo() {
-  const [prodSnap, estoqueSnap, movSnap, sessoesSnap] = await Promise.all([
+  // Produtos, saldos e sessões são dados essenciais para operar a tela.
+  // O histórico de movimentos é carregado separadamente: uma falha nele não
+  // deve apagar visualmente todo o estoque já salvo.
+  // Produtos e saldos são o núcleo da tela. Carregue-os primeiro, sem
+  // acoplar sua exibição à disponibilidade das coleções auxiliares.
+  const [prodSnap, estoqueSnap] = await Promise.all([
     getDocs(query(collection(db, "produtos"), where("estabelecimentoId", "==", estabelecimentoAtual.id))),
-    getDocs(query(collection(db, "estoque"), where("estabelecimentoId", "==", estabelecimentoAtual.id))),
-    getDocs(query(collection(db, "movimentosEstoque"), where("estabelecimentoId", "==", estabelecimentoAtual.id))),
-    getDocs(query(collection(db, "vistoriasEstoque"), where("estabelecimentoId", "==", estabelecimentoAtual.id)))
+    getDocs(query(collection(db, "estoque"), where("estabelecimentoId", "==", estabelecimentoAtual.id)))
   ]);
+
   produtos = prodSnap.docs.map(d => ({ id:d.id, ...d.data() }))
     .sort((a,b) => nomeApresentacao(a).localeCompare(nomeApresentacao(b), "pt-BR", { sensitivity:"base" }));
   estoqueMap = {};
-  estoqueSnap.forEach(d => { const e=d.data(); estoqueMap[d.id] = { id:d.id, ...e, geladeira:numero(e.geladeira), seco:numero(e.seco) }; });
-  movimentos = movSnap.docs.map(d => ({ id:d.id, ...d.data() }));
-  sessoes = sessoesSnap.docs.map(d => ({ id:d.id, ...d.data() }));
+  estoqueSnap.forEach(d => {
+    const e = d.data();
+    estoqueMap[d.id] = { id:d.id, ...e, geladeira:numero(e.geladeira), seco:numero(e.seco) };
+  });
+
+  // Uma falha nas vistorias não pode apagar o estoque visível.
+  sessoesDisponiveis = true;
+  try {
+    const sessoesSnap = await getDocs(query(
+      collection(db, "vistoriasEstoque"),
+      where("estabelecimentoId", "==", estabelecimentoAtual.id)
+    ));
+    sessoes = sessoesSnap.docs.map(d => ({ id:d.id, ...d.data() }));
+  } catch (erro) {
+    sessoesDisponiveis = false;
+    sessoes = [];
+    console.error("Sessões de vistoria indisponíveis:", erro);
+  }
+
+  movimentosDisponiveis = true;
+  try {
+    const movSnap = await getDocs(query(
+      collection(db, "movimentosEstoque"),
+      where("estabelecimentoId", "==", estabelecimentoAtual.id)
+    ));
+    movimentos = movSnap.docs.map(d => ({ id:d.id, ...d.data() }));
+  } catch (erro) {
+    movimentosDisponiveis = false;
+    movimentos = [];
+    console.error("Histórico de movimentos indisponível:", erro);
+  }
+
   sessaoAtual = obterSessaoLocal();
-  await carregarContagensDaSessao();
+  contagensDisponiveis = true;
+  try {
+    await carregarContagensDaSessao();
+  } catch (erro) {
+    contagensDisponiveis = false;
+    contagens = {};
+    console.error("Contagens da vistoria indisponíveis:", erro);
+  }
   renderizarTudo();
-  await prepararImportacao();
+
+  if (!sessoesDisponiveis) {
+    mostrarToast("Estoque carregado. As vistorias estão indisponíveis; operações de contagem foram bloqueadas.", "erro");
+  } else if (!contagensDisponiveis) {
+    mostrarToast("Estoque carregado. Não foi possível ler as contagens existentes; esta vistoria ficará bloqueada para evitar sobrescritas.", "erro");
+  }
+  if (!movimentosDisponiveis) {
+    mostrarToast("Estoque carregado, mas o histórico de movimentos falhou. A finalização da vistoria ficará bloqueada até a conexão ser restabelecida.", "erro");
+  }
+
+  try {
+    await prepararImportacao();
+  } catch (erro) {
+    console.error("Não foi possível preparar a importação de lotes:", erro);
+    mostrarToast("Estoque carregado, mas a verificação de lotes para importação falhou.", "erro");
+  }
 }
 
 async function carregarContagensDaSessao() {
@@ -373,8 +439,23 @@ function atualizarResumo() {
 function renderizarSessao() {
   secaoContagem.hidden = true;
   painelRevisao.hidden = true;
+  if (!sessoesDisponiveis) {
+    painelSessao.innerHTML = '<h2>Vistoria indisponível</h2><p class="mensagem-vazio">Não foi possível consultar as sessões salvas. O estoque existente continua visível, mas novas operações de vistoria foram bloqueadas.</p>';
+    return;
+  }
+  if (sessaoAtual && !contagensDisponiveis) {
+    painelSessao.innerHTML = '<h2>Vistoria protegida</h2><p class="mensagem-vazio">Não foi possível consultar as contagens já salvas. Nenhuma contagem pode ser alterada até a leitura ser restabelecida.</p>';
+    return;
+  }
   if (!sessaoAtual) {
-    painelSessao.innerHTML = '<h2>Vistoria: ' + esc(ROTULO_LOCAL[localAtual]) + '</h2><p class="legenda">Nenhuma vistoria em andamento neste local.</p><button type="button" class="btn" id="btn-iniciar">Iniciar vistoria</button>';
+    const ultimaFinalizada = obterUltimaSessaoFinalizadaLocal();
+    const resumoAnterior = ultimaFinalizada
+      ? '<p class="legenda">Última vistoria finalizada em ' + formatarDataHora(ultimaFinalizada.finalizadaEm || ultimaFinalizada.updatedAt || ultimaFinalizada.createdAt) +
+        (Number.isFinite(Number(ultimaFinalizada.quantidadeItensContados)) ? ' · ' + Number(ultimaFinalizada.quantidadeItensContados) + ' produtos registrados.' : '.') +
+        '</p>'
+      : '<p class="legenda">Nenhuma vistoria anterior registrada neste local.</p>';
+    painelSessao.innerHTML = '<h2>Vistoria: ' + esc(ROTULO_LOCAL[localAtual]) + '</h2>' + resumoAnterior +
+      '<p class="legenda">Nenhuma vistoria em andamento neste local.</p><button type="button" class="btn" id="btn-iniciar">Iniciar vistoria</button>';
     document.getElementById("btn-iniciar").addEventListener("click", iniciarSessao);
     return;
   }
@@ -416,6 +497,10 @@ async function iniciarSessao() {
 }
 
 function renderizarLista() {
+  if (!sessoesDisponiveis || (sessaoAtual && !contagensDisponiveis)) {
+    lista.innerHTML = '<p class="mensagem-vazio">Contagem bloqueada enquanto não for possível confirmar a leitura dos dados já salvos.</p>';
+    return;
+  }
   if (!sessaoAtual || sessaoAtual.status !== "em_andamento") {
     lista.innerHTML = '<p class="mensagem-vazio">Inicie ou retome uma vistoria para contar produtos.</p>';
     return;
@@ -545,6 +630,10 @@ document.getElementById("btn-finalizar").addEventListener("click", finalizarSess
 
 async function finalizarSessao() {
   if (!sessaoAtual || sessaoAtual.status !== "aguardando_revisao") return;
+  if (!movimentosDisponiveis) {
+    mostrarToast("Não é seguro finalizar sem consultar o histórico de movimentos. Atualize a página e tente novamente.", "erro");
+    return;
+  }
   const esperados = produtosDoLocal();
   const idsEsperados = new Set(esperados.map(p => p.id));
   const itens = Object.values(contagens).filter(c => c.local === localAtual && idsEsperados.has(c.produtoId));
@@ -577,7 +666,9 @@ async function finalizarSessao() {
           estabelecimentoId:estabelecimentoAtual.id, produtoId:c.produtoId, produtoNome:c.produtoNome,
           [localAtual]:c.quantidadeFinal, ultimaContagemEm:ultimaContagem, atualizadoEm:serverTimestamp()
         }, {merge:true});
-        batch.set(doc(collection(db,"movimentosEstoque")), {
+        // ID determinístico: se o lote de saldo for salvo e a atualização da sessão
+        // falhar, uma nova tentativa sobrescreve o mesmo movimento em vez de duplicá-lo.
+        batch.set(doc(db,"movimentosEstoque", sessaoAtual.id + "_" + c.produtoId), {
           estabelecimentoId:estabelecimentoAtual.id, produtoId:c.produtoId, produtoNome:c.produtoNome,
           local:localAtual, tipo:"contagem", delta:c.quantidadeFinal-numero(atual[localAtual]),
           quantidadeContada:numero(c.quantidade), deltaMovimentacoesPosteriores:c.deltaPosterior,

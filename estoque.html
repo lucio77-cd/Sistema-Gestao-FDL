@@ -36,6 +36,11 @@
     <a href="graficos.html" data-pagina="graficos">Gráficos</a><a href="estoque.html" data-pagina="estoque">Estoque</a><a href="caixa.html" data-pagina="caixa">Caixa</a><a href="configuracoes.html" data-pagina="configuracoes">Configurações</a><a href="#" id="link-sair">Sair</a></div>
 <main>
 <h1>Estoque</h1>
+<section class="painel" id="painel-saldos-registrados" aria-live="polite">
+  <h2>Saldos registrados</h2>
+  <p class="legenda">Consulta dos saldos já salvos. Esta visualização não inicia vistoria nem altera quantidades.</p>
+  <div id="lista-saldos-registrados"><p class="mensagem-vazio">Carregando saldos registrados…</p></div>
+</section>
     <p class="legenda">Vistoria física com salvamento contínuo e revisão antes de aplicar os saldos.</p>
 <p class="legenda">Conte fisicamente os produtos da geladeira e da parte seca. Cada item é salvo durante a vistoria; o saldo oficial só muda após revisar e finalizar.</p>
 <section class="painel stock-resumo">
@@ -110,6 +115,7 @@
 <section class="painel stock-review" id="painel-revisao" hidden><h2>Revisão da vistoria</h2><p class="legenda" id="texto-revisao"></p><div id="resumo-revisao"></div><div class="stock-review-actions"><button type="button" class="btn btn-secundario" id="btn-voltar-contagem">Voltar à contagem</button><button type="button" class="btn" id="btn-finalizar">Confirmar e aplicar saldos</button></div></section>
 <section class="painel" id="painel-importacao" hidden><h2>Importar contagem antiga</h2><p class="legenda" id="texto-importacao"></p><div id="conferencia-importacao"></div><button type="button" class="btn" id="btn-confirmar-importacao">Confirmar importação</button></section>
 </main>
+<script type="module" src="js/estoque-saldos.js"></script>
 <script type="module" src="js/estoque.js"></script>
 </body>
 </html>
