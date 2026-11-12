@@ -1287,3 +1287,78 @@ label.switch {
 
 /* O atributo hidden deve prevalecer sobre o layout flex do submenu. */
 @media(min-width:900px){body:has(> .tabbar) .menu-mais[hidden]{display:none!important;}}
+
+
+/* ---------- Estrutura responsiva da navegação (independente do tema) ---------- */
+@media (min-width: 900px) {
+  body:has(> .tabbar):not(.pagina-caixa) > .topo {
+    position: sticky;
+    top: 0;
+    margin-left: 224px;
+    z-index: 15;
+  }
+  body:has(> .tabbar):not(.pagina-caixa) > .tabbar {
+    position: fixed;
+    top: 0;
+    bottom: 0;
+    left: 0;
+    right: auto;
+    width: 224px;
+    min-height: 100vh;
+    flex-direction: column;
+    align-items: stretch;
+    justify-content: flex-start;
+    padding: 1.1rem .75rem;
+    border-top: 0;
+    border-right: 1px solid var(--steel-light);
+    background: var(--surface);
+  }
+  body:has(> .tabbar):not(.pagina-caixa) > .tabbar::before {
+    content: "FDL  /  GESTÃO";
+    display: block;
+    color: var(--primary);
+    font-size: .72rem;
+    font-weight: 800;
+    letter-spacing: .12em;
+    padding: .75rem .85rem 1.4rem;
+  }
+  body:has(> .tabbar):not(.pagina-caixa) .tabbar-item {
+    flex: 0 0 auto;
+    flex-direction: row;
+    justify-content: flex-start;
+    gap: .8rem;
+    min-height: 44px;
+    padding: .65rem .85rem;
+    border-radius: 6px;
+    font-size: .84rem;
+    text-align: left;
+  }
+  body:has(> .tabbar):not(.pagina-caixa) .tabbar-item.ativo {
+    background: color-mix(in srgb, var(--primary) 14%, transparent);
+    color: var(--primary);
+  }
+  body:has(> .tabbar):not(.pagina-caixa) .tabbar-item.ativo::before,
+  body:has(> .tabbar):not(.pagina-caixa) .tabbar-item.ativo::after {
+    display: none;
+  }
+  body:has(> .tabbar):not(.pagina-caixa) > main {
+    margin-left: 224px;
+    max-width: none;
+    padding: 2rem clamp(1.5rem, 3vw, 3.5rem) 3rem;
+  }
+  body:has(> .tabbar):not(.pagina-caixa) > .menu-mais {
+    position: static;
+    left: auto;
+    right: auto;
+    bottom: auto;
+    top: auto;
+    width: auto;
+    margin: .15rem 0 .55rem;
+    padding: .35rem 0 .35rem .65rem;
+    border: 0;
+    border-left: 1px solid var(--steel-light);
+    border-radius: 0;
+    box-shadow: none;
+    background: transparent;
+  }
+}
