@@ -1362,3 +1362,143 @@ label.switch {
     background: transparent;
   }
 }
+
+
+/* ---------- Navegação lateral: acabamento visual ---------- */
+@media (min-width: 900px) {
+  body:has(> .tabbar):not(.pagina-caixa) > .tabbar {
+    width: 248px;
+    padding: 1.35rem 1rem 1rem;
+    gap: .32rem;
+    border-right: 1px solid var(--steel-light);
+    background: var(--surface);
+    box-shadow: 8px 0 28px rgba(15, 23, 30, .06);
+  }
+  body:has(> .tabbar):not(.pagina-caixa) > .tabbar::before {
+    content: "FDL  /  GESTÃO";
+    margin: 0 .25rem 1.15rem;
+    padding: .55rem .7rem 1rem;
+    border-bottom: 1px solid var(--steel-light);
+    font-size: .68rem;
+    letter-spacing: .16em;
+  }
+  body:has(> .tabbar):not(.pagina-caixa) .tabbar-item {
+    min-height: 46px;
+    padding: .7rem .85rem;
+    gap: .9rem;
+    border-radius: 8px;
+    color: var(--ink-soft);
+    font-size: .86rem;
+    font-weight: 550;
+    transition: background .18s ease, color .18s ease, transform .18s ease;
+  }
+  body:has(> .tabbar):not(.pagina-caixa) .tabbar-item svg {
+    width: 19px;
+    height: 19px;
+    flex: 0 0 19px;
+    opacity: .82;
+  }
+  body:has(> .tabbar):not(.pagina-caixa) .tabbar-item:hover {
+    color: var(--ink);
+    background: color-mix(in srgb, var(--ink) 6%, transparent);
+  }
+  body:has(> .tabbar):not(.pagina-caixa) .tabbar-item.ativo {
+    position: relative;
+    color: var(--normal);
+    background: color-mix(in srgb, var(--primary) 11%, transparent);
+    font-weight: 700;
+  }
+  body:has(> .tabbar):not(.pagina-caixa) .tabbar-item.ativo::after {
+    content: "";
+    position: absolute;
+    left: -1rem;
+    top: 10px;
+    bottom: 10px;
+    width: 3px;
+    border-radius: 0 4px 4px 0;
+    background: var(--primary);
+  }
+  body:has(> .tabbar):not(.pagina-caixa) .tabbar-item.ativo svg { opacity: 1; }
+  body:has(> .tabbar):not(.pagina-caixa) #btn-mais[aria-expanded="true"] {
+    color: var(--normal);
+    background: color-mix(in srgb, var(--primary) 9%, transparent);
+  }
+  body:has(> .tabbar):not(.pagina-caixa) > .menu-mais {
+    position: fixed;
+    z-index: 14;
+    left: 0;
+    top: 306px;
+    bottom: 0;
+    width: 248px;
+    display: flex;
+    flex-direction: column;
+    gap: .22rem;
+    overflow-y: auto;
+    margin: 0;
+    padding: .55rem 1rem 1rem 1.85rem;
+    border: 0;
+    border-right: 1px solid var(--steel-light);
+    border-radius: 0;
+    background: var(--surface);
+    box-shadow: 8px 0 28px rgba(15, 23, 30, .06);
+  }
+  body:has(> .tabbar):not(.pagina-caixa) > .menu-mais[hidden] {
+    display: none !important;
+  }
+  body:has(> .tabbar):not(.pagina-caixa) > .menu-mais::before {
+    content: "ATALHOS";
+    display: block;
+    margin: 0 0 .35rem;
+    padding: .2rem .7rem .55rem;
+    color: var(--ink-soft);
+    font-size: .62rem;
+    font-weight: 800;
+    letter-spacing: .14em;
+  }
+  body:has(> .tabbar):not(.pagina-caixa) > .menu-mais a {
+    position: relative;
+    display: flex;
+    align-items: center;
+    min-height: 40px;
+    padding: .55rem .75rem;
+    border: 0;
+    border-radius: 7px;
+    background: transparent;
+    color: var(--ink-soft);
+    font-size: .82rem;
+    font-weight: 550;
+    text-decoration: none;
+    transition: background .18s ease, color .18s ease;
+  }
+  body:has(> .tabbar):not(.pagina-caixa) > .menu-mais a:not(#link-sair)::before {
+    content: "";
+    width: 5px;
+    height: 5px;
+    margin-right: .75rem;
+    border-radius: 50%;
+    background: var(--steel);
+    opacity: .65;
+  }
+  body:has(> .tabbar):not(.pagina-caixa) > .menu-mais a:hover {
+    color: var(--ink);
+    background: color-mix(in srgb, var(--ink) 6%, transparent);
+  }
+  body:has(> .tabbar):not(.pagina-caixa) > .menu-mais a.ativo {
+    color: var(--normal);
+    background: color-mix(in srgb, var(--primary) 10%, transparent);
+    font-weight: 700;
+  }
+  body:has(> .tabbar):not(.pagina-caixa) > .menu-mais a.ativo::before {
+    background: var(--primary);
+    opacity: 1;
+  }
+  body:has(> .tabbar):not(.pagina-caixa) > .menu-mais #link-sair {
+    margin-top: auto;
+    padding: .8rem .75rem .35rem;
+    border-top: 1px solid var(--steel-light);
+    border-radius: 0;
+    color: var(--vencido);
+    font-weight: 650;
+  }
+  body:has(> .tabbar):not(.pagina-caixa) > main { margin-left: 248px; }
+}
