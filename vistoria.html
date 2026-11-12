@@ -7,7 +7,8 @@
 <title>Vistoria — Controle de Bebidas</title>
 <link rel="stylesheet" href="css/styles.css" />
 <meta name="theme-color" content="#171B20" />
-<link rel="stylesheet" href="css/theme-dark.css" />
+<link rel="stylesheet" href="css/theme-dark.css" id="theme-dark-stylesheet" media="not all" />
+<script>(function(){try{var p=localStorage.getItem("fdl-theme-preference")||"dark";var d=p==="dark"||(p==="system"&&window.matchMedia&&window.matchMedia("(prefers-color-scheme: dark)").matches);document.documentElement.dataset.theme=d?"dark":"light";var s=document.getElementById("theme-dark-stylesheet");if(s)s.media=d?"all":"not all";}catch(_){document.documentElement.dataset.theme="dark";}})();</script>
 </head>
 <body data-pagina-atual="vistoria">
   <header class="topo">
@@ -155,5 +156,6 @@
   </main>
 
   <script type="module" src="js/vistoria.js"></script>
+  <script type="module" src="js/theme.js"></script>
 </body>
 </html>

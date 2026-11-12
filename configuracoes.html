@@ -18,6 +18,19 @@
   <main>
     <h1>Configurações</h1>
 
+    <section class="painel painel-aparencia" aria-labelledby="titulo-aparencia">
+      <p class="aparencia-sobretitulo">PERSONALIZAÇÃO</p>
+      <h2 id="titulo-aparencia">Aparência do sistema</h2>
+      <p class="legenda">Escolha como deseja visualizar o FDL neste dispositivo.</p>
+      <fieldset class="theme-options">
+        <legend class="sr-only">Tema do sistema</legend>
+        <label class="theme-option"><input type="radio" name="tema-sistema" value="light" /><span class="theme-option-preview theme-option-preview--light" aria-hidden="true"></span><span class="theme-option-copy"><strong>Claro</strong><small>Visual claro e arejado</small></span></label>
+        <label class="theme-option"><input type="radio" name="tema-sistema" value="dark" /><span class="theme-option-preview theme-option-preview--dark" aria-hidden="true"></span><span class="theme-option-copy"><strong>Escuro</strong><small>Dark Industrial</small></span></label>
+        <label class="theme-option"><input type="radio" name="tema-sistema" value="system" /><span class="theme-option-preview theme-option-preview--system" aria-hidden="true"></span><span class="theme-option-copy"><strong>Automático</strong><small>Segue o dispositivo</small></span></label>
+      </fieldset>
+      <p class="aparencia-nota">A preferência fica salva neste navegador e vale para todas as telas do sistema.</p>
+    </section>
+
     <div class="painel">
       <h2 style="margin-top:0">Nome do estabelecimento</h2>
       <input type="text" id="nome-input" />

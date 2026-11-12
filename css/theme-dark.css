@@ -317,3 +317,20 @@ dialog, .modal, .modal-conteudo, .scanner-modal {
     border-radius: 10px;
   }
 }
+@media (min-width:900px){
+ body:has(> .tabbar) .tabbar-item.ativo{background:#263B32;color:#9AD9B4;}
+ body:has(> .tabbar) .tabbar-item.ativo::after{background:#4C9B78;}
+ body:has(> .tabbar) .menu-mais{border-left-color:#46525D;}
+ body:has(> .tabbar) .menu-mais a,body:has(> .tabbar) .menu-mais button{color:#A4ADB7;}
+ body:has(> .tabbar) .menu-mais a:hover,body:has(> .tabbar) .menu-mais button:hover{background:#303942;color:#E7ECEF;}
+ body:has(> .tabbar) .menu-mais a.ativo{color:#9AD9B4;}
+ body:has(> .tabbar) .menu-mais #link-sair{border-top-color:#46525D;color:#E07878;}
+}
+@media(max-width:899px){
+ .tabbar .menu-mais{background:#242B32;border-color:#46525D;color:#E7ECEF;}
+ .tabbar .menu-mais a,.tabbar .menu-mais button{color:#E7ECEF;}
+ .tabbar .menu-mais #link-sair{border-top-color:#46525D;color:#E07878;}
+}
+.painel-aparencia .theme-option{background:#1B2228;border-color:#46525D;}
+.painel-aparencia .theme-option:has(input:checked){border-color:#75C49A;}
+.painel-aparencia .theme-option-copy small,.painel-aparencia .aparencia-nota{color:#A4ADB7;}

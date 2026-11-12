@@ -6,6 +6,12 @@ export function iniciarNavegacao() {
   const btnMais = document.getElementById("btn-mais");
   const menuMais = document.getElementById("menu-mais");
 
+  // Mantém o submenu na própria barra lateral no desktop.
+  if (menuMais && btnMais && btnMais.parentElement !== menuMais.parentElement) {
+    btnMais.insertAdjacentElement("afterend", menuMais);
+    btnMais.setAttribute("aria-controls", "menu-mais");
+  }
+
   // Garante o link "Cozinha" no menu "Mais" de todas as páginas, sem precisar
   // editar cada HTML. Se o HTML já tiver o link, nada é duplicado.
   if (menuMais && !menuMais.querySelector('a[href="cozinha.html"]')) {

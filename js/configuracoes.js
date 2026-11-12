@@ -2,9 +2,19 @@ import { db } from "./firebase-config.js";
 import { protegerPagina } from "./auth-guard.js";
 import { iniciarNavegacao } from "./nav.js";
 import { mostrarToast } from "./toast.js";
+import { getThemePreference, setThemePreference } from "./theme.js";
 import { doc, updateDoc } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
 iniciarNavegacao();
+
+document.querySelectorAll('input[name="tema-sistema"]').forEach((input) => {
+  input.checked = input.value === getThemePreference();
+  input.addEventListener("change", () => {
+    if (!input.checked) return;
+    setThemePreference(input.value);
+    mostrarToast("Aparência atualizada.", "ok");
+  });
+});
 
 let estabelecimentoAtual = null;
 
