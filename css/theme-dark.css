@@ -389,3 +389,14 @@ dialog, .modal, .modal-conteudo, .scanner-modal {
   body:has(> .tabbar):not(.pagina-caixa) > .tabbar > .menu-mais a.ativo { color: #A8E0BE; background: #293B33; }
   body:has(> .tabbar):not(.pagina-caixa) > .tabbar > .menu-mais #link-sair { border-top-color: #39444E; color: #E78A8A; }
 }
+
+
+/* Mantém as mesmas medidas da navegação no tema claro e no escuro. */
+@media (min-width: 900px) {
+  body:has(> .tabbar):not(.pagina-caixa) > .tabbar {
+    width: 248px;
+    padding: 1.2rem .9rem 1rem;
+  }
+  body:has(> .tabbar):not(.pagina-caixa) > .topo { margin-left: 248px; }
+  body:has(> .tabbar):not(.pagina-caixa) > main { margin-left: 248px; }
+}
