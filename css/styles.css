@@ -1649,3 +1649,9 @@ label.switch {
 @media (max-width: 520px) {
   .theme-option-preview { height: 76px; }
 }
+
+
+/* Sidebar desktop: mantém cabeçalho e conteúdo na mesma coluna de alinhamento. */
+@media (min-width: 900px) {
+  body:has(> .tabbar):not(.pagina-caixa) > .topo { margin-left: 248px; }
+}
