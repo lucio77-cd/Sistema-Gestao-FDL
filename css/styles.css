@@ -1544,3 +1544,85 @@ label.switch {
     margin-top: auto;
   }
 }
+
+
+/* ---------- FDL UI System: navegação desktop expandida ---------- */
+@media (min-width: 900px) {
+  body:has(> .tabbar):not(.pagina-caixa) > .tabbar {
+    width: 248px;
+    padding: 1.2rem .9rem 1rem;
+    gap: .28rem;
+  }
+  body:has(> .tabbar):not(.pagina-caixa) > .tabbar #btn-mais { display: none !important; }
+  body:has(> .tabbar):not(.pagina-caixa) > .tabbar > .menu-mais,
+  body:has(> .tabbar):not(.pagina-caixa) > .tabbar > .menu-mais[hidden] {
+    position: static !important;
+    inset: auto !important;
+    z-index: auto !important;
+    display: flex !important;
+    flex: 1 1 auto;
+    flex-direction: column;
+    gap: .2rem;
+    width: 100%;
+    min-width: 0;
+    max-width: none;
+    max-height: none;
+    overflow-y: auto;
+    margin: .45rem 0 0;
+    padding: .75rem 0 .35rem;
+    border: 0;
+    border-top: 1px solid var(--steel-light);
+    border-radius: 0;
+    background: transparent;
+    box-shadow: none;
+  }
+  body:has(> .tabbar):not(.pagina-caixa) > .tabbar > .menu-mais::before {
+    content: "GESTÃO E CONTROLE";
+    display: block;
+    margin: 0 0 .4rem;
+    padding: .1rem .75rem .55rem;
+    color: var(--ink-soft);
+    font-size: .62rem;
+    font-weight: 800;
+    letter-spacing: .14em;
+  }
+  body:has(> .tabbar):not(.pagina-caixa) > .tabbar > .menu-mais a {
+    display: flex;
+    align-items: center;
+    gap: .8rem;
+    min-height: 43px;
+    padding: .65rem .8rem;
+    border: 0;
+    border-radius: 8px;
+    background: transparent;
+    color: var(--ink-soft);
+    font-size: .84rem;
+    font-weight: 550;
+    text-decoration: none;
+    transition: background .18s ease, color .18s ease;
+  }
+  body:has(> .tabbar):not(.pagina-caixa) > .tabbar > .menu-mais a::before { content: none !important; }
+  body:has(> .tabbar):not(.pagina-caixa) > .tabbar > .menu-mais a svg {
+    width: 19px;
+    height: 19px;
+    flex: 0 0 19px;
+    opacity: .82;
+  }
+  body:has(> .tabbar):not(.pagina-caixa) > .tabbar > .menu-mais a:hover {
+    color: var(--ink);
+    background: color-mix(in srgb, var(--ink) 6%, transparent);
+  }
+  body:has(> .tabbar):not(.pagina-caixa) > .tabbar > .menu-mais a.ativo {
+    color: var(--normal);
+    background: color-mix(in srgb, var(--primary) 11%, transparent);
+    font-weight: 700;
+  }
+  body:has(> .tabbar):not(.pagina-caixa) > .tabbar > .menu-mais a.ativo svg { opacity: 1; }
+  body:has(> .tabbar):not(.pagina-caixa) > .tabbar > .menu-mais #link-sair {
+    margin-top: auto;
+    padding-top: .9rem;
+    border-top: 1px solid var(--steel-light);
+    border-radius: 0;
+    color: var(--vencido);
+  }
+}
