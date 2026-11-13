@@ -363,3 +363,15 @@ dialog, .modal, .modal-conteudo, .scanner-modal {
   body:has(> .tabbar):not(.pagina-caixa) > .menu-mais a.ativo { color: #A8E0BE; background: #293B33; }
   body:has(> .tabbar):not(.pagina-caixa) > .menu-mais #link-sair { border-color: #39444E; color: #E78A8A; }
 }
+
+
+/* ---------- Navegação desktop sempre expandida: tema escuro ---------- */
+@media (min-width: 900px) {
+  body:has(> .tabbar):not(.pagina-caixa) > .menu-mais,
+  body:has(> .tabbar):not(.pagina-caixa) > .menu-mais[hidden] {
+    background: #20272E;
+    border-right-color: #39444E;
+    box-shadow: 8px 0 28px rgba(0, 0, 0, .14);
+  }
+  body:has(> .tabbar):not(.pagina-caixa) > .menu-mais::before { color: #83919C; }
+}
