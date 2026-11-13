@@ -1502,3 +1502,45 @@ label.switch {
   }
   body:has(> .tabbar):not(.pagina-caixa) > main { margin-left: 248px; }
 }
+
+
+/* ---------- Navegação desktop sem submenu oculto ---------- */
+@media (min-width: 900px) {
+  body:has(> .tabbar):not(.pagina-caixa) #btn-mais {
+    display: none !important;
+  }
+  body:has(> .tabbar):not(.pagina-caixa) > .menu-mais,
+  body:has(> .tabbar):not(.pagina-caixa) > .menu-mais[hidden] {
+    position: fixed;
+    z-index: 14;
+    top: 292px;
+    right: auto;
+    bottom: 0;
+    left: 0;
+    display: flex !important;
+    flex-direction: column;
+    gap: .22rem;
+    width: 248px;
+    overflow-y: auto;
+    margin: 0;
+    padding: .65rem 1rem 1rem 1.85rem;
+    border: 0;
+    border-right: 1px solid var(--steel-light);
+    border-radius: 0;
+    background: var(--surface);
+    box-shadow: 8px 0 28px rgba(15, 23, 30, .06);
+  }
+  body:has(> .tabbar):not(.pagina-caixa) > .menu-mais::before {
+    content: "GESTÃO E CONTROLE";
+    display: block;
+    margin: 0 0 .4rem;
+    padding: .2rem .7rem .65rem;
+    color: var(--ink-soft);
+    font-size: .62rem;
+    font-weight: 800;
+    letter-spacing: .14em;
+  }
+  body:has(> .tabbar):not(.pagina-caixa) > .menu-mais #link-sair {
+    margin-top: auto;
+  }
+}
