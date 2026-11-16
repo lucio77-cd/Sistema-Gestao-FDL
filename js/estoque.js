@@ -313,12 +313,20 @@ async function transferirEstoque(evento) {
       where("produtoId", "==", produtoId)
     );
 
+    // O SDK Web não aceita tx.get(query). Consultamos os IDs dos lotes
+    // antes e lemos cada documento individualmente dentro da transação.
+    const lotesConsultaSnap = await getDocs(consultaLotes);
+    const lotesRefs = lotesConsultaSnap.docs.map(d => ({ id:d.id, ref:d.ref }));
+
     await runTransaction(db, async tx => {
-      const [estoqueSnap, produtoSnap, lotesSnap] = await Promise.all([
+      const snapshots = await Promise.all([
         tx.get(estoqueRef),
         tx.get(produtoRef),
-        tx.get(consultaLotes)
+        ...lotesRefs.map(lote => tx.get(lote.ref))
       ]);
+      const estoqueSnap = snapshots[0];
+      const produtoSnap = snapshots[1];
+      const lotesSnaps = snapshots.slice(2);
       if (!estoqueSnap.exists() || !produtoSnap.exists()) {
         throw new Error("Produto sem saldo registrado. Faça uma contagem ou registre uma entrada antes de transferir.");
       }
@@ -346,9 +354,15 @@ async function transferirEstoque(evento) {
 
       // Lotes com validade acompanham a transferência. Lotes inteiros mudam
       // de local; lotes parciais são divididos para preservar quantidade e data.
-      const lotesDaOrigem = lotesSnap.docs
-        .map(d => ({ id:d.id, ref:doc(db, "lotes", d.id), ...d.data() }))
-        .filter(l => !l.importadoParaEstoque && !l.encerrado && l.local === rotuloOrigem && numero(l.quantidade) > 0)
+      const lotesDaOrigem = lotesRefs
+        .map((lote, indice) => ({
+          id:lote.id,
+          ref:lote.ref,
+          ...(lotesSnaps[indice].exists() ? lotesSnaps[indice].data() : {})
+        }))
+        .filter((l, indice) => lotesSnaps[indice].exists()
+          && !l.importadoParaEstoque && !l.encerrado
+          && l.local === rotuloOrigem && numero(l.quantidade) > 0)
         .sort((a,b) => String(a.dataVencimento || "9999-12-31").localeCompare(String(b.dataVencimento || "9999-12-31")));
       let restanteParaLotes = quantidade;
       lotesDaOrigem.forEach(lote => {
