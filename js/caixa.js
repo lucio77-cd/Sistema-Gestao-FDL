@@ -77,8 +77,9 @@ async function processarLeitura(codigo, tentativas = 0) {
     // Não podem voltar a ser vendidos como se fossem um segundo estoque.
     const candidatos = lotesSnap.docs
       .map((d) => ({ id: d.id, ...d.data() }))
-      .filter((l) => !l.importadoParaEstoque && Number(l.quantidade) > 0)
-      .sort((a, b) => Number(b.quantidade) - Number(a.quantidade));
+      .filter((l) => !l.importadoParaEstoque && !l.encerrado && Number(l.quantidade) > 0)
+      // FEFO: quando há validade, vende primeiro o lote que vence antes.
+      .sort((a, b) => String(a.dataVencimento || "9999-12-31").localeCompare(String(b.dataVencimento || "9999-12-31")));
     const loteRef = candidatos.length ? doc(db, "lotes", candidatos[0].id) : null;
 
     const resultado = await runTransaction(db, async (tx) => {
