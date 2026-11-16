@@ -7,7 +7,7 @@ import {
   CHAVE_SEM_VALOR, chaveOpcao, rotuloPadronizado
 } from "./opcoes-produto.js";
 import {
-  collection, query, where, getDocs, addDoc, setDoc, updateDoc,
+  collection, query, where, getDocs, addDoc, setDoc, updateDoc, runTransaction,
   doc, writeBatch, increment, serverTimestamp, Timestamp
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
@@ -106,6 +106,8 @@ protegerPagina(async ({ estabelecimento, user }) => {
   }
 });
 
+document.getElementById("form-transferencia")?.addEventListener("submit", transferirEstoque);
+
 const segGeladeira = document.getElementById("seg-geladeira");
 const segSeco = document.getElementById("seg-seco");
 segGeladeira.addEventListener("click", () => mudarLocal("geladeira"));
@@ -146,6 +148,7 @@ async function carregarTudo() {
 
   produtos = prodSnap.docs.map(d => ({ id:d.id, ...d.data() }))
     .sort((a,b) => nomeApresentacao(a).localeCompare(nomeApresentacao(b), "pt-BR", { sensitivity:"base" }));
+  preencherProdutosTransferencia();
   estoqueMap = {};
   estoqueSnap.forEach(d => {
     const e = d.data();
@@ -219,8 +222,158 @@ function renderizarTudo() {
   renderizarEstoqueBaixo();
   renderizarSessao();
   renderizarLista();
+  renderizarHistoricoMovimentos();
   preencherFiltrosListaWhatsApp();
   if (localListaWhatsApp) gerarListaWhatsApp(localListaWhatsApp);
+}
+
+function renderizarHistoricoMovimentos() {
+  const container = document.getElementById("lista-historico-movimentos");
+  if (!container) return;
+  if (!movimentosDisponiveis) {
+    container.innerHTML = '<p class="mensagem-vazio">Histórico indisponível no momento. Os saldos continuam preservados.</p>';
+    return;
+  }
+  const rotulos = {
+    entrada: "Entrada",
+    venda: "Venda",
+    perda: "Perda",
+    vencido: "Vencimento",
+    ajuste: "Ajuste",
+    contagem: "Contagem física",
+    importacao: "Importação inicial",
+    transferencia_saida: "Transferência — saída",
+    transferencia_entrada: "Transferência — entrada"
+  };
+  const recentes = [...movimentos]
+    .sort((a,b) => dataMillis(b.registradoEm) - dataMillis(a.registradoEm))
+    .slice(0,20);
+  if (!recentes.length) {
+    container.innerHTML = '<p class="mensagem-vazio">Nenhuma movimentação registrada ainda.</p>';
+    return;
+  }
+  container.innerHTML = recentes.map(m => {
+    const delta = Number(m.delta);
+    const quantidade = Number.isFinite(delta) ? (delta > 0 ? "+" : "") + delta + " un." : "—";
+    const local = ROTULO_LOCAL[m.local] || m.local || "—";
+    return '<article class="stock-item"><div class="stock-item-head"><div><strong>' +
+      esc(m.produtoNome || "Produto") + '</strong><small>' +
+      esc(rotulos[m.tipo] || m.tipo || "Movimentação") + ' · ' + esc(local) +
+      '</small></div><span class="selo ' + (delta < 0 ? "selo--atencao" : "selo--normal") +
+      '">' + esc(quantidade) + '</span></div><div class="stock-item-meta">' +
+      esc(formatarDataHora(m.registradoEm)) + '</div></article>';
+  }).join("");
+}
+
+function preencherProdutosTransferencia() {
+  const select = document.getElementById("transferencia-produto");
+  if (!select) return;
+  const selecionado = select.value;
+  const ativos = produtos.filter(p => p.ativo !== false)
+    .sort((a,b) => nomeApresentacao(a).localeCompare(nomeApresentacao(b), "pt-BR", {sensitivity:"base"}));
+  select.innerHTML = '<option value="">Selecione…</option>' +
+    ativos.map(p => '<option value="' + esc(p.id) + '">' + esc(nomeApresentacao(p)) + '</option>').join("");
+  if (ativos.some(p => p.id === selecionado)) select.value = selecionado;
+}
+
+async function transferirEstoque(evento) {
+  evento.preventDefault();
+  const produtoId = document.getElementById("transferencia-produto").value;
+  const origem = document.getElementById("transferencia-origem").value;
+  const destino = document.getElementById("transferencia-destino").value;
+  const quantidade = Number(document.getElementById("transferencia-quantidade").value);
+  const produto = produtos.find(p => p.id === produtoId);
+  if (!produto) {
+    mostrarToast("Selecione um produto.", "erro");
+    return;
+  }
+  if (origem === destino) {
+    mostrarToast("Origem e destino precisam ser diferentes.", "erro");
+    return;
+  }
+  if (!Number.isInteger(quantidade) || quantidade <= 0) {
+    mostrarToast("Informe uma quantidade inteira maior que zero.", "erro");
+    return;
+  }
+
+  const botao = document.getElementById("btn-transferir");
+  botao.disabled = true;
+  const textoOriginal = botao.textContent;
+  botao.textContent = "Transferindo…";
+  try {
+    const estoqueRef = doc(db, "estoque", produtoId);
+    const produtoRef = doc(db, "produtos", produtoId);
+    const movimentoSaidaRef = doc(collection(db, "movimentosEstoque"));
+    const movimentoEntradaRef = doc(collection(db, "movimentosEstoque"));
+
+    await runTransaction(db, async tx => {
+      const [estoqueSnap, produtoSnap] = await Promise.all([
+        tx.get(estoqueRef),
+        tx.get(produtoRef)
+      ]);
+      if (!estoqueSnap.exists() || !produtoSnap.exists()) {
+        throw new Error("Produto sem saldo registrado. Faça uma contagem ou registre uma entrada antes de transferir.");
+      }
+      const saldo = estoqueSnap.data();
+      const quantidadeOrigem = numero(saldo[origem]);
+      const quantidadeDestino = numero(saldo[destino]);
+      if (quantidadeOrigem < quantidade) {
+        throw new Error("Saldo insuficiente na origem. Disponível: " + quantidadeOrigem + " un.");
+      }
+      const dadosProduto = produtoSnap.data();
+      const locaisAtuais = Array.isArray(dadosProduto.locaisEstoque) && dadosProduto.locaisEstoque.length
+        ? dadosProduto.locaisEstoque
+        : [dadosProduto.localEstoque].filter(local => ["geladeira","seco"].includes(local));
+      const locaisEstoque = [...new Set([...locaisAtuais, origem, destino])];
+
+      tx.update(estoqueRef, {
+        [origem]: quantidadeOrigem - quantidade,
+        [destino]: quantidadeDestino + quantidade,
+        atualizadoEm: serverTimestamp()
+      });
+      tx.update(produtoRef, {
+        locaisEstoque,
+        localEstoque: ["geladeira","seco"].includes(dadosProduto.localEstoque) ? dadosProduto.localEstoque : origem
+      });
+      tx.set(movimentoSaidaRef, {
+        estabelecimentoId: estabelecimentoAtual.id,
+        produtoId,
+        produtoNome: nomeApresentacao(produto),
+        local: origem,
+        tipo: "transferencia_saida",
+        quantidade,
+        delta: -quantidade,
+        deLocal: origem,
+        paraLocal: destino,
+        origem: "transferencia",
+        registradoEm: serverTimestamp()
+      });
+      tx.set(movimentoEntradaRef, {
+        estabelecimentoId: estabelecimentoAtual.id,
+        produtoId,
+        produtoNome: nomeApresentacao(produto),
+        local: destino,
+        tipo: "transferencia_entrada",
+        quantidade,
+        delta: quantidade,
+        deLocal: origem,
+        paraLocal: destino,
+        origem: "transferencia",
+        registradoEm: serverTimestamp()
+      });
+    });
+
+    document.getElementById("transferencia-quantidade").value = "";
+    mostrarToast("Transferência registrada. O total geral foi preservado.", "ok");
+    await carregarTudo();
+    preencherProdutosTransferencia();
+  } catch (erro) {
+    console.error(erro);
+    mostrarToast(erro.message || "Não foi possível transferir o estoque.", "erro");
+  } finally {
+    botao.disabled = false;
+    botao.textContent = textoOriginal;
+  }
 }
 
 function renderizarEstoqueBaixo() {
@@ -659,7 +812,7 @@ async function finalizarSessao() {
     const itensPendentes = itens.filter(c => !movimentosJaAplicados.has(sessaoAtual.id + "_" + c.produtoId));
     const plano = itensPendentes.map(c => {
       const contagemMs = dataMillis(c.contadoEm);
-      const posteriores = freshMovs.filter(m => m.produtoId === c.produtoId && dataMillis(m.registradoEm) > contagemMs && m.local === localAtual && ["entrada","perda","vencido","ajuste","venda"].includes(m.tipo));
+      const posteriores = freshMovs.filter(m => m.produtoId === c.produtoId && dataMillis(m.registradoEm) > contagemMs && m.local === localAtual && ["entrada","perda","vencido","ajuste","venda","transferencia_saida","transferencia_entrada"].includes(m.tipo));
       const delta = posteriores.reduce((sum,m) => sum + numero(m.delta),0);
       return {...c, deltaPosterior:delta, quantidadeFinal:numero(c.quantidade)+delta};
     });
