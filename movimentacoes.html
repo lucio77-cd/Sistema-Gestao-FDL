@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<meta name="robots" content="noindex, nofollow" />
+<title>Movimentações — Controle de Bebidas</title>
+<link rel="stylesheet" href="css/styles.css" />
+<meta name="theme-color" content="#171B20" />
+<link rel="stylesheet" href="css/theme-dark.css" id="theme-dark-stylesheet" media="not all" />
+<script>(function(){try{var p=localStorage.getItem("fdl-theme-preference")||"dark";var d=p==="dark"||(p==="system"&&window.matchMedia&&window.matchMedia("(prefers-color-scheme: dark)").matches);document.documentElement.dataset.theme=d?"dark":"light";var s=document.getElementById("theme-dark-stylesheet");if(s)s.media=d?"all":"not all";}catch(_){document.documentElement.dataset.theme="dark";}})();</script>
+</head>
+<body data-pagina-atual="movimentacoes">
+<header class="topo"><div class="topo-marca">Controle de Bebidas</div><div class="topo-sub" id="nome-estabelecimento">Carregando…</div></header>
+<nav class="tabbar" aria-label="Navegação principal">
+  <a href="index.html" class="tabbar-item" data-pagina="dashboard"><span>Início</span></a>
+  <a href="vistoria.html" class="tabbar-item" data-pagina="vistoria"><span>Vistoria</span></a>
+  <a href="promocoes.html" class="tabbar-item" data-pagina="promocoes"><span>Promoções</span></a>
+  <a href="produtos.html" class="tabbar-item" data-pagina="produtos"><span>Produtos</span></a>
+  <button type="button" class="tabbar-item" id="btn-mais" aria-haspopup="true" aria-expanded="false"><span>Mais</span></button>
+</nav>
+<div class="menu-mais" id="menu-mais" hidden>
+  <a href="graficos.html" data-pagina="graficos">Gráficos</a>
+  <a href="estoque.html" data-pagina="estoque">Estoque</a>
+  <a href="movimentacoes.html" data-pagina="movimentacoes">Movimentações</a>
+  <a href="caixa.html" data-pagina="caixa">Caixa</a>
+  <a href="configuracoes.html" data-pagina="configuracoes">Configurações</a>
+  <a href="#" id="link-sair">Sair</a>
+</div>
+<main>
+  <h1>Movimentações</h1>
+  <p class="legenda">Livro cronológico do estoque: entradas, vendas, perdas, contagens físicas, importações e transferências. Os registros são apenas para consulta.</p>
+  <section class="painel">
+    <div class="stock-form-grid">
+      <div><label for="filtro-tipo">Tipo de movimentação</label><select id="filtro-tipo"><option value="">Todos os tipos</option></select></div>
+      <div><label for="filtro-local">Local</label><select id="filtro-local"><option value="">Todos os locais</option><option value="geladeira">Geladeira</option><option value="seco">Parte seca</option><option value="ambos">Ambos / geral</option></select></div>
+      <div style="grid-column:1/-1"><label for="busca-movimentacao">Produto ou detalhe</label><input id="busca-movimentacao" type="search" placeholder="Buscar Coca-Cola, lata, venda..." autocomplete="off" /></div>
+    </div>
+    <p class="legenda" id="resumo-movimentacoes">Carregando histórico…</p>
+  </section>
+  <section id="lista-movimentacoes" aria-live="polite"><p class="mensagem-vazio">Carregando movimentações…</p></section>
+</main>
+<script type="module" src="js/movimentacoes.js"></script>
+<script type="module" src="js/theme.js"></script>
+</body>
+</html>
