@@ -64,7 +64,7 @@ async function processarLeitura(codigo, tentativas = 0) {
     }
 
     const produto = { id: produtosSnap.docs[0].id, ...produtosSnap.docs[0].data() };
-
+    const estoqueRef = doc(db, "estoque", produto.id);
     const lotesSnap = await getDocs(
       query(
         collection(db, "lotes"),
@@ -73,39 +73,63 @@ async function processarLeitura(codigo, tentativas = 0) {
       )
     );
 
+    // Lotes já importados representam o mesmo saldo controlado em estoque/{produtoId}.
+    // Não podem voltar a ser vendidos como se fossem um segundo estoque.
     const candidatos = lotesSnap.docs
       .map((d) => ({ id: d.id, ...d.data() }))
-      .filter((l) => Number(l.quantidade) > 0)
+      .filter((l) => !l.importadoParaEstoque && Number(l.quantidade) > 0)
       .sort((a, b) => Number(b.quantidade) - Number(a.quantidade));
-
-    if (candidatos.length === 0) {
-      registrarLeitura(produto.nome, "Sem estoque registrado para este produto.", "erro");
-      return;
-    }
-
-    const loteRef = doc(db, "lotes", candidatos[0].id);
+    const loteRef = candidatos.length ? doc(db, "lotes", candidatos[0].id) : null;
 
     const resultado = await runTransaction(db, async (tx) => {
-      const loteSnap = await tx.get(loteRef);
+      const estoqueSnap = await tx.get(estoqueRef);
+      const loteSnap = loteRef ? await tx.get(loteRef) : null;
 
-      if (!loteSnap.exists()) {
-        return { status: "lote-mudou" };
+      if (estoqueSnap.exists()) {
+        const saldo = estoqueSnap.data();
+        let campoLocal = produto.localEstoque;
+        if (!["geladeira", "seco"].includes(campoLocal)) {
+          const positivos = ["geladeira", "seco"].filter((campo) => Number(saldo[campo]) > 0);
+          if (positivos.length !== 1) {
+            return { status: "local-indefinido" };
+          }
+          campoLocal = positivos[0];
+        }
+
+        const quantidadeAtual = Number(saldo[campoLocal]) || 0;
+        if (quantidadeAtual <= 0) return { status: "sem-estoque" };
+
+        tx.update(estoqueRef, { [campoLocal]: quantidadeAtual - 1 });
+        const refMovimento = doc(collection(db, "movimentosEstoque"));
+        tx.set(refMovimento, {
+          estabelecimentoId: estabelecimentoAtual.id,
+          produtoId: produto.id,
+          produtoNome: produto.nome,
+          local: campoLocal,
+          tipo: "venda",
+          quantidade: 1,
+          delta: -1,
+          origem: "caixa",
+          registradoEm: serverTimestamp(),
+        });
+        return { status: "baixado-estoque", quantidadeNova: quantidadeAtual - 1, local: campoLocal, precoPromocional: null };
       }
 
+      // Compatibilidade com produtos legados ainda controlados exclusivamente por lotes.
+      if (!loteSnap || !loteSnap.exists()) return { status: "sem-estoque" };
       const lote = loteSnap.data();
       const quantidadeAtual = Number(lote.quantidade) || 0;
-
-      if (quantidadeAtual <= 0) {
-        return { status: "lote-mudou" };
-      }
+      if (quantidadeAtual <= 0 || lote.importadoParaEstoque) return { status: "lote-mudou" };
 
       const quantidadeNova = quantidadeAtual - 1;
-      const refMovimentoEstoque = doc(collection(db, "movimentosEstoque"));
-      tx.set(refMovimentoEstoque, {
+      const local = lote.local === "Geladeira" ? "geladeira"
+        : lote.local === "Estoque seco" ? "seco" : "geral";
+      const refMovimento = doc(collection(db, "movimentosEstoque"));
+      tx.set(refMovimento, {
         estabelecimentoId: estabelecimentoAtual.id,
         produtoId: produto.id,
         produtoNome: produto.nome,
-        local: "geral",
+        local,
         tipo: "venda",
         quantidade: 1,
         delta: -1,
@@ -113,28 +137,45 @@ async function processarLeitura(codigo, tentativas = 0) {
         registradoEm: serverTimestamp(),
       });
 
-      if (quantidadeNova > 0) {
-        tx.update(loteRef, { quantidade: quantidadeNova });
-        return { status: "baixado", quantidadeNova, precoPromocional: lote.promocaoAtiva && lote.precoPromocional != null ? lote.precoPromocional : null };
+      // Exclusão física de lotes é bloqueada pelas regras. Zerar preserva o
+      // registro histórico e permite que a venda seja concluída com segurança.
+      tx.update(loteRef, { quantidade: quantidadeNova });
+      if (quantidadeNova === 0) {
+        const refSaida = doc(collection(db, "saidas"));
+        tx.set(refSaida, {
+          estabelecimentoId: estabelecimentoAtual.id,
+          produtoId: produto.id,
+          produtoNome: produto.nome,
+          motivo: "vendido",
+          quantidade: 1,
+          precoCusto: lote.precoCusto ?? produto.precoCusto ?? 0,
+          valor: (lote.precoCusto ?? produto.precoCusto ?? 0),
+          local: lote.local || "",
+          dataVencimentoOriginal: lote.dataVencimento,
+          origem: "caixa",
+          registradoEm: serverTimestamp(),
+        });
       }
-
-      const refSaida = doc(collection(db, "saidas"));
-      tx.delete(loteRef);
-      tx.set(refSaida, {
-        estabelecimentoId: estabelecimentoAtual.id,
-        produtoId: produto.id,
-        produtoNome: produto.nome,
-        motivo: "vendido",
-        quantidade: 1,
-        precoCusto: lote.precoCusto ?? produto.precoCusto ?? 0,
-        valor: (lote.precoCusto ?? produto.precoCusto ?? 0) * 1,
-        local: lote.local || "",
-        dataVencimentoOriginal: lote.dataVencimento,
-        origem: "caixa",
-        registradoEm: serverTimestamp(),
-      });
-      return { status: "encerrado", precoPromocional: lote.promocaoAtiva && lote.precoPromocional != null ? lote.precoPromocional : null };
+      return {
+        status: "baixado-lote",
+        quantidadeNova,
+        precoPromocional: lote.promocaoAtiva && lote.precoPromocional != null ? lote.precoPromocional : null
+      };
     });
+
+    if (resultado.status === "local-indefinido") {
+      registrarLeitura(produto.nome, "Defina o local do produto no cadastro: há saldo em mais de um local.", "erro");
+      return;
+    }
+    if (resultado.status === "sem-estoque") {
+      registrarLeitura(produto.nome, "Sem saldo disponível para venda.", "erro");
+      return;
+    }
+    if (resultado.status === "lote-mudou") {
+      if (tentativas < 3) return processarLeitura(codigo, tentativas + 1);
+      registrarLeitura(produto.nome, "O estoque mudou durante a leitura. Tente novamente.", "erro");
+      return;
+    }
 
     const precoPromocional = resultado.precoPromocional;
     const precoCadastro = produto.precoVenda;
@@ -142,15 +183,15 @@ async function processarLeitura(codigo, tentativas = 0) {
       ? Number(precoPromocional)
       : (precoCadastro != null && precoCadastro !== "" && Number.isFinite(Number(precoCadastro)) ? Number(precoCadastro) : null);
 
-    if (resultado.status === "baixado") {
-      registrarLeitura(produto.nome, `Baixa registrada — restam ${resultado.quantidadeNova} un.`, "ok", { produtoId: produto.id, precoUnitario });
-    } else if (resultado.status === "encerrado") {
-      registrarLeitura(produto.nome, "Baixa registrada — lote encerrado.", "ok", { produtoId: produto.id, precoUnitario });
-    } else if (tentativas < 3) {
-      await processarLeitura(codigo, tentativas + 1);
-    } else {
-      registrarLeitura(produto.nome, "Estoque mudou repetidamente durante a leitura — tente de novo.", "erro");
-    }
+    const localTexto = resultado.local ? (resultado.local === "geladeira" ? "Geladeira" : "Parte seca") : "lote";
+    registrarLeitura(
+      produto.nome,
+      resultado.quantidadeNova > 0
+        ? `Baixa registrada em ${localTexto} — restam ${resultado.quantidadeNova} un.`
+        : `Baixa registrada em ${localTexto} — saldo zerado.`,
+      "ok",
+      { produtoId: produto.id, precoUnitario }
+    );
   } catch (erro) {
     console.error(erro);
     registrarLeitura(null, "Erro ao processar. Tente ler de novo.", "erro");
