@@ -307,25 +307,17 @@ async function transferirEstoque(evento) {
     const movimentoEntradaRef = doc(collection(db, "movimentosEstoque"));
     const rotuloOrigem = CAMPO_LOTE[origem];
     const rotuloDestino = CAMPO_LOTE[destino];
-    const lotesSnap = await getDocs(query(
+    const consultaLotes = query(
       collection(db, "lotes"),
       where("estabelecimentoId", "==", estabelecimentoAtual.id),
       where("produtoId", "==", produtoId)
-    ));
-    const lotesDaOrigem = lotesSnap.docs
-      .map(d => ({ id:d.id, ...d.data() }))
-      .filter(l => !l.importadoParaEstoque && !l.encerrado && l.local === rotuloOrigem && Number(l.quantidade) > 0)
-      .sort((a,b) => String(a.dataVencimento || "9999-12-31").localeCompare(String(b.dataVencimento || "9999-12-31")));
-    const referenciasLotes = lotesDaOrigem.map(l => ({
-      ref: doc(db, "lotes", l.id),
-      novoRef: doc(collection(db, "lotes"))
-    }));
+    );
 
     await runTransaction(db, async tx => {
-      const [estoqueSnap, produtoSnap, ...lotesLidos] = await Promise.all([
+      const [estoqueSnap, produtoSnap, lotesSnap] = await Promise.all([
         tx.get(estoqueRef),
         tx.get(produtoRef),
-        ...referenciasLotes.map(item => tx.get(item.ref))
+        tx.get(consultaLotes)
       ]);
       if (!estoqueSnap.exists() || !produtoSnap.exists()) {
         throw new Error("Produto sem saldo registrado. Faça uma contagem ou registre uma entrada antes de transferir.");
@@ -354,28 +346,32 @@ async function transferirEstoque(evento) {
 
       // Lotes com validade acompanham a transferência. Lotes inteiros mudam
       // de local; lotes parciais são divididos para preservar quantidade e data.
+      const lotesDaOrigem = lotesSnap.docs
+        .map(d => ({ id:d.id, ref:doc(db, "lotes", d.id), ...d.data() }))
+        .filter(l => !l.importadoParaEstoque && !l.encerrado && l.local === rotuloOrigem && numero(l.quantidade) > 0)
+        .sort((a,b) => String(a.dataVencimento || "9999-12-31").localeCompare(String(b.dataVencimento || "9999-12-31")));
       let restanteParaLotes = quantidade;
-      lotesLidos.forEach((loteSnap, indice) => {
-        if (restanteParaLotes <= 0 || !loteSnap.exists()) return;
-        const lote = loteSnap.data();
-        if (lote.importadoParaEstoque || lote.encerrado || lote.local !== rotuloOrigem) return;
+      lotesDaOrigem.forEach(lote => {
+        if (restanteParaLotes <= 0) return;
         const quantidadeLote = numero(lote.quantidade);
         const quantidadeMovida = Math.min(restanteParaLotes, quantidadeLote);
         if (quantidadeMovida <= 0) return;
         if (quantidadeMovida === quantidadeLote) {
-          tx.update(referenciasLotes[indice].ref, {
+          tx.update(lote.ref, {
             local: rotuloDestino,
             transferidoEm: serverTimestamp()
           });
         } else {
-          tx.update(referenciasLotes[indice].ref, {
+          const novoLoteRef = doc(collection(db, "lotes"));
+          tx.update(lote.ref, {
             quantidade: quantidadeLote - quantidadeMovida
           });
-          tx.set(referenciasLotes[indice].novoRef, {
+          tx.set(novoLoteRef, {
             ...lote,
+            id: undefined,
             quantidade: quantidadeMovida,
             local: rotuloDestino,
-            transferidoDeLoteId: referenciasLotes[indice].ref.id,
+            transferidoDeLoteId: lote.id,
             transferidoEm: serverTimestamp()
           });
         }
