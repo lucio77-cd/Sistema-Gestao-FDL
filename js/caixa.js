@@ -118,7 +118,8 @@ async function processarLeitura(codigo, tentativas = 0) {
         let precoPromocional = null;
         if (loteSnap && loteSnap.exists()) {
           const lote = loteSnap.data();
-          if (!lote.importadoParaEstoque && !lote.encerrado && Number(lote.quantidade) > 0) {
+          const localLoteEsperado = campoLocal === "geladeira" ? "Geladeira" : "Estoque seco";
+          if (!lote.importadoParaEstoque && !lote.encerrado && lote.local === localLoteEsperado && Number(lote.quantidade) > 0) {
             const quantidadeLoteNova = Number(lote.quantidade) - 1;
             tx.update(loteRef, {
               quantidade: quantidadeLoteNova,
@@ -174,7 +175,14 @@ async function processarLeitura(codigo, tentativas = 0) {
 
       // Exclusão física de lotes é bloqueada pelas regras. Zerar preserva o
       // registro histórico e permite que a venda seja concluída com segurança.
-      tx.update(loteRef, { quantidade: quantidadeNova });
+      tx.update(loteRef, {
+        quantidade: quantidadeNova,
+        ...(quantidadeNova === 0 ? {
+          encerrado: true,
+          motivoEncerramento: "vendido",
+          encerradoEm: serverTimestamp()
+        } : {})
+      });
       if (quantidadeNova === 0) {
         const refSaida = doc(collection(db, "saidas"));
         tx.set(refSaida, {
