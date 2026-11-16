@@ -86,6 +86,24 @@
 </div>
 <div id="lista-estoque-baixo"><p class="mensagem-vazio">Carregando alertas…</p></div>
 </section>
+<section class="painel" id="painel-transferencia">
+  <h2>Transferir entre locais</h2>
+  <p class="legenda">Mova unidades da geladeira para a parte seca ou no sentido inverso. A transferência atualiza os dois saldos e registra o histórico sem alterar o total geral.</p>
+  <form id="form-transferencia">
+    <div class="stock-form-grid">
+      <div><label for="transferencia-produto">Produto</label><select id="transferencia-produto" required><option value="">Selecione…</option></select></div>
+      <div><label for="transferencia-origem">Origem</label><select id="transferencia-origem"><option value="geladeira">Geladeira</option><option value="seco">Parte seca</option></select></div>
+      <div><label for="transferencia-destino">Destino</label><select id="transferencia-destino"><option value="seco">Parte seca</option><option value="geladeira">Geladeira</option></select></div>
+      <div><label for="transferencia-quantidade">Quantidade</label><input id="transferencia-quantidade" type="number" min="1" step="1" required placeholder="Ex.: 12" /></div>
+    </div>
+    <button class="btn" type="submit" id="btn-transferir">Confirmar transferência</button>
+  </form>
+</section>
+<section class="painel" id="painel-historico-movimentos">
+  <h2>Histórico de movimentações</h2>
+  <p class="legenda">Entradas, vendas, perdas, contagens e transferências recentes.</p>
+  <div id="lista-historico-movimentos"><p class="mensagem-vazio">Carregando histórico…</p></div>
+</section>
 <div class="segmentado" role="tablist" aria-label="Local da contagem">
 <button type="button" id="seg-geladeira" class="ativo" role="tab" aria-selected="true">Geladeira</button>
 <button type="button" id="seg-seco" role="tab" aria-selected="false">Parte seca</button>
