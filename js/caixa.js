@@ -12,6 +12,7 @@ import {
   query,
   where,
   getDocs,
+  getDoc,
   doc,
   runTransaction,
   serverTimestamp,
@@ -65,6 +66,20 @@ async function processarLeitura(codigo, tentativas = 0) {
 
     const produto = { id: produtosSnap.docs[0].id, ...produtosSnap.docs[0].data() };
     const estoqueRef = doc(db, "estoque", produto.id);
+    const estoqueConsulta = await getDoc(estoqueRef);
+    let localParaLote = produto.localEstoque;
+    if (estoqueConsulta.exists()) {
+      const saldoConsulta = estoqueConsulta.data();
+      if (["geladeira","seco"].includes(localParaLote) && Number(saldoConsulta[localParaLote]) <= 0) {
+        const outro = localParaLote === "geladeira" ? "seco" : "geladeira";
+        if (Number(saldoConsulta[outro]) > 0) localParaLote = outro;
+      } else if (!["geladeira","seco"].includes(localParaLote)) {
+        const positivos = ["geladeira","seco"].filter(campo => Number(saldoConsulta[campo]) > 0);
+        if (positivos.length === 1) localParaLote = positivos[0];
+      }
+    }
+    const localLoteTexto = localParaLote === "geladeira" ? "Geladeira"
+      : localParaLote === "seco" ? "Estoque seco" : null;
     const lotesSnap = await getDocs(
       query(
         collection(db, "lotes"),
@@ -77,7 +92,8 @@ async function processarLeitura(codigo, tentativas = 0) {
     // Não podem voltar a ser vendidos como se fossem um segundo estoque.
     const candidatos = lotesSnap.docs
       .map((d) => ({ id: d.id, ...d.data() }))
-      .filter((l) => !l.importadoParaEstoque && !l.encerrado && Number(l.quantidade) > 0)
+      .filter((l) => !l.importadoParaEstoque && !l.encerrado && Number(l.quantidade) > 0
+        && (!localLoteTexto || l.local === localLoteTexto))
       // FEFO: quando há validade, vende primeiro o lote que vence antes.
       .sort((a, b) => String(a.dataVencimento || "9999-12-31").localeCompare(String(b.dataVencimento || "9999-12-31")));
     const loteRef = candidatos.length ? doc(db, "lotes", candidatos[0].id) : null;
