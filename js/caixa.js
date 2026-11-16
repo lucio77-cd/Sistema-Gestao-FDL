@@ -124,6 +124,33 @@ async function processarLeitura(codigo, tentativas = 0) {
           quantidadeAtual = saldoOutro;
         }
 
+        // Se a consulta de lotes encontrou um candidato, ele precisa continuar
+        // válido dentro da transação. Caso tenha sido encerrado/movido por outra
+        // venda, repetimos a leitura para escolher o próximo lote FEFO.
+        let precoPromocional = null;
+        let loteParaHistorico = null;
+        if (loteRef) {
+          if (!loteSnap || !loteSnap.exists()) return { status: "lote-mudou" };
+          const lote = loteSnap.data();
+          const localLoteEsperado = campoLocal === "geladeira" ? "Geladeira" : "Estoque seco";
+          if (lote.importadoParaEstoque || lote.encerrado || lote.local !== localLoteEsperado || Number(lote.quantidade) <= 0) {
+            return { status: "lote-mudou" };
+          }
+          loteParaHistorico = lote;
+          const quantidadeLoteNova = Number(lote.quantidade) - 1;
+          tx.update(loteRef, {
+            quantidade: quantidadeLoteNova,
+            ...(quantidadeLoteNova === 0 ? {
+              encerrado: true,
+              motivoEncerramento: "vendido",
+              encerradoEm: serverTimestamp()
+            } : {})
+          });
+          precoPromocional = lote.promocaoAtiva && lote.precoPromocional != null ? lote.precoPromocional : null;
+        }
+
+        // Só baixa o saldo geral depois de validar o lote candidato. Assim,
+        // uma disputa pelo último item não reduz o estoque sem atualizar lote.
         tx.update(estoqueRef, { [campoLocal]: quantidadeAtual - 1 });
         const refMovimento = doc(collection(db, "movimentosEstoque"));
         tx.set(refMovimento, {
@@ -137,28 +164,6 @@ async function processarLeitura(codigo, tentativas = 0) {
           origem: "caixa",
           registradoEm: serverTimestamp(),
         });
-
-        // Quando existe lote com validade, ele acompanha o saldo consolidado
-        // para que a venda também atualize a visão de vencimentos.
-        let precoPromocional = null;
-        let loteParaHistorico = null;
-        if (loteSnap && loteSnap.exists()) {
-          const lote = loteSnap.data();
-          const localLoteEsperado = campoLocal === "geladeira" ? "Geladeira" : "Estoque seco";
-          if (!lote.importadoParaEstoque && !lote.encerrado && lote.local === localLoteEsperado && Number(lote.quantidade) > 0) {
-            loteParaHistorico = lote;
-            const quantidadeLoteNova = Number(lote.quantidade) - 1;
-            tx.update(loteRef, {
-              quantidade: quantidadeLoteNova,
-              ...(quantidadeLoteNova === 0 ? {
-                encerrado: true,
-                motivoEncerramento: "vendido",
-                encerradoEm: serverTimestamp()
-              } : {})
-            });
-            precoPromocional = lote.promocaoAtiva && lote.precoPromocional != null ? lote.precoPromocional : null;
-          }
-        }
         const custoVenda = loteParaHistorico?.precoCusto ?? produto.precoCusto ?? 0;
         const refSaida = doc(collection(db, "saidas"));
         tx.set(refSaida, {
