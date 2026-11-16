@@ -56,8 +56,14 @@ function dataMillis(v) {
 function nomeApresentacao(p) {
   return [p.marca, p.nome, p.variante, p.embalagem, p.volume].filter(Boolean).join(" · ");
 }
+function produtoEstaNoLocal(produto, local) {
+  const locais = Array.isArray(produto.locaisEstoque) && produto.locaisEstoque.length
+    ? produto.locaisEstoque
+    : (produto.localEstoque ? [produto.localEstoque] : []);
+  return locais.includes(local);
+}
 function produtosDoLocal() {
-  return produtos.filter(p => p.ativo !== false && p.localEstoque === localAtual);
+  return produtos.filter(p => p.ativo !== false && produtoEstaNoLocal(p, localAtual));
 }
 function obterSessaoLocal() {
   return sessoes.filter(s => s.local === localAtual && s.status !== "finalizada")
@@ -223,14 +229,13 @@ function renderizarEstoqueBaixo() {
   if (!totalEl || !listaEl) return;
 
   const itens = produtos
-    .filter(p => p.ativo !== false && ["geladeira","seco"].includes(p.localEstoque) && p.estoqueMinimo !== undefined && p.estoqueMinimo !== null && p.estoqueMinimo !== "")
+    .filter(p => p.ativo !== false && (Array.isArray(p.locaisEstoque) ? p.locaisEstoque.length > 0 : ["geladeira","seco"].includes(p.localEstoque)) && p.estoqueMinimo !== undefined && p.estoqueMinimo !== null && p.estoqueMinimo !== "")
     .map(p => {
       const saldo = estoqueMap[p.id] || {};
-      const geladeira = numero(saldo.geladeira);
-      const seco = numero(saldo.seco);
-      const total = p.localEstoque === "geladeira" ? geladeira : seco;
+      const locais = Array.isArray(p.locaisEstoque) && p.locaisEstoque.length ? p.locaisEstoque : [p.localEstoque];
+      const total = locais.reduce((soma, local) => soma + numero(saldo[local]), 0);
       const minimo = numero(p.estoqueMinimo);
-      return { produto:p, total, minimo, local:ROTULO_LOCAL[p.localEstoque] };
+      return { produto:p, total, minimo, local:locais.map(local => ROTULO_LOCAL[local]).join(" + ") };
     })
     .filter(i => i.total <= i.minimo)
     .sort((a,b) => (a.total-a.minimo) - (b.total-b.minimo) || nomeApresentacao(a.produto).localeCompare(nomeApresentacao(b.produto), "pt-BR", {sensitivity:"base"}));
@@ -358,7 +363,7 @@ function gerarListaWhatsApp(local) {
   localListaWhatsApp = local;
   const rotulo = ROTULO_LOCAL[local];
   const itens = produtos
-    .filter(p => p.ativo !== false && p.localEstoque === local)
+    .filter(p => p.ativo !== false && produtoEstaNoLocal(p, local))
     .filter(produtoPassaNoFiltro)
     .map(p => ({ produto: p, quantidade: numero((estoqueMap[p.id] || {})[local]) }))
     .filter(i => i.quantidade > 0)
@@ -720,6 +725,9 @@ document.getElementById("form-novo-produto-estoque").addEventListener("submit", 
     codigoBarras:document.getElementById("np-codigo").value.trim(),
     precoCusto:0, precoVenda:0, ativo:true,
     localEstoque:localProduto,
+    locaisEstoque:document.getElementById("np-outro-local").checked
+      ? ["geladeira","seco"]
+      : [localProduto],
     ...(minimoTexto !== "" ? { estoqueMinimo:Number(minimoTexto) } : {})
   };
   const chave = [dados.nome,dados.marca,dados.variante,dados.embalagem,dados.volume].join("|").toLocaleLowerCase("pt-BR");
