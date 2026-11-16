@@ -112,7 +112,42 @@ async function processarLeitura(codigo, tentativas = 0) {
           origem: "caixa",
           registradoEm: serverTimestamp(),
         });
-        return { status: "baixado-estoque", quantidadeNova: quantidadeAtual - 1, local: campoLocal, precoPromocional: null };
+
+        // Quando existe lote com validade, ele acompanha o saldo consolidado
+        // para que a venda também atualize a visão de vencimentos.
+        let precoPromocional = null;
+        if (loteSnap && loteSnap.exists()) {
+          const lote = loteSnap.data();
+          if (!lote.importadoParaEstoque && !lote.encerrado && Number(lote.quantidade) > 0) {
+            const quantidadeLoteNova = Number(lote.quantidade) - 1;
+            tx.update(loteRef, {
+              quantidade: quantidadeLoteNova,
+              ...(quantidadeLoteNova === 0 ? {
+                encerrado: true,
+                motivoEncerramento: "vendido",
+                encerradoEm: serverTimestamp()
+              } : {})
+            });
+            precoPromocional = lote.promocaoAtiva && lote.precoPromocional != null ? lote.precoPromocional : null;
+            if (quantidadeLoteNova === 0) {
+              const refSaida = doc(collection(db, "saidas"));
+              tx.set(refSaida, {
+                estabelecimentoId: estabelecimentoAtual.id,
+                produtoId: produto.id,
+                produtoNome: produto.nome,
+                motivo: "vendido",
+                quantidade: 1,
+                precoCusto: lote.precoCusto ?? produto.precoCusto ?? 0,
+                valor: lote.precoCusto ?? produto.precoCusto ?? 0,
+                local: lote.local || "",
+                dataVencimentoOriginal: lote.dataVencimento,
+                origem: "caixa",
+                registradoEm: serverTimestamp(),
+              });
+            }
+          }
+        }
+        return { status: "baixado-estoque", quantidadeNova: quantidadeAtual - 1, local: campoLocal, precoPromocional };
       }
 
       // Compatibilidade com produtos legados ainda controlados exclusivamente por lotes.
