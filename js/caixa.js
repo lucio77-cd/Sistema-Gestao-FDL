@@ -97,8 +97,16 @@ async function processarLeitura(codigo, tentativas = 0) {
           campoLocal = positivos[0];
         }
 
-        const quantidadeAtual = Number(saldo[campoLocal]) || 0;
-        if (quantidadeAtual <= 0) return { status: "sem-estoque" };
+        let quantidadeAtual = Number(saldo[campoLocal]) || 0;
+        if (quantidadeAtual <= 0) {
+          // Se o local padrão estiver zerado, só usa o outro quando ele for
+          // a única origem com saldo. Nunca escolhe entre dois saldos positivos.
+          const outroLocal = campoLocal === "geladeira" ? "seco" : "geladeira";
+          const saldoOutro = Number(saldo[outroLocal]) || 0;
+          if (saldoOutro <= 0) return { status: "sem-estoque" };
+          campoLocal = outroLocal;
+          quantidadeAtual = saldoOutro;
+        }
 
         tx.update(estoqueRef, { [campoLocal]: quantidadeAtual - 1 });
         const refMovimento = doc(collection(db, "movimentosEstoque"));
