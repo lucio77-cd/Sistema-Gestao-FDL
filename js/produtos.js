@@ -62,8 +62,8 @@ function camposFaltantes(p) {
   const faltantes = campos.filter(([chave]) =>
     p[chave] === undefined || p[chave] === null || String(p[chave]).trim() === ""
   ).map(([, rotulo]) => rotulo);
-  const temLocal = ["geladeira","seco"].includes(p.localEstoque)
-    || (Array.isArray(p.locaisEstoque) && p.locaisEstoque.length > 0);
+  // O local principal é obrigatório porque define a origem padrão da baixa no Caixa.
+  const temLocal = ["geladeira","seco"].includes(p.localEstoque);
   if (!temLocal) faltantes.push("Local do estoque");
   return faltantes;
 }
