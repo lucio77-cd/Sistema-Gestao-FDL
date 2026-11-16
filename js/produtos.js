@@ -316,15 +316,21 @@ async function salvarProduto(btn) {
   }
 
   const ler = seletor => painel.querySelector(seletor).value.trim();
+  const localPrincipal = ler(".pe-local-estoque");
+  if (!["geladeira","seco"].includes(localPrincipal)) {
+    mostrarToast("Escolha o local principal para a baixa automática no Caixa.", "erro");
+    painel.querySelector(".pe-local-estoque").focus();
+    return;
+  }
   const numeroOuNulo = valor => valor === "" ? null : Number(valor);
   const dados = {
     nome,
     marca: ler(".pe-marca"),
     categoria: ler(".pe-categoria"),
-    localEstoque: ler(".pe-local-estoque") || null,
+    localEstoque: localPrincipal,
     locaisEstoque: painel.querySelector(".pe-outro-local").checked
       ? ["geladeira","seco"]
-      : [ler(".pe-local-estoque")].filter(Boolean),
+      : [localPrincipal],
     variante: ler(".pe-variante"),
     embalagem: ler(".pe-embalagem"),
     volume: ler(".pe-volume"),
