@@ -954,7 +954,7 @@ async function registrarEntrada(produto, quantidade, dataVencimento) {
 async function prepararImportacao() {
   const painel = document.getElementById("painel-importacao");
   const snap = await getDocs(query(collection(db,"lotes"),where("estabelecimentoId","==",estabelecimentoAtual.id)));
-  const candidatos = snap.docs.map(d=>({id:d.id,...d.data()})).filter(l=>!l.dataVencimento && !l.importadoParaEstoque && l.produtoId);
+  const candidatos = snap.docs.map(d=>({id:d.id,...d.data()})).filter(l=>!l.dataVencimento && !l.importadoParaEstoque && !l.encerrado && Number(l.quantidade) > 0 && l.produtoId);
   const porProduto = {};
   candidatos.forEach(l=>{
     if (!porProduto[l.produtoId]) porProduto[l.produtoId]={produtoId:l.produtoId,nome:l.produtoNome||produtos.find(p=>p.id===l.produtoId)?.nome||"(sem nome)",geladeira:0,seco:0,loteIds:[]};
