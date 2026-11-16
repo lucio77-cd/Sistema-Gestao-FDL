@@ -141,10 +141,12 @@ async function processarLeitura(codigo, tentativas = 0) {
         // Quando existe lote com validade, ele acompanha o saldo consolidado
         // para que a venda também atualize a visão de vencimentos.
         let precoPromocional = null;
+        let loteParaHistorico = null;
         if (loteSnap && loteSnap.exists()) {
           const lote = loteSnap.data();
           const localLoteEsperado = campoLocal === "geladeira" ? "Geladeira" : "Estoque seco";
           if (!lote.importadoParaEstoque && !lote.encerrado && lote.local === localLoteEsperado && Number(lote.quantidade) > 0) {
+            loteParaHistorico = lote;
             const quantidadeLoteNova = Number(lote.quantidade) - 1;
             tx.update(loteRef, {
               quantidade: quantidadeLoteNova,
@@ -155,24 +157,23 @@ async function processarLeitura(codigo, tentativas = 0) {
               } : {})
             });
             precoPromocional = lote.promocaoAtiva && lote.precoPromocional != null ? lote.precoPromocional : null;
-            if (quantidadeLoteNova === 0) {
-              const refSaida = doc(collection(db, "saidas"));
-              tx.set(refSaida, {
-                estabelecimentoId: estabelecimentoAtual.id,
-                produtoId: produto.id,
-                produtoNome: produto.nome,
-                motivo: "vendido",
-                quantidade: 1,
-                precoCusto: lote.precoCusto ?? produto.precoCusto ?? 0,
-                valor: lote.precoCusto ?? produto.precoCusto ?? 0,
-                local: lote.local || "",
-                dataVencimentoOriginal: lote.dataVencimento,
-                origem: "caixa",
-                registradoEm: serverTimestamp(),
-              });
-            }
           }
         }
+        const custoVenda = loteParaHistorico?.precoCusto ?? produto.precoCusto ?? 0;
+        const refSaida = doc(collection(db, "saidas"));
+        tx.set(refSaida, {
+          estabelecimentoId: estabelecimentoAtual.id,
+          produtoId: produto.id,
+          produtoNome: produto.nome,
+          motivo: "vendido",
+          quantidade: 1,
+          precoCusto: custoVenda,
+          valor: custoVenda,
+          local: loteParaHistorico?.local || (campoLocal === "geladeira" ? "Geladeira" : "Estoque seco"),
+          dataVencimentoOriginal: loteParaHistorico?.dataVencimento || null,
+          origem: "caixa",
+          registradoEm: serverTimestamp(),
+        });
         return { status: "baixado-estoque", quantidadeNova: quantidadeAtual - 1, local: campoLocal, precoPromocional };
       }
 
@@ -208,22 +209,21 @@ async function processarLeitura(codigo, tentativas = 0) {
           encerradoEm: serverTimestamp()
         } : {})
       });
-      if (quantidadeNova === 0) {
-        const refSaida = doc(collection(db, "saidas"));
-        tx.set(refSaida, {
-          estabelecimentoId: estabelecimentoAtual.id,
-          produtoId: produto.id,
-          produtoNome: produto.nome,
-          motivo: "vendido",
-          quantidade: 1,
-          precoCusto: lote.precoCusto ?? produto.precoCusto ?? 0,
-          valor: (lote.precoCusto ?? produto.precoCusto ?? 0),
-          local: lote.local || "",
-          dataVencimentoOriginal: lote.dataVencimento,
-          origem: "caixa",
-          registradoEm: serverTimestamp(),
-        });
-      }
+      const custoVenda = lote.precoCusto ?? produto.precoCusto ?? 0;
+      const refSaida = doc(collection(db, "saidas"));
+      tx.set(refSaida, {
+        estabelecimentoId: estabelecimentoAtual.id,
+        produtoId: produto.id,
+        produtoNome: produto.nome,
+        motivo: "vendido",
+        quantidade: 1,
+        precoCusto: custoVenda,
+        valor: custoVenda,
+        local: lote.local || "",
+        dataVencimentoOriginal: lote.dataVencimento || null,
+        origem: "caixa",
+        registradoEm: serverTimestamp(),
+      });
       return {
         status: "baixado-lote",
         quantidadeNova,
