@@ -2,9 +2,8 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // O estabelecimento e os lotes continuam com leitura pública porque
-    // gerente.html acessa dados por link/token, sem autenticação.
-    // Escritas no estabelecimento são restritas ao proprietário atual.
+    // Dados operacionais são isolados por estabelecimento. A página da gerente
+    // também exige autenticação via protegerPagina; não há escrita pública.
     function autenticado() {
       return request.auth != null;
     }
@@ -87,37 +86,36 @@ service cloud.firestore {
       allow delete: if false;
     }
 
+    // Lotes são privados ao estabelecimento. Atualizações promocionais da
+    // gerente usam a mesma autenticação e propriedade do restante do sistema.
+    // O encerramento é lógico; exclusão física permanece bloqueada.
     match /lotes/{id} {
-      allow read: if true;
-      // A gerente sem login só pode alterar os campos promocionais.
-      // Operadores autenticados mantêm as operações atuais dos lotes.
-      allow update: if autenticado() ||
-        request.resource.data.diff(resource.data).affectedKeys().hasOnly([
-          "precoPromocional",
-          "promocaoAtiva"
-        ]);
-      allow create: if autenticado();
-      // Exclusões de lotes exigem operação administrativa fora do cliente.
+      allow read: if donoDoEstabelecimento(resource.data.estabelecimentoId);
+      allow create: if donoDoEstabelecimento(request.resource.data.estabelecimentoId);
+      allow update: if mesmoEstabelecimento();
       allow delete: if false;
     }
 
-    // Produtos são lidos/escritos pelo operador autenticado. Exclusão física
-    // é bloqueada; o fluxo usa desativação lógica (ativo=false).
+    // Produtos só podem ser consultados e alterados pelo dono do estabelecimento.
+    // Exclusão física é bloqueada; o fluxo usa desativação lógica.
     match /produtos/{id} {
-      allow read, create, update: if autenticado();
+      allow read: if donoDoEstabelecimento(resource.data.estabelecimentoId);
+      allow create: if donoDoEstabelecimento(request.resource.data.estabelecimentoId);
+      allow update: if mesmoEstabelecimento();
       allow delete: if false;
     }
 
-    // Histórico de vistorias: consulta e inclusão autenticadas; sem edição
-    // retroativa ou exclusão pelo cliente.
+    // Histórico de vistorias: acesso restrito ao estabelecimento de origem.
     match /vistorias/{id} {
-      allow read, create: if autenticado();
+      allow read: if donoDoEstabelecimento(resource.data.estabelecimentoId);
+      allow create: if donoDoEstabelecimento(request.resource.data.estabelecimentoId);
       allow update, delete: if false;
     }
 
-    // Saídas representam eventos históricos (venda/perda/vencimento).
+    // Saídas são eventos históricos e só podem ser lidas/criadas pelo proprietário.
     match /saidas/{id} {
-      allow read, create: if autenticado();
+      allow read: if donoDoEstabelecimento(resource.data.estabelecimentoId);
+      allow create: if donoDoEstabelecimento(request.resource.data.estabelecimentoId);
       allow update, delete: if false;
     }
   }
