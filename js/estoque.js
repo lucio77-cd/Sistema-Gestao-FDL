@@ -647,10 +647,14 @@ async function finalizarSessao() {
   botao.textContent = "Aplicando…";
   try {
     const snap = await getDocs(query(collection(db,"movimentosEstoque"),where("estabelecimentoId","==",estabelecimentoAtual.id)));
+    const movimentosJaAplicados = new Set(snap.docs.map(d => d.id));
     const freshMovs = snap.docs.map(d => d.data());
-    const plano = itens.map(c => {
+    // Cada produto usa um ID determinístico para a aplicação da contagem.
+    // Se um lote anterior já foi confirmado, ele não pode ser aplicado outra vez.
+    const itensPendentes = itens.filter(c => !movimentosJaAplicados.has(sessaoAtual.id + "_" + c.produtoId));
+    const plano = itensPendentes.map(c => {
       const contagemMs = dataMillis(c.contadoEm);
-      const posteriores = freshMovs.filter(m => m.produtoId === c.produtoId && dataMillis(m.registradoEm) > contagemMs && m.local === localAtual && ["entrada","perda","vencido","ajuste"].includes(m.tipo));
+      const posteriores = freshMovs.filter(m => m.produtoId === c.produtoId && dataMillis(m.registradoEm) > contagemMs && m.local === localAtual && ["entrada","perda","vencido","ajuste","venda"].includes(m.tipo));
       const delta = posteriores.reduce((sum,m) => sum + numero(m.delta),0);
       return {...c, deltaPosterior:delta, quantidadeFinal:numero(c.quantidade)+delta};
     });
