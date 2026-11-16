@@ -1655,3 +1655,54 @@ label.switch {
 @media (min-width: 900px) {
   body:has(> .tabbar):not(.pagina-caixa) > .topo { margin-left: 248px; }
 }
+
+
+/* ---------- Saldos registrados recolhíveis ---------- */
+.stock-saldos-painel { padding: .85rem 1rem; }
+.stock-collapsible > summary {
+  display: flex;
+  align-items: center;
+  gap: .55rem .8rem;
+  flex-wrap: wrap;
+  min-height: 2.5rem;
+  list-style: none;
+  cursor: pointer;
+  user-select: none;
+}
+.stock-collapsible > summary::-webkit-details-marker { display: none; }
+.stock-collapsible-titulo { color: var(--ink); font-size: 1rem; font-weight: 750; }
+.stock-collapsible-ajuda { flex: 1 1 auto; color: var(--ink-soft); font-size: .76rem; }
+.stock-collapsible-icone {
+  display: grid;
+  place-items: center;
+  width: 1.8rem;
+  height: 1.8rem;
+  flex: 0 0 1.8rem;
+  margin-left: auto;
+  border: 1px solid var(--steel-light);
+  border-radius: 50%;
+  color: var(--primary);
+}
+.stock-collapsible-icone::before {
+  content: "";
+  width: .48rem;
+  height: .48rem;
+  border-right: 2px solid currentColor;
+  border-bottom: 2px solid currentColor;
+  transform: translateY(-.12rem) rotate(45deg);
+  transition: transform .18s ease;
+}
+.stock-collapsible[open] .stock-collapsible-icone::before {
+  transform: translateY(.12rem) rotate(225deg);
+}
+.stock-collapsible-conteudo { padding-top: .65rem; }
+.stock-collapsible-conteudo > .legenda { margin-bottom: .8rem; }
+.stock-collapsible > summary:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 4px;
+  border-radius: 4px;
+}
+@media (max-width: 520px) {
+  .stock-collapsible-ajuda { flex-basis: calc(100% - 2.8rem); order: 2; }
+  .stock-collapsible-icone { grid-column: 2; grid-row: 1; }
+}
