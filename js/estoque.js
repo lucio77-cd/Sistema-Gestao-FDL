@@ -63,7 +63,14 @@ function produtoEstaNoLocal(produto, local) {
   return locais.includes(local);
 }
 function produtosDoLocal() {
-  return produtos.filter(p => p.ativo !== false && produtoEstaNoLocal(p, localAtual));
+  return produtos.filter(p => {
+    if (p.ativo === false || !produtoEstaNoLocal(p, localAtual)) return false;
+    // A sessão guarda o foco escolhido no início. Campos ausentes em sessões
+    // antigas significam "todos", preservando a compatibilidade histórica.
+    if (sessaoAtual?.categoriaFiltro && chaveOpcao(p.categoria) !== chaveOpcao(sessaoAtual.categoriaFiltro)) return false;
+    if (sessaoAtual?.embalagemFiltro && chaveOpcao(p.embalagem) !== chaveOpcao(sessaoAtual.embalagemFiltro)) return false;
+    return true;
+  });
 }
 function obterSessaoLocal() {
   return sessoes.filter(s => s.local === localAtual && s.status !== "finalizada")
@@ -222,47 +229,8 @@ function renderizarTudo() {
   renderizarEstoqueBaixo();
   renderizarSessao();
   renderizarLista();
-  renderizarHistoricoMovimentos();
   preencherFiltrosListaWhatsApp();
   if (localListaWhatsApp) gerarListaWhatsApp(localListaWhatsApp);
-}
-
-function renderizarHistoricoMovimentos() {
-  const container = document.getElementById("lista-historico-movimentos");
-  if (!container) return;
-  if (!movimentosDisponiveis) {
-    container.innerHTML = '<p class="mensagem-vazio">Histórico indisponível no momento. Os saldos continuam preservados.</p>';
-    return;
-  }
-  const rotulos = {
-    entrada: "Entrada",
-    venda: "Venda",
-    perda: "Perda",
-    vencido: "Vencimento",
-    ajuste: "Ajuste",
-    contagem: "Contagem física",
-    importacao: "Importação inicial",
-    transferencia_saida: "Transferência — saída",
-    transferencia_entrada: "Transferência — entrada"
-  };
-  const recentes = [...movimentos]
-    .sort((a,b) => dataMillis(b.registradoEm) - dataMillis(a.registradoEm))
-    .slice(0,20);
-  if (!recentes.length) {
-    container.innerHTML = '<p class="mensagem-vazio">Nenhuma movimentação registrada ainda.</p>';
-    return;
-  }
-  container.innerHTML = recentes.map(m => {
-    const delta = Number(m.delta);
-    const quantidade = Number.isFinite(delta) ? (delta > 0 ? "+" : "") + delta + " un." : "—";
-    const local = ROTULO_LOCAL[m.local] || m.local || "—";
-    return '<article class="stock-item"><div class="stock-item-head"><div><strong>' +
-      esc(m.produtoNome || "Produto") + '</strong><small>' +
-      esc(rotulos[m.tipo] || m.tipo || "Movimentação") + ' · ' + esc(local) +
-      '</small></div><span class="selo ' + (delta < 0 ? "selo--atencao" : "selo--normal") +
-      '">' + esc(quantidade) + '</span></div><div class="stock-item-meta">' +
-      esc(formatarDataHora(m.registradoEm)) + '</div></article>';
-  }).join("");
 }
 
 function preencherProdutosTransferencia() {
@@ -673,15 +641,26 @@ function renderizarSessao() {
         (Number.isFinite(Number(ultimaFinalizada.quantidadeItensContados)) ? ' · ' + Number(ultimaFinalizada.quantidadeItensContados) + ' produtos registrados.' : '.') +
         '</p>'
       : '<p class="legenda">Nenhuma vistoria anterior registrada neste local.</p>';
+    const produtosDisponiveis = produtos.filter(p => p.ativo !== false && produtoEstaNoLocal(p, localAtual));
+    const opcoesUnicas = campo => [...new Set(produtosDisponiveis.map(p => String(p[campo] || "").trim()).filter(Boolean))]
+      .sort((a,b) => a.localeCompare(b, "pt-BR", {sensitivity:"base"}));
+    const opcoesSelect = (campo, rotuloTodos) => '<option value="">' + rotuloTodos + '</option>' +
+      opcoesUnicas(campo).map(valor => '<option value="' + esc(valor) + '">' + esc(valor) + '</option>').join("");
     painelSessao.innerHTML = '<h2>Vistoria: ' + esc(ROTULO_LOCAL[localAtual]) + '</h2>' + resumoAnterior +
-      '<p class="legenda">Nenhuma vistoria em andamento neste local.</p><button type="button" class="btn" id="btn-iniciar">Iniciar vistoria</button>';
+      '<p class="legenda">Escolha o grupo físico que vai conferir agora. A vistoria incluirá somente os produtos desse foco; os demais ficam para outra vistoria.</p>' +
+      '<div class="stock-form-grid stock-vistoria-filtros">' +
+      '<div><label for="filtro-inicio-categoria">Tipo</label><select id="filtro-inicio-categoria">' + opcoesSelect("categoria", "Todos os tipos") + '</select></div>' +
+      '<div><label for="filtro-inicio-embalagem">Embalagem</label><select id="filtro-inicio-embalagem">' + opcoesSelect("embalagem", "Todas as embalagens") + '</select></div></div>' +
+      '<p class="legenda">Exemplo: Refrigerante + Lata. A contagem e a revisão vão considerar apenas esse grupo.</p>' +
+      '<button type="button" class="btn" id="btn-iniciar">Iniciar vistoria deste grupo</button>';
     document.getElementById("btn-iniciar").addEventListener("click", iniciarSessao);
     return;
   }
   const produtosLocais = produtosDoLocal();
   const contados = Object.values(contagens).filter(c => c.local === localAtual && produtosLocais.some(p => p.id === c.produtoId)).length;
+  const focoSessao = [sessaoAtual.categoriaFiltro, sessaoAtual.embalagemFiltro].filter(Boolean).join(" · ") || "Todos os produtos deste local";
   painelSessao.innerHTML = '<h2>Vistoria: ' + esc(ROTULO_LOCAL[localAtual]) + '</h2>' +
-    '<p class="legenda">Iniciada em ' + formatarDataHora(sessaoAtual.createdAt) + ' · ' + contados + ' de ' + produtosLocais.length + ' apresentações contadas.</p>' +
+    '<p class="legenda">Foco: <strong>' + esc(focoSessao) + '</strong> · Iniciada em ' + formatarDataHora(sessaoAtual.createdAt) + ' · ' + contados + ' de ' + produtosLocais.length + ' apresentações contadas.</p>' +
     '<p><span class="selo ' + (sessaoAtual.status === "aguardando_revisao" ? "selo--atencao" : "selo--normal") + '">' + (sessaoAtual.status === "aguardando_revisao" ? "Aguardando revisão" : "Em andamento") + '</span></p>';
   if (sessaoAtual.status === "aguardando_revisao") {
     painelRevisao.hidden = false;
@@ -700,11 +679,15 @@ async function iniciarSessao() {
   btn.disabled = true;
   try {
     const now = Timestamp.now();
+    const categoriaFiltro = document.getElementById("filtro-inicio-categoria")?.value || "";
+    const embalagemFiltro = document.getElementById("filtro-inicio-embalagem")?.value || "";
     const ref = await addDoc(collection(db, "vistoriasEstoque"), {
       estabelecimentoId: estabelecimentoAtual.id, local:localAtual, status:"em_andamento",
+      categoriaFiltro, embalagemFiltro,
       criadaPor:usuarioAtual?.uid || null, criadaEm:serverTimestamp(), createdAt:now, updatedAt:serverTimestamp()
     });
-    sessaoAtual = { id:ref.id, estabelecimentoId:estabelecimentoAtual.id, local:localAtual, status:"em_andamento", createdAt:now, updatedAt:now };
+    sessaoAtual = { id:ref.id, estabelecimentoId:estabelecimentoAtual.id, local:localAtual, status:"em_andamento",
+      categoriaFiltro, embalagemFiltro, createdAt:now, updatedAt:now };
     sessoes.push(sessaoAtual);
     contagens = {};
     renderizarTudo();
