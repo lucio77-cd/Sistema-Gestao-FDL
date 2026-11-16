@@ -208,10 +208,17 @@ async function carregarLotes() {
 
   controlesQuantidade = {};
 
-  if (snap.empty || snap.docs.every((d) => d.data().importadoParaEstoque)) {
+  // Lotes importados ou encerrados permanecem preservados no Firestore,
+  // mas não reaparecem como estoque ativo na vistoria.
+  const lotes = snap.docs
+    .map((d) => ({ id: d.id, ...d.data() }))
+    .filter((l) => !l.importadoParaEstoque && !l.encerrado && Number(l.quantidade) > 0)
+    .sort((a, b) => (a.dataVencimento || "9999-12-31").localeCompare(b.dataVencimento || "9999-12-31"));
+
+  if (!lotes.length) {
     container.innerHTML = `
       <div class="estado-vazio">
-        <p>Nenhum lote cadastrado ainda. Comece cadastrando seu primeiro produto.</p>
+        <p>Nenhum lote ativo cadastrado. Comece cadastrando um produto ou registrando uma entrada.</p>
         <button type="button" class="btn" id="btn-primeiro-produto">Cadastrar primeiro produto</button>
       </div>
     `;
@@ -221,13 +228,6 @@ async function carregarLotes() {
 
   const diasAlertaPadrao = estabelecimentoAtual.diasAlertaPadrao ?? 3;
   container.innerHTML = "";
-
-  // Lotes sem data já importados para o Estoque ficam fora desta lista (não
-  // são apagados) — assim o mesmo produto não aparece com duas contagens.
-  const lotes = snap.docs
-    .map((d) => ({ id: d.id, ...d.data() }))
-    .filter((l) => !l.importadoParaEstoque)
-    .sort((a, b) => (a.dataVencimento || "9999-12-31").localeCompare(b.dataVencimento || "9999-12-31"));
 
   // Migração silenciosa: lotes criados antes desta versão não têm o nome do
   // produto gravado no próprio lote — necessário pra página da gerente ler
@@ -479,10 +479,22 @@ document.getElementById("btn-salvar-vistoria").addEventListener("click", async (
       const quantidadeDaAcao = c.quantidadeParaAcao ?? c.valorOriginal;
 
       if (c.acaoZero === "excluir") {
-        // Só apaga o lote: sem registro em "saidas".
-        batch.delete(loteRef);
+        // Exclusão lógica: preserva o documento e evita depender de delete
+        // físico, que é deliberadamente bloqueado pelas regras do Firestore.
+        batch.update(loteRef, {
+          quantidade: 0,
+          encerrado: true,
+          motivoEncerramento: "excluido",
+          encerradoEm: serverTimestamp(),
+        });
       } else if (c.acaoZero === "vendido" || c.acaoZero === "vencido") {
-        batch.delete(loteRef);
+        // Encerra o lote sem apagar sua trilha histórica.
+        batch.update(loteRef, {
+          quantidade: 0,
+          encerrado: true,
+          motivoEncerramento: c.acaoZero,
+          encerradoEm: serverTimestamp(),
+        });
         const refSaida = doc(collection(db, "saidas"));
         batch.set(refSaida, {
           estabelecimentoId: estabelecimentoAtual.id,
@@ -498,10 +510,9 @@ document.getElementById("btn-salvar-vistoria").addEventListener("click", async (
           registradoEm: serverTimestamp(),
         });
 
-        // "Vencido" também desconta do estoque (no local do lote) — mas só se
-        // o produto já foi contado na aba Estoque, para não criar número
-        // negativo sem motivo. "Vendido" não desconta: isso é papel do Caixa.
-        if (c.acaoZero === "vencido" && quantidadeDaAcao > 0 && produtosComEstoque.has(c.produtoId)) {
+        // Saídas manuais também atualizam o saldo consolidado quando ele
+        // existe. O Caixa usa o mesmo livro de movimentos para vendas.
+        if (quantidadeDaAcao > 0 && produtosComEstoque.has(c.produtoId)) {
           const campo = campoEstoqueDoLocal(c.local);
           batch.set(
             doc(db, "estoque", c.produtoId),
@@ -513,7 +524,7 @@ document.getElementById("btn-salvar-vistoria").addEventListener("click", async (
             produtoId: c.produtoId,
             produtoNome: c.produtoNome,
             local: campo,
-            tipo: "vencido",
+            tipo: c.acaoZero === "vencido" ? "vencido" : "venda",
             delta: -quantidadeDaAcao,
             origem: "vistoria",
             registradoEm: serverTimestamp(),
