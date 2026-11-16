@@ -58,14 +58,13 @@ protegerPagina(async ({ estabelecimento }) => {
     lista.innerHTML = produtos.map(produto => {
       const saldo = saldosPorProduto.get(produto.id) || {};
       const local = produto.localEstoque;
-      const quantidade = local === "geladeira" || local === "seco"
-        ? numero(saldo[local])
-        : numero(saldo.geladeira) + numero(saldo.seco);
-      const localTexto = local === "geladeira" ? "Geladeira"
-        : local === "seco" ? "Parte seca" : "Total dos locais";
-      const detalhe = local === "geladeira" || local === "seco"
-        ? localTexto
-        : "Geladeira: " + numero(saldo.geladeira) + " · Parte seca: " + numero(saldo.seco);
+      const locais = Array.isArray(produto.locaisEstoque) && produto.locaisEstoque.length
+        ? produto.locaisEstoque
+        : (local === "geladeira" || local === "seco" ? [local] : ["geladeira","seco"]);
+      const quantidade = locais.reduce((soma, campo) => soma + numero(saldo[campo]), 0);
+      const detalhe = locais.length === 2
+        ? "Geladeira: " + numero(saldo.geladeira) + " · Parte seca: " + numero(saldo.seco)
+        : (locais[0] === "geladeira" ? "Geladeira" : "Parte seca");
 
       return '<article class="stock-item">' +
         '<div class="stock-item-head"><div><strong>' + esc(nomeProduto(produto)) +
