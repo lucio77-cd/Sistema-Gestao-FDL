@@ -382,7 +382,9 @@ function renderizarEstoqueBaixo() {
   if (!totalEl || !listaEl) return;
 
   const itens = produtos
-    .filter(p => p.ativo !== false && (Array.isArray(p.locaisEstoque) ? p.locaisEstoque.length > 0 : ["geladeira","seco"].includes(p.localEstoque)) && p.estoqueMinimo !== undefined && p.estoqueMinimo !== null && p.estoqueMinimo !== "")
+    .filter(p => p.ativo !== false && (Array.isArray(p.locaisEstoque) && p.locaisEstoque.length
+      ? p.locaisEstoque.some(local => ["geladeira","seco"].includes(local))
+      : ["geladeira","seco"].includes(p.localEstoque)) && p.estoqueMinimo !== undefined && p.estoqueMinimo !== null && p.estoqueMinimo !== "")
     .map(p => {
       const saldo = estoqueMap[p.id] || {};
       const locais = Array.isArray(p.locaisEstoque) && p.locaisEstoque.length ? p.locaisEstoque : [p.localEstoque];
