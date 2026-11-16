@@ -366,9 +366,11 @@ async function transferirEstoque(evento) {
           tx.update(lote.ref, {
             quantidade: quantidadeLote - quantidadeMovida
           });
+          const dadosNovoLote = { ...lote };
+          delete dadosNovoLote.id;
+          delete dadosNovoLote.ref;
           tx.set(novoLoteRef, {
-            ...lote,
-            id: undefined,
+            ...dadosNovoLote,
             quantidade: quantidadeMovida,
             local: rotuloDestino,
             transferidoDeLoteId: lote.id,
