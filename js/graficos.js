@@ -248,28 +248,44 @@ function renderizarHistoricoVistorias() {
 
   area.hidden = false;
   vazio.hidden = true;
-  area.style.height = `${Math.max(260, historico.length * 42)}px`;
+  area.style.height = "320px";
+  // Cada sessão é um ponto no tempo. Duas séries mantêm Geladeira e Parte
+  // seca separadas, evitando somar ou confundir contagens de armários distintos.
+  const locaisHistorico = [
+    { chave: "geladeira", rotulo: "Geladeira" },
+    { chave: "seco", rotulo: "Parte seca" }
+  ];
+  const sessoesOrdenadas = historico;
   chartHistorico = new Chart(canvas, {
-    type: "bar",
+    type: "line",
     data: {
-      labels: historico.map(c => c.data.toLocaleDateString("pt-BR") + " · " + (c.local === "seco" ? "Parte seca" : "Geladeira")),
-      datasets: [{
-        label: "Quantidade contada",
-        data: historico.map(c => c.quantidade),
-        borderRadius: 4
-      }]
+      labels: sessoesOrdenadas.map(c => c.data.toLocaleDateString("pt-BR") + " " +
+        c.data.toLocaleTimeString("pt-BR", { hour:"2-digit", minute:"2-digit" })),
+      datasets: locaisHistorico
+        .filter(local => sessoesOrdenadas.some(c => (c.local === local.chave || (local.chave === "geladeira" && c.local === "Geladeira"))))
+        .map(local => ({
+          label: local.rotulo,
+          data: sessoesOrdenadas.map(c =>
+            (c.local === local.chave || (local.chave === "geladeira" && c.local === "Geladeira"))
+              ? c.quantidade : null
+          ),
+          tension: 0.25,
+          spanGaps: false,
+          pointRadius: 4,
+          pointHoverRadius: 6
+        }))
     },
     options: {
-      indexAxis: "y",
       responsive: true,
       maintainAspectRatio: false,
+      interaction: { mode: "nearest", intersect: false },
       plugins: {
-        legend: { display: false },
-        tooltip: { callbacks: { label: ctx => `${ctx.parsed.x} unidade(s)` } }
+        legend: { display: true, position: "bottom" },
+        tooltip: { callbacks: { label: ctx => `${ctx.dataset.label}: ${ctx.parsed.y} unidade(s)` } }
       },
       scales: {
-        x: { beginAtZero: true, ticks: { precision: 0 } },
-        y: { ticks: { autoSkip: false } }
+        y: { beginAtZero: true, ticks: { precision: 0 }, title: { display: true, text: "Unidades em estoque" } },
+        x: { ticks: { maxTicksLimit: 8, maxRotation: 0, minRotation: 0 } }
       }
     }
   });
