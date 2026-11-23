@@ -14,6 +14,12 @@ document.getElementById("link-sair").addEventListener("click", (e) => {
   sair();
 });
 
+function escapeHtml(valor) {
+  return String(valor ?? "").replace(/[&<>"']/g, (c) => ({
+    "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"
+  }[c]));
+}
+
 protegerPagina(async ({ estabelecimento }) => {
   document.getElementById("nome-estabelecimento").textContent = estabelecimento.nome;
   await carregar(estabelecimento.id);
@@ -26,8 +32,9 @@ async function carregar(estabelecimentoId) {
   try {
     snap = await getDocs(
       query(
-        collection(db, "perdas"),
+        collection(db, "saidas"),
         where("estabelecimentoId", "==", estabelecimentoId),
+        where("motivo", "==", "vencido"),
         orderBy("registradoEm", "desc")
       )
     );
@@ -36,7 +43,7 @@ async function carregar(estabelecimentoId) {
     // a consulta ordenada falha. Faz um fallback sem ordenação em vez de
     // travar a tela — e ordena no cliente.
     console.warn("Consulta ordenada falhou, tentando sem orderBy:", erro);
-    snap = await getDocs(query(collection(db, "perdas"), where("estabelecimentoId", "==", estabelecimentoId)));
+    snap = await getDocs(query(collection(db, "saidas"), where("estabelecimentoId", "==", estabelecimentoId), where("motivo", "==", "vencido")));
   }
 
   const perdas = snap.docs
@@ -47,7 +54,7 @@ async function carregar(estabelecimentoId) {
       return dataB - dataA;
     });
 
-  const total = perdas.reduce((soma, p) => soma + (Number(p.valorPerdido) || 0), 0);
+  const total = perdas.reduce((soma, p) => soma + (Number(p.valor) || (Number(p.quantidade) || 0) * (Number(p.precoCusto) || 0)), 0);
   document.getElementById("total-perdido").textContent = formatarMoeda(total);
 
   container.innerHTML = "";
@@ -65,11 +72,11 @@ async function carregar(estabelecimentoId) {
     div.className = "lote lote--vencido";
     div.innerHTML = `
       <div class="lote-info">
-        <div class="lote-produto">${p.produtoNome}</div>
-        <div class="lote-meta">${p.local || "—"} · ${p.quantidadePerdida} un. · vencia em ${formatarData(p.dataVencimentoOriginal)}</div>
+        <div class="lote-produto">${escapeHtml(p.produtoNome)}</div>
+        <div class="lote-meta">${escapeHtml(p.local || "—")} · ${Number(p.quantidade) || 0} un. · vencia em ${escapeHtml(formatarData(p.dataVencimentoOriginal))}</div>
       </div>
       <div class="lote-dados">
-        <div class="lote-dias lote-dias--vencido">${formatarValorOuAviso(p.quantidadePerdida, p.precoCusto)}</div>
+        <div class="lote-dias lote-dias--vencido">${formatarValorOuAviso(p.quantidade, p.precoCusto)}</div>
         <div class="lote-valor">registrado em ${dataTexto}</div>
       </div>
     `;
