@@ -13,7 +13,6 @@ import {
   addDoc,
   doc,
   updateDoc,
-  deleteDoc,
   writeBatch,
   serverTimestamp,
   Timestamp,
@@ -244,7 +243,9 @@ async function carregarDados() {
   // As vistorias salvas são complementares: se falhar, a lista continua funcionando.
   try {
     const vistoriasSnap = await getDocs(query(collection(db, COL_VISTORIAS), filtro));
-    vistorias = vistoriasSnap.docs.map((d) => ({ id: d.id, ...d.data() }));
+    vistorias = vistoriasSnap.docs
+      .map((d) => ({ id: d.id, ...d.data() }))
+      .filter((v) => v.excluida !== true);
     ordenarVistorias();
   } catch (erro) {
     console.error("Vistorias da cozinha indisponíveis:", erro);
@@ -1064,7 +1065,11 @@ $("lista-vistorias-salvas").addEventListener("click", async (e) => {
     if (!confirmou) return;
 
     try {
-      await deleteDoc(doc(db, COL_VISTORIAS, id));
+      await updateDoc(doc(db, COL_VISTORIAS, id), {
+        excluida: true,
+        excluidaEm: serverTimestamp(),
+        excluidaPor: usuarioAtual?.uid || null,
+      });
       vistorias = vistorias.filter((x) => x.id !== id);
       if (vistoriaSelecionada === id) vistoriaSelecionada = null;
       aplicarBaseAposMudancaDeVistorias();
