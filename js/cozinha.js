@@ -60,6 +60,7 @@ let editandoId = null;
 let graficoLinha = null;
 let graficoEstoque = null;
 let graficoConsumo = null;
+let mostrarZerados = false;
 
 // Vistoria em andamento (rascunho). Fica só neste aparelho até "Salvar vistoria".
 //  quantidades: itemId -> número mostrado na tela (começa na última contagem)
@@ -420,17 +421,22 @@ function renderizarLista() {
     const semHistorico = !temValorConhecido(i);
     const temSaldo = saldo > 0;
     const correspondeBusca = !busca || String(i.nome).toLocaleLowerCase("pt-BR").includes(busca);
-    return (semHistorico || temSaldo) && correspondeBusca;
+    return (mostrarZerados || semHistorico || temSaldo) && correspondeBusca;
   });
 
+  const acaoZerados = ativos.some((i) => temValorConhecido(i) && qtd(i) === 0);
+  const botaoZerados = acaoZerados
+    ? `<button type="button" class="btn-texto" data-acao="toggle-zerados">${mostrarZerados ? "Ocultar itens zerados" : "Mostrar itens zerados / registrar reposição"}</button>`
+    : "";
+
   if (!visiveis.length) {
-    lista.innerHTML = busca
-      ? '<p class="mensagem-vazio">Nenhum item com estoque disponível encontrado.</p>'
-      : '<p class="mensagem-vazio">Nenhum produto com estoque disponível. Os itens zerados continuam no cadastro e no histórico; quando houver reposição, informe a entrada para voltar a exibi-los.</p>';
+    lista.innerHTML = `
+      <p class="mensagem-vazio">${busca ? "Nenhum item com estoque disponível encontrado." : "Nenhum produto com estoque disponível."}</p>
+      ${botaoZerados}`;
     return;
   }
 
-  lista.innerHTML = visiveis.map(cartaoHtml).join("");
+  lista.innerHTML = visiveis.map(cartaoHtml).join("") + botaoZerados;
 }
 
 function atualizarCartao(item) {
@@ -493,6 +499,12 @@ lista.addEventListener("click", async (e) => {
 
   if (acao === "seed") {
     await cadastrarItensIniciais(botao);
+    return;
+  }
+
+  if (acao === "toggle-zerados") {
+    mostrarZerados = !mostrarZerados;
+    renderizarLista();
     return;
   }
 
