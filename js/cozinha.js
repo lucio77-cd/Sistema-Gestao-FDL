@@ -757,7 +757,28 @@ $("form-novo-item").addEventListener("submit", async (e) => {
       $("novo-nome").focus();
       mostrarToast(r.criados ? "Item adicionado à lista." : "Item voltou para a lista.", "ok");
     } else {
-      mostrarToast("Este item já está na lista.", "erro");
+      // Se o item já existe, ele pode estar oculto porque seu saldo conhecido é zero.
+      // Revela os zerados, limpa a busca e leva a pessoa diretamente até o cadastro.
+      const existente = itens.find((i) =>
+        i.ativo !== false && chaveOpcao(i.nome) === chaveOpcao(nome)
+      );
+      if (existente) {
+        mostrarZerados = true;
+        campoBusca.value = "";
+        renderizarLista();
+        requestAnimationFrame(() => {
+          const cartao = lista.querySelector(`[data-id="${CSS.escape(existente.id)}"]`);
+          if (cartao) {
+            cartao.scrollIntoView({ behavior: "smooth", block: "center" });
+            cartao.classList.add("cozinha-item--destacado");
+            cartao.querySelector(".cozinha-item-nome")?.setAttribute("tabindex", "-1");
+            cartao.querySelector(".cozinha-item-nome")?.focus({ preventScroll: true });
+          }
+        });
+        mostrarToast(`"${existente.nome}" já estava cadastrado. Localizei o item na lista.`, "ok");
+      } else {
+        mostrarToast("Este item já está na lista.", "erro");
+      }
     }
   } catch (erro) {
     console.error(erro);
