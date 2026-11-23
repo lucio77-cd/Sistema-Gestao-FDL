@@ -223,7 +223,7 @@ function renderizarLista(lotes) {
         <div class="lote-instrucao lote-dias--${l.status}">${sugestaoAcao(l.status, l.diasRestantes)}</div>
         <div class="lote-preco-venda">
           <label>Valor de venda (R$)</label>
-          <input type="number" step="0.01" min="0" class="input-preco-venda" value="${Number.isFinite(Number(l.precoPromocional)) ? Number(l.precoPromocional) : ""}" placeholder="Ex: 3.50" />
+          <input type="number" step="0.01" min="0" class="input-preco-venda" value="${l.precoPromocional != null && Number.isFinite(Number(l.precoPromocional)) ? Number(l.precoPromocional) : ""}" placeholder="Ex: 3.50" />
           <button type="button" class="btn btn-secundario btn-salvar-preco" data-id="${escapeHtml(l.id)}">Salvar</button>
         </div>
       </div>
