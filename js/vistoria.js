@@ -254,12 +254,18 @@ async function carregarLotes() {
     }
   });
 
-  for (let i = 0; i < lotesMigrar.length; i += 400) {
-    const batchMigracao = writeBatch(db);
-    lotesMigrar.slice(i, i + 400).forEach(lote => {
-      batchMigracao.update(doc(db, "lotes", lote.id), lote.dados);
-    });
-    await batchMigracao.commit();
+  try {
+    for (let i = 0; i < lotesMigrar.length; i += 400) {
+      const batchMigracao = writeBatch(db);
+      lotesMigrar.slice(i, i + 400).forEach(lote => {
+        batchMigracao.update(doc(db, "lotes", lote.id), lote.dados);
+      });
+      await batchMigracao.commit();
+    }
+  } catch (erro) {
+    // A migração é auxiliar: uma falha não pode impedir a vistoria de aparecer.
+    console.error("Migração de lotes falhou; a lista continuará disponível:", erro);
+    mostrarToast("Alguns dados antigos dos lotes não puderam ser atualizados agora.", "erro");
   }
 
   lotes.forEach((l) => {
