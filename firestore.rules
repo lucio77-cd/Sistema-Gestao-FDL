@@ -22,7 +22,9 @@ service cloud.firestore {
     }
 
     match /estabelecimentos/{id} {
-      allow read: if true;
+      // Dados do estabelecimento (inclusive ownerId e configurações) não são públicos.
+      // A consulta do app já filtra pelo UID autenticado.
+      allow read: if autenticado() && resource.data.ownerId == request.auth.uid;
 
       // O app só precisa atualizar estes campos operacionais/configuráveis.
       // ownerId e demais campos de identidade/propriedade nunca podem ser
