@@ -114,6 +114,22 @@ service cloud.firestore {
       allow update, delete: if false;
     }
 
+    // Módulo Cozinha: itens podem ser desativados logicamente; o histórico
+    // de vistorias também usa exclusão lógica para preservar rastreabilidade.
+    match /cozinhaItens/{id} {
+      allow read: if donoDoEstabelecimento(resource.data.estabelecimentoId);
+      allow create: if donoDoEstabelecimento(request.resource.data.estabelecimentoId);
+      allow update: if mesmoEstabelecimento();
+      allow delete: if false;
+    }
+
+    match /cozinhaVistorias/{id} {
+      allow read: if donoDoEstabelecimento(resource.data.estabelecimentoId);
+      allow create: if donoDoEstabelecimento(request.resource.data.estabelecimentoId);
+      allow update: if mesmoEstabelecimento();
+      allow delete: if false;
+    }
+
     // Saídas são eventos históricos e só podem ser lidas/criadas pelo proprietário.
     match /saidas/{id} {
       allow read: if donoDoEstabelecimento(resource.data.estabelecimentoId);
