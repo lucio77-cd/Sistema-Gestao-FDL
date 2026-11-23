@@ -17,6 +17,12 @@ import {
 
 iniciarNavegacao();
 
+function escapeHtml(valor) {
+  return String(valor ?? "").replace(/[&<>"']/g, (c) => ({
+    "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"
+  }[c]));
+}
+
 let estabelecimentoAtual = null;
 let produtosCache = {};
 // Produtos que já têm contagem na aba Estoque (só esses sofrem o desconto
@@ -232,8 +238,7 @@ async function carregarLotes() {
   // Migração silenciosa: lotes criados antes desta versão não têm o nome do
   // produto gravado no próprio lote — necessário pra página da gerente ler
   // sem depender da coleção "produtos" (restrita).
-  const batchMigracao = writeBatch(db);
-  let precisaMigrar = false;
+  const lotesMigrar = [];
 
   lotes.forEach((l) => {
     const produto = produtosCache[l.produtoId];
@@ -241,17 +246,20 @@ async function carregarLotes() {
       l.produtoNome = produto.nome;
       l.precoCusto = produto.precoCusto ?? 0;
       if (l.diasAlerta === undefined) l.diasAlerta = produto.diasAlerta ?? null;
-      batchMigracao.update(doc(db, "lotes", l.id), {
+      lotesMigrar.push({ id: l.id, dados: {
         produtoNome: produto.nome,
         precoCusto: produto.precoCusto ?? 0,
         diasAlerta: produto.diasAlerta ?? null,
-      });
-      precisaMigrar = true;
+      }});
     }
   });
 
-  if (precisaMigrar) {
-    batchMigracao.commit().catch((erro) => console.error("Migração de lotes falhou:", erro));
+  for (let i = 0; i < lotesMigrar.length; i += 400) {
+    const batchMigracao = writeBatch(db);
+    lotesMigrar.slice(i, i + 400).forEach(lote => {
+      batchMigracao.update(doc(db, "lotes", lote.id), lote.dados);
+    });
+    await batchMigracao.commit();
   }
 
   lotes.forEach((l) => {
@@ -264,8 +272,8 @@ async function carregarLotes() {
     div.dataset.loteId = l.id;
     div.innerHTML = `
       <div class="lote-info">
-        <div class="lote-produto">${produto.nome}</div>
-        <div class="lote-meta">${l.local || "—"} · ${l.dataVencimento ? `vence em ${formatarData(l.dataVencimento)}` : "sem validade cadastrada"}</div>
+        <div class="lote-produto">${escapeHtml(produto.nome)}</div>
+        <div class="lote-meta">${escapeHtml(l.local || "—")} · ${l.dataVencimento ? `vence em ${escapeHtml(formatarData(l.dataVencimento))}` : "sem validade cadastrada"}</div>
         <div class="lote-acao-zero">
           <button type="button" class="btn-texto btn-acao-zero" data-acao="vendido">Vendido</button>
           <button type="button" class="btn-texto btn-acao-zero" data-acao="vencido">Vencido</button>
@@ -273,9 +281,9 @@ async function carregarLotes() {
         </div>
       </div>
       <div class="stepper" data-lote-id="${l.id}">
-        <button type="button" class="btn-menos" aria-label="Diminuir quantidade de ${produto.nome}">−</button>
-        <input type="number" min="0" value="${l.quantidade}" inputmode="numeric" aria-label="Quantidade de ${produto.nome}" />
-        <button type="button" class="btn-mais" aria-label="Aumentar quantidade de ${produto.nome}">+</button>
+        <button type="button" class="btn-menos" aria-label="Diminuir quantidade de ${escapeHtml(produto.nome)}">−</button>
+        <input type="number" min="0" value="${l.quantidade}" inputmode="numeric" aria-label="Quantidade de ${escapeHtml(produto.nome)}" />
+        <button type="button" class="btn-mais" aria-label="Aumentar quantidade de ${escapeHtml(produto.nome)}">+</button>
       </div>
     `;
     container.appendChild(div);
@@ -404,8 +412,8 @@ async function carregarSaidas(motivo) {
     div.className = `lote lote--${motivo === "vencido" ? "vencido" : "excluido"}`;
     div.innerHTML = `
       <div class="lote-info">
-        <div class="lote-produto">${item.produtoNome}</div>
-        <div class="lote-meta">${item.local || "—"} · ${item.quantidade} un. · ${item.dataVencimentoOriginal ? `vencia em ${formatarData(item.dataVencimentoOriginal)}` : "sem validade cadastrada"}</div>
+        <div class="lote-produto">${escapeHtml(item.produtoNome)}</div>
+        <div class="lote-meta">${escapeHtml(item.local || "—")} · ${Number(item.quantidade) || 0} un. · ${item.dataVencimentoOriginal ? `vencia em ${escapeHtml(formatarData(item.dataVencimentoOriginal))}` : "sem validade cadastrada"}</div>
       </div>
       <div class="lote-dados">
         ${motivo === "vencido" ? `<div class="lote-dias lote-dias--vencido">${formatarValorOuAviso(item.quantidade, item.precoCusto)}</div>` : ""}
@@ -448,8 +456,27 @@ document.getElementById("btn-salvar-vistoria").addEventListener("click", async (
     }
   });
 
+  if (pendentes.length > 0) {
+    mostrarToast(`Defina se os itens zerados foram vendidos, venceram ou devem ser excluídos. Nenhuma alteração foi salva. Itens: ${pendentes.join(", ")}.`, "erro");
+    return;
+  }
   if (prontos.length === 0) {
-    mostrarToast(`Escolha "Vendido", "Vencido" ou "Excluir" para: ${pendentes.join(", ")}.`, "erro");
+    mostrarToast("Nenhuma alteração válida para salvar.", "erro");
+    return;
+  }
+  const quantidadeInvalida = prontos.find(([, c, quantidadeNova]) =>
+    !Number.isInteger(quantidadeNova) || quantidadeNova < 0 ||
+    (["vendido", "vencido"].includes(c.acaoZero) && (!Number.isInteger(c.quantidadeParaAcao) || c.quantidadeParaAcao <= 0))
+  );
+  if (quantidadeInvalida) {
+    mostrarToast(`Quantidade inválida para ${quantidadeInvalida[1].produtoNome}. Use um inteiro maior ou igual a zero; ações de venda/vencimento exigem quantidade maior que zero.`, "erro");
+    return;
+  }
+  const writesEstimados = 2 + prontos.reduce((total, [, c]) =>
+    total + 1 + (["vendido", "vencido"].includes(c.acaoZero) ? 1 + (c.quantidadeParaAcao > 0 && produtosComEstoque.has(c.produtoId) ? 2 : 0) : 0), 0
+  );
+  if (writesEstimados > 450) {
+    mostrarToast(`Esta vistoria exige ${writesEstimados} gravações e ultrapassa o limite seguro de 450 por operação. Salve em grupos menores de produtos.`, "erro");
     return;
   }
 
@@ -556,11 +583,7 @@ document.getElementById("btn-salvar-vistoria").addEventListener("click", async (
 
     await batch.commit();
 
-    if (pendentes.length > 0) {
-      mostrarToast(`Vistoria salva. Falta decidir: ${pendentes.join(", ")}.`, "erro");
-    } else {
-      mostrarToast("Vistoria salva com sucesso.", "ok");
-    }
+    mostrarToast("Vistoria salva com sucesso.", "ok");
 
     await carregarLotes();
   } catch (erro) {
