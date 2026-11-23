@@ -124,3 +124,15 @@
   .cozinha-form-novo { grid-template-columns: 1fr; }
   .cozinha-controles .btn-secundario { width: 100%; }
 }
+
+
+/* Destaca o item encontrado ao tentar cadastrar um nome já existente. */
+.cozinha-item--destacado {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--primary) 22%, transparent);
+  animation: cozinha-item-encontrado 1.8s ease-out;
+}
+@keyframes cozinha-item-encontrado {
+  0%, 35% { background: color-mix(in srgb, var(--primary) 12%, var(--surface)); }
+  100% { background: var(--surface); }
+}
