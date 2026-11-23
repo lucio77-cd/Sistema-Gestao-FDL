@@ -411,10 +411,22 @@ function renderizarLista() {
   }
 
   const busca = campoBusca.value.trim().toLocaleLowerCase("pt-BR");
-  const visiveis = ativos.filter((i) => !busca || String(i.nome).toLocaleLowerCase("pt-BR").includes(busca));
+
+  // Itens já conferidos/registrados com saldo zero ficam fora da lista
+  // operacional: continuam cadastrados e aparecem no histórico/Dashboard.
+  // Itens sem nenhuma contagem anterior permanecem visíveis para a primeira vistoria.
+  const visiveis = ativos.filter((i) => {
+    const saldo = qtd(i);
+    const semHistorico = !temValorConhecido(i);
+    const temSaldo = saldo > 0;
+    const correspondeBusca = !busca || String(i.nome).toLocaleLowerCase("pt-BR").includes(busca);
+    return (semHistorico || temSaldo) && correspondeBusca;
+  });
 
   if (!visiveis.length) {
-    lista.innerHTML = '<p class="mensagem-vazio">Nenhum item encontrado.</p>';
+    lista.innerHTML = busca
+      ? '<p class="mensagem-vazio">Nenhum item com estoque disponível encontrado.</p>'
+      : '<p class="mensagem-vazio">Nenhum produto com estoque disponível. Os itens zerados continuam no cadastro e no histórico; quando houver reposição, informe a entrada para voltar a exibi-los.</p>';
     return;
   }
 
@@ -422,9 +434,9 @@ function renderizarLista() {
 }
 
 function atualizarCartao(item) {
-  const card = lista.querySelector(`[data-id="${CSS.escape(item.id)}"]`);
-  if (!card) return;
-  card.outerHTML = cartaoHtml(item);
+  // Re-renderiza a lista para incluir o item quando receber saldo
+  // e removê-lo imediatamente quando sua quantidade chegar a zero.
+  renderizarLista();
 }
 
 function atualizarTotais() {
