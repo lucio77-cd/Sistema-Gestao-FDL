@@ -22,6 +22,12 @@ import { mostrarToast } from "./toast.js";
 
 iniciarNavegacao();
 
+function escapeHtml(valor) {
+  return String(valor ?? "").replace(/[&<>"']/g, (c) => ({
+    "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"
+  }[c]));
+}
+
 // A gerente precisa entrar com e-mail e senha; os dados são limitados ao estabelecimento autenticado.
 
 let itensEstoque = []; // linhas planas { produtoNome, quantidade, local } vindas da coleção "estoque"
@@ -166,7 +172,7 @@ function renderizarEstoque() {
     .map(
       (p) => `
         <div class="linha-estoque">
-          <div class="linha-estoque-nome">${p.produtoNome}</div>
+          <div class="linha-estoque-nome">${escapeHtml(p.produtoNome)}</div>
           <div class="linha-estoque-qtd">${p.quantidade} un.</div>
           <div class="linha-estoque-pct">${p.percentual.toFixed(1)}%</div>
         </div>
@@ -212,13 +218,13 @@ function renderizarLista(lotes) {
     div.className = `lote lote--${l.status}`;
     div.innerHTML = `
       <div class="lote-info">
-        <div class="lote-produto">${STATUS_ICONE[l.status]} ${l.produtoNome}</div>
-        <div class="lote-meta">${l.local || "—"} · ${l.quantidade} un.</div>
+        <div class="lote-produto">${STATUS_ICONE[l.status] || ""} ${escapeHtml(l.produtoNome)}</div>
+        <div class="lote-meta">${escapeHtml(l.local || "—")} · ${Number(l.quantidade) || 0} un.</div>
         <div class="lote-instrucao lote-dias--${l.status}">${sugestaoAcao(l.status, l.diasRestantes)}</div>
         <div class="lote-preco-venda">
           <label>Valor de venda (R$)</label>
-          <input type="number" step="0.01" min="0" class="input-preco-venda" value="${l.precoPromocional ?? ""}" placeholder="Ex: 3.50" />
-          <button type="button" class="btn btn-secundario btn-salvar-preco" data-id="${l.id}">Salvar</button>
+          <input type="number" step="0.01" min="0" class="input-preco-venda" value="${Number.isFinite(Number(l.precoPromocional)) ? Number(l.precoPromocional) : ""}" placeholder="Ex: 3.50" />
+          <button type="button" class="btn btn-secundario btn-salvar-preco" data-id="${escapeHtml(l.id)}">Salvar</button>
         </div>
       </div>
       <div class="lote-dados">
