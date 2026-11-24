@@ -28,6 +28,7 @@ let produtosCache = {};
 // Produtos que já têm contagem na aba Estoque (só esses sofrem o desconto
 // quando um lote é marcado como "Vencido").
 let produtosComEstoque = new Set();
+let saldosEstoquePorProduto = new Map();
 // { loteId: { input, valorOriginal, produtoId, produtoNome, precoCusto, local, dataVencimento, acaoZero, quantidadeParaAcao } }
 let controlesQuantidade = {};
 
@@ -44,6 +45,13 @@ async function carregarProdutosComEstoque() {
     query(collection(db, "estoque"), where("estabelecimentoId", "==", estabelecimentoAtual.id))
   );
   produtosComEstoque = new Set(snap.docs.map((d) => d.id));
+  saldosEstoquePorProduto = new Map(snap.docs.map((d) => {
+    const dados = d.data();
+    return [d.id, {
+      geladeira: Number(dados.geladeira) || 0,
+      seco: Number(dados.seco) || 0,
+    }];
+  }));
 }
 
 // ---------- Ordenação da lista ----------
@@ -501,6 +509,31 @@ document.getElementById("btn-salvar-vistoria").addEventListener("click", async (
   botao.textContent = "Salvando…";
 
   try {
+    // Recarrega os saldos imediatamente antes da operação. A regra do
+    // Firestore também valida o saldo final para impedir valores negativos
+    // em caso de concorrência entre duas telas.
+    await carregarProdutosComEstoque();
+
+    const saidasPorProdutoLocal = new Map();
+    prontos.forEach(([, c]) => {
+      if (!["vendido", "vencido"].includes(c.acaoZero)) return;
+      if (!produtosComEstoque.has(c.produtoId)) return;
+      const campo = campoEstoqueDoLocal(c.local);
+      const chave = c.produtoId + "|" + campo;
+      saidasPorProdutoLocal.set(chave, (saidasPorProdutoLocal.get(chave) || 0) + Number(c.quantidadeParaAcao || 0));
+    });
+
+    for (const [chave, quantidadeSaida] of saidasPorProdutoLocal) {
+      const separador = chave.lastIndexOf("|");
+      const produtoId = chave.slice(0, separador);
+      const campo = chave.slice(separador + 1);
+      const saldoAtual = saldosEstoquePorProduto.get(produtoId)?.[campo] || 0;
+      if (quantidadeSaida > saldoAtual) {
+        const nome = prontos.find(([, c]) => c.produtoId === produtoId)?.[1].produtoNome || "Produto";
+        throw new Error("Saldo insuficiente para registrar a saída de " + nome + " em " + (campo === "geladeira" ? "Geladeira" : "Parte seca") + ". Disponível: " + saldoAtual + " un.; saída solicitada: " + quantidadeSaida + " un. Atualize o estoque antes de continuar.");
+      }
+    }
+
     const batch = writeBatch(db);
     const itensHistorico = [];
 
@@ -594,7 +627,7 @@ document.getElementById("btn-salvar-vistoria").addEventListener("click", async (
     await carregarLotes();
   } catch (erro) {
     console.error(erro);
-    mostrarToast("Não salvou — verifique a conexão e tente de novo.", "erro");
+    mostrarToast(erro.message || "Não salvou — verifique a conexão e tente de novo.", "erro");
   } finally {
     botao.disabled = false;
     botao.textContent = textoOriginal;
