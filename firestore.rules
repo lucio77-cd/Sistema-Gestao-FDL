@@ -72,20 +72,15 @@ service cloud.firestore {
       allow update: if autenticado()
         && resource.data.ownerId == request.auth.uid
         && request.resource.data.ownerId == resource.data.ownerId
-        && request.resource.data.keys().hasOnly([
-          'ownerId', 'nome', 'diasAlertaPadrao',
-          'baixaAutomaticaAtiva', 'ultimaVistoria'
-        ])
         && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
           'nome', 'diasAlertaPadrao', 'baixaAutomaticaAtiva', 'ultimaVistoria'
         ])
         && request.resource.data.nome is string
         && request.resource.data.nome.size() > 0
         && request.resource.data.nome.size() <= 120
-        && request.resource.data.diasAlertaPadrao is number
-        && request.resource.data.diasAlertaPadrao >= 0
-        && request.resource.data.diasAlertaPadrao <= 365
-        && request.resource.data.baixaAutomaticaAtiva is bool
+        && numeroOpcional(request.resource.data, 'diasAlertaPadrao', 0, 365)
+        && (!('baixaAutomaticaAtiva' in request.resource.data)
+          || request.resource.data.baixaAutomaticaAtiva is bool)
         && (!('ultimaVistoria' in request.resource.data)
           || request.resource.data.ultimaVistoria is timestamp);
     }
@@ -95,13 +90,7 @@ service cloud.firestore {
     // =========================================================
 
     function produtoValido(data) {
-      return data.keys().hasOnly([
-          'estabelecimentoId', 'nome', 'marca', 'categoria',
-          'localEstoque', 'locaisEstoque', 'variante', 'embalagem',
-          'volume', 'codigoBarras', 'precoCusto', 'precoVenda',
-          'diasAlerta', 'estoqueMinimo', 'ativo', 'criadoEm', 'atualizadoEm'
-        ])
-        && data.nome is string
+      return data.nome is string
         && data.nome.size() > 0
         && data.nome.size() <= 160
         && textoOpcional(data, 'marca', 100)
@@ -128,6 +117,12 @@ service cloud.firestore {
     match /produtos/{id} {
       allow read: if donoDosDados(resource.data);
       allow create: if donoDosDados(request.resource.data)
+        && request.resource.data.keys().hasOnly([
+          'estabelecimentoId', 'nome', 'marca', 'categoria',
+          'localEstoque', 'locaisEstoque', 'variante', 'embalagem',
+          'volume', 'codigoBarras', 'precoCusto', 'precoVenda',
+          'diasAlerta', 'estoqueMinimo', 'ativo', 'criadoEm', 'atualizadoEm'
+        ])
         && produtoValido(request.resource.data);
       allow update: if mesmoEstabelecimento()
         && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
@@ -145,11 +140,7 @@ service cloud.firestore {
     // =========================================================
 
     function estoqueValido(data, id) {
-      return data.keys().hasOnly([
-          'estabelecimentoId', 'produtoId', 'produtoNome',
-          'geladeira', 'seco', 'atualizadoEm', 'ultimaContagemEm'
-        ])
-        && textoOpcional(data, 'produtoNome', 180)
+      return textoOpcional(data, 'produtoNome', 180)
         && (!('produtoId' in data) || (data.produtoId is string && data.produtoId == id))
         && numeroOpcional(data, 'geladeira', 0, 1000000)
         && numeroOpcional(data, 'seco', 0, 1000000)
@@ -160,6 +151,10 @@ service cloud.firestore {
     match /estoque/{id} {
       allow read: if donoDosDados(resource.data);
       allow create: if donoDosDados(request.resource.data)
+        && request.resource.data.keys().hasOnly([
+          'estabelecimentoId', 'produtoId', 'produtoNome',
+          'geladeira', 'seco', 'atualizadoEm', 'ultimaContagemEm'
+        ])
         && estoqueValido(request.resource.data, id)
         && (!('produtoId' in request.resource.data)
           || produtoDoEstabelecimento(request.resource.data.produtoId, request.resource.data.estabelecimentoId));
@@ -179,14 +174,7 @@ service cloud.firestore {
     // =========================================================
 
     function loteValido(data) {
-      return data.keys().hasOnly([
-          'estabelecimentoId', 'produtoId', 'produtoNome', 'precoCusto',
-          'diasAlerta', 'quantidade', 'local', 'dataVencimento',
-          'promocaoAtiva', 'precoPromocional', 'importadoParaEstoque',
-          'encerrado', 'motivoEncerramento', 'encerradoEm',
-          'transferidoEm', 'transferidoDeLoteId'
-        ])
-        && data.produtoId is string
+      return data.produtoId is string
         && data.produtoNome is string
         && data.produtoNome.size() > 0
         && data.quantidade is number
@@ -209,6 +197,13 @@ service cloud.firestore {
     match /lotes/{id} {
       allow read: if donoDosDados(resource.data);
       allow create: if donoDosDados(request.resource.data)
+        && request.resource.data.keys().hasOnly([
+          'estabelecimentoId', 'produtoId', 'produtoNome', 'precoCusto',
+          'diasAlerta', 'quantidade', 'local', 'dataVencimento',
+          'promocaoAtiva', 'precoPromocional', 'importadoParaEstoque',
+          'encerrado', 'motivoEncerramento', 'encerradoEm',
+          'transferidoEm', 'transferidoDeLoteId'
+        ])
         && loteValido(request.resource.data)
         && produtoDoEstabelecimento(request.resource.data.produtoId, request.resource.data.estabelecimentoId);
       allow update: if mesmoEstabelecimento()
@@ -384,11 +379,7 @@ service cloud.firestore {
     // =========================================================
 
     function cozinhaItemValido(data) {
-      return data.keys().hasOnly([
-          'estabelecimentoId', 'nome', 'unidade', 'grupo',
-          'estoqueMinimo', 'ativo', 'criadoEm', 'atualizadoEm'
-        ])
-        && data.nome is string
+      return data.nome is string
         && data.nome.size() > 0
         && data.nome.size() <= 160
         && textoOpcional(data, 'unidade', 40)
@@ -402,6 +393,10 @@ service cloud.firestore {
     match /cozinhaItens/{id} {
       allow read: if donoDosDados(resource.data);
       allow create: if donoDosDados(request.resource.data)
+        && request.resource.data.keys().hasOnly([
+          'estabelecimentoId', 'nome', 'unidade', 'grupo',
+          'estoqueMinimo', 'ativo', 'criadoEm', 'atualizadoEm'
+        ])
         && cozinhaItemValido(request.resource.data);
       allow update: if mesmoEstabelecimento()
         && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
@@ -437,7 +432,7 @@ service cloud.firestore {
       allow create: if donoDosDados(request.resource.data)
         && cozinhaVistoriaValida(request.resource.data);
       allow update: if mesmoEstabelecimento()
-        && resource.data.excluida != true
+        && (!('excluida' in resource.data) || resource.data.excluida != true)
         && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
           'excluida', 'excluidaEm', 'excluidaPor'
         ])
