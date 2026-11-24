@@ -1706,3 +1706,57 @@ label.switch {
   .stock-collapsible-ajuda { flex-basis: calc(100% - 2.8rem); order: 2; }
   .stock-collapsible-icone { grid-column: 2; grid-row: 1; }
 }
+
+
+/* ---------- Validade dos doces: controle separado da contagem de estoque ---------- */
+.doces-main { max-width: 1120px; }
+.doces-cabecalho { display:flex; align-items:center; justify-content:space-between; gap:1rem; margin-bottom:1.35rem; }
+.doces-cabecalho h1 { margin:.15rem 0 .35rem; }
+.doces-sobretitulo { margin:0; color:var(--primary); font-size:.68rem; font-weight:800; letter-spacing:.14em; }
+.doces-cabecalho-icone { display:grid; place-items:center; width:76px; height:76px; flex:0 0 76px; border:1px solid var(--steel-light); border-radius:18px; background:color-mix(in srgb,var(--primary) 10%,var(--surface)); font-size:2rem; }
+.doces-resumo { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:.8rem; margin:1rem 0; }
+.doces-resumo article { display:flex; flex-direction:column; gap:.35rem; min-width:0; padding:1rem 1.1rem; border:1px solid var(--steel-light); border-radius:10px; background:var(--surface); }
+.doces-resumo span { color:var(--ink-soft); font-size:.78rem; }
+.doces-resumo strong { color:var(--ink); font-size:1.7rem; font-variant-numeric:tabular-nums; }
+.doces-form-painel { padding:clamp(1rem,2.5vw,1.5rem); }
+.doces-form-topo,.doces-lista-topo { display:flex; align-items:flex-start; justify-content:space-between; gap:1rem; }
+.doces-form-topo h2,.doces-lista-topo h2 { margin:0 0 .25rem; }
+.doces-form-topo .legenda,.doces-lista-topo .legenda { margin:.2rem 0 0; }
+.doces-form-selo { flex:0 0 auto; padding:.35rem .55rem; border-radius:5px; background:color-mix(in srgb,var(--primary) 12%,var(--surface)); color:var(--primary); font-size:.62rem; font-weight:800; letter-spacing:.08em; }
+.doces-form { display:grid; grid-template-columns:2fr 1fr 1.2fr; gap:.85rem; margin-top:1.2rem; }
+.doces-campo { display:flex; flex-direction:column; gap:.35rem; min-width:0; }
+.doces-campo label { color:var(--ink-soft); font-size:.78rem; font-weight:650; }
+.doces-campo input,.doces-lista-topo select { width:100%; min-height:44px; }
+.doces-campo--nome { grid-column:span 1; }
+.doces-campo--obs { grid-column:1 / 3; }
+.doces-form-acoes { display:flex; align-items:end; gap:.55rem; flex-wrap:wrap; }
+.doces-lista-secao { margin-top:1.8rem; }
+.doces-lista-topo { align-items:center; margin-bottom:.8rem; }
+.doces-lista-topo select { width:auto; min-width:180px; }
+.doce-card { display:flex; align-items:center; justify-content:space-between; gap:1rem; margin:.65rem 0; padding:1rem 1.1rem; border:1px solid var(--steel-light); border-left:3px solid var(--primary); border-radius:9px; background:var(--surface); }
+.doce-card--encerrado { opacity:.72; border-left-color:var(--steel); }
+.doce-card-conteudo { min-width:0; }
+.doce-card-titulo { display:flex; align-items:center; gap:.55rem; flex-wrap:wrap; }
+.doce-card-titulo h3 { margin:0; font-size:1rem; overflow-wrap:anywhere; }
+.doce-card-dados { display:flex; flex-wrap:wrap; gap:.35rem 1rem; margin-top:.5rem; color:var(--ink-soft); font-size:.8rem; }
+.doce-card-dados strong { color:var(--ink); font-variant-numeric:tabular-nums; }
+.doce-card-obs { margin:.45rem 0 0; color:var(--ink-soft); font-size:.78rem; }
+.doce-card-acoes { display:flex; align-items:center; justify-content:flex-end; gap:.65rem; flex-wrap:wrap; flex:0 0 auto; }
+.doce-card-acoes button { text-align:right; }
+@media(max-width:720px) {
+ .doces-form { grid-template-columns:1fr 1fr; }
+ .doces-campo--nome,.doces-campo--obs { grid-column:1 / -1; }
+ .doces-form-acoes { grid-column:1 / -1; }
+ .doce-card { align-items:flex-start; flex-direction:column; }
+ .doce-card-acoes { width:100%; justify-content:flex-start; }
+}
+@media(max-width:480px) {
+ .doces-resumo { gap:.45rem; }
+ .doces-resumo article { padding:.75rem .65rem; }
+ .doces-resumo span { font-size:.68rem; }
+ .doces-resumo strong { font-size:1.4rem; }
+ .doces-cabecalho-icone { width:58px; height:58px; flex-basis:58px; font-size:1.6rem; }
+ .doces-lista-topo { align-items:flex-start; flex-direction:column; }
+ .doces-lista-topo select { width:100%; }
+ .doces-form-acoes > button { flex:1 1 auto; }
+}
