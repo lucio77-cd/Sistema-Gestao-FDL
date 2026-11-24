@@ -79,8 +79,12 @@ protegerPagina(async ({ estabelecimento }) => {
     estoqueSnap.forEach((d) => {
       const e = d.data();
       const nome = e.produtoNome || "Produto";
-      itensEstoque.push({ produtoNome: nome, quantidade: Math.max(0, Number(e.geladeira) || 0), local: "Geladeira" });
-      itensEstoque.push({ produtoNome: nome, quantidade: Math.max(0, Number(e.seco) || 0), local: "Estoque seco" });
+      // Não mascarar saldos negativos como zero: valores negativos são
+      // inconsistências que precisam ficar visíveis para conferência.
+      const geladeira = Number(e.geladeira);
+      const seco = Number(e.seco);
+      itensEstoque.push({ produtoNome: nome, quantidade: Number.isFinite(geladeira) ? geladeira : 0, local: "Geladeira" });
+      itensEstoque.push({ produtoNome: nome, quantidade: Number.isFinite(seco) ? seco : 0, local: "Estoque seco" });
     });
     estoqueCarregado = true;
     if (!secaoEstoque.hidden) renderizarEstoque();
