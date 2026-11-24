@@ -27,6 +27,11 @@ protegerPagina(({ estabelecimento }) => {
 });
 
 document.getElementById("toggle-caixa").addEventListener("change", async (e) => {
+  if (!estabelecimentoAtual) {
+    e.target.checked = !e.target.checked;
+    mostrarToast("Aguarde o carregamento das configurações.", "erro");
+    return;
+  }
   try {
     await updateDoc(doc(db, "estabelecimentos", estabelecimentoAtual.id), {
       baixaAutomaticaAtiva: e.target.checked,
@@ -36,13 +41,34 @@ document.getElementById("toggle-caixa").addEventListener("change", async (e) => 
     console.error(erro);
     e.target.checked = !e.target.checked;
     mostrarToast("Não foi possível salvar. Tente novamente.", "erro");
+  } finally {
+    botao.disabled = false;
   }
 });
 
 document.getElementById("btn-salvar-config").addEventListener("click", async () => {
-  const nome = document.getElementById("nome-input").value.trim();
-  const diasAlertaPadrao = Number(document.getElementById("dias-alerta-input").value);
+  if (!estabelecimentoAtual) {
+    mostrarToast("Aguarde o carregamento das configurações.", "erro");
+    return;
+  }
 
+  const nome = document.getElementById("nome-input").value.trim();
+  const diasTexto = document.getElementById("dias-alerta-input").value.trim();
+  const diasAlertaPadrao = Number(diasTexto);
+
+  if (!nome || nome.length > 120) {
+    mostrarToast("Informe um nome de estabelecimento com até 120 caracteres.", "erro");
+    document.getElementById("nome-input").focus();
+    return;
+  }
+  if (diasTexto === "" || !Number.isInteger(diasAlertaPadrao) || diasAlertaPadrao < 0 || diasAlertaPadrao > 365) {
+    mostrarToast("O prazo de alerta deve ser um número inteiro entre 0 e 365 dias.", "erro");
+    document.getElementById("dias-alerta-input").focus();
+    return;
+  }
+
+  const botao = document.getElementById("btn-salvar-config");
+  botao.disabled = true;
   try {
     await updateDoc(doc(db, "estabelecimentos", estabelecimentoAtual.id), {
       nome,
