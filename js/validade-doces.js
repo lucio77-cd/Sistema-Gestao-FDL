@@ -42,8 +42,7 @@ async function carregarRegistros() {
   try {
     const snap = await getDocs(query(
       collection(db, "docesValidade"),
-      where("estabelecimentoId", "==", estabelecimentoAtual.id),
-      where("ownerId", "==", estabelecimentoAtual.ownerId)
+      where("estabelecimentoId", "==", estabelecimentoAtual.id)
     ));
     registros = snap.docs.map(d => ({ id: d.id, ...d.data() }));
     registros.sort((a, b) => String(a.dataVencimento || "").localeCompare(String(b.dataVencimento || "")));
@@ -152,7 +151,6 @@ form.addEventListener("submit", async (evento) => {
       await addDoc(collection(db, "docesValidade"), {
         ...dados,
         estabelecimentoId: estabelecimentoAtual.id,
-        ownerId: estabelecimentoAtual.ownerId,
         ativo: true,
         criadoEm: serverTimestamp()
       });
