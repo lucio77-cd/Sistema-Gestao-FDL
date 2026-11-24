@@ -64,6 +64,14 @@ async function processarLeitura(codigo, tentativas = 0) {
       return;
     }
 
+    // Um código de barras deve identificar uma única apresentação dentro
+    // do estabelecimento. Escolher o primeiro resultado poderia baixar
+    // o produto errado quando há cadastros duplicados.
+    if (produtosSnap.size > 1) {
+      registrarLeitura(null, "Este código de barras está vinculado a mais de um produto. Corrija os cadastros antes de vender.", "erro");
+      return;
+    }
+
     const produto = { id: produtosSnap.docs[0].id, ...produtosSnap.docs[0].data() };
     const estoqueRef = doc(db, "estoque", produto.id);
     const estoqueConsulta = await getDoc(estoqueRef);
