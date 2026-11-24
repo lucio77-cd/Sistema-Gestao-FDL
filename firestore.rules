@@ -374,7 +374,6 @@ service cloud.firestore {
       allow delete: if false;
     }
 
-
     // =========================================================
     // VALIDADE DOS DOCES (CONTROLE DA VENDA, SEM MOVIMENTAR ESTOQUE)
     // =========================================================
@@ -387,75 +386,7 @@ service cloud.firestore {
         && data.quantidade >= 1
         && data.quantidade <= 1000000
         && data.dataVencimento is string
-        && data.dataVencimento.matches('^[0-9]{4}-[0-9]{2}-[0-9]{2}    // =========================================================
-
-    function cozinhaItemValido(data) {
-      return data.nome is string
-        && data.nome.size() > 0
-        && data.nome.size() <= 160
-        && textoOpcional(data, 'unidade', 40)
-        && textoOpcional(data, 'grupo', 80)
-        && numeroOpcional(data, 'estoqueMinimo', 0, 1000000)
-        && (!('ativo' in data) || data.ativo is bool)
-        && (!('criadoEm' in data) || data.criadoEm is timestamp)
-        && (!('atualizadoEm' in data) || data.atualizadoEm is timestamp);
-    }
-
-    match /cozinhaItens/{id} {
-      allow read: if donoDosDados(resource.data);
-      allow create: if donoDosDados(request.resource.data)
-        && request.resource.data.keys().hasOnly([
-          'estabelecimentoId', 'nome', 'unidade', 'grupo',
-          'estoqueMinimo', 'ativo', 'criadoEm', 'atualizadoEm'
-        ])
-        && cozinhaItemValido(request.resource.data);
-      allow update: if mesmoEstabelecimento()
-        && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
-          'nome', 'unidade', 'grupo', 'estoqueMinimo', 'ativo', 'atualizadoEm'
-        ])
-        && cozinhaItemValido(request.resource.data);
-      allow delete: if false;
-    }
-
-    function cozinhaVistoriaValida(data) {
-      return data.keys().hasOnly([
-          'estabelecimentoId', 'dia', 'data', 'itens',
-          'totalItens', 'totalConferidos', 'criadoPor',
-          'excluida', 'excluidaEm', 'excluidaPor'
-        ])
-        && data.dia is string
-        && data.data is timestamp
-        && data.itens is list
-        && data.itens.size() <= 500
-        && data.totalItens is int
-        && data.totalItens >= 0
-        && data.totalConferidos is int
-        && data.totalConferidos >= 0
-        && data.totalConferidos <= data.totalItens
-        && textoOpcional(data, 'criadoPor', 160)
-        && (!('excluida' in data) || data.excluida is bool)
-        && (!('excluidaEm' in data) || data.excluidaEm is timestamp)
-        && textoOpcional(data, 'excluidaPor', 160);
-    }
-
-    match /cozinhaVistorias/{id} {
-      allow read: if donoDosDados(resource.data);
-      allow create: if donoDosDados(request.resource.data)
-        && cozinhaVistoriaValida(request.resource.data);
-      allow update: if mesmoEstabelecimento()
-        && (!('excluida' in resource.data) || resource.data.excluida != true)
-        && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
-          'excluida', 'excluidaEm', 'excluidaPor'
-        ])
-        && request.resource.data.excluida == true
-        && request.resource.data.excluidaEm is timestamp
-        && textoOpcional(request.resource.data, 'excluidaPor', 160);
-      allow delete: if false;
-    }
-
-    // Nenhuma outra coleção é acessível pelo cliente por padrão.
-  }
-})
+        && data.dataVencimento.matches('^[0-9]{4}-[0-9]{2}-[0-9]{2}$')
         && textoOpcional(data, 'observacao', 240)
         && data.ativo is bool
         && data.criadoEm is timestamp
