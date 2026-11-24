@@ -36,6 +36,17 @@ export function iniciarNavegacao() {
     else menuMais.appendChild(linkMovimentacoes);
   }
 
+  // Atalho para controle de validade dos doces vendidos no balcão.
+  if (menuMais && !menuMais.querySelector('a[href="validade-doces.html"]')) {
+    const linkDoces = document.createElement("a");
+    linkDoces.href = "validade-doces.html";
+    linkDoces.dataset.pagina = "validade-doces";
+    linkDoces.textContent = "Validade dos doces";
+    const referencia = menuMais.querySelector('a[href="caixa.html"]') || menuMais.querySelector("#link-sair");
+    if (referencia) menuMais.insertBefore(linkDoces, referencia);
+    else menuMais.appendChild(linkDoces);
+  }
+
   // Ícones consistentes nos atalhos de gestão, inclusive no link Cozinha criado acima.
   const iconesMenu = {
     "graficos.html": '<path d="M4 19V5"/><path d="M4 19h16"/><path d="M8 15v-4"/><path d="M13 15V7"/><path d="M18 15V3"/>',
@@ -43,6 +54,7 @@ export function iniciarNavegacao() {
     "movimentacoes.html": '<path d="M3 12h4l3-8 4 16 3-8h4"/><path d="M3 5v14"/>',
     "cozinha.html": '<path d="M4 10h16l-1 10H5L4 10Z"/><path d="M7 10V7a5 5 0 0 1 10 0v3"/><path d="M9 4V2M15 4V2"/>',
     "caixa.html": '<rect x="3" y="6" width="18" height="14" rx="2"/><path d="M3 10h18M7 15h4"/><path d="M7 3h10"/>',
+    "validade-doces.html": '<path d="M4 7h16v13H4z"/><path d="M8 4v6M16 4v6M4 11h16"/><path d="m9 16 2 2 4-4"/>',
     "configuracoes.html": '<path d="M4 7h9M17 7h3M4 17h3m4 0h9"/><circle cx="15" cy="7" r="2"/><circle cx="9" cy="17" r="2"/>',
     "#": '<path d="M10 17l5-5-5-5"/><path d="M15 12H3"/><path d="M21 19V5"/>'
   };
@@ -70,7 +82,7 @@ export function iniciarNavegacao() {
     if (el.tagName === "A") el.setAttribute("aria-current", "page");
   });
 
-  if (btnMais && ["estoque", "movimentacoes", "cozinha", "caixa", "configuracoes", "graficos"].includes(paginaAtual)) {
+  if (btnMais && ["estoque", "movimentacoes", "cozinha", "caixa", "configuracoes", "graficos", "validade-doces"].includes(paginaAtual)) {
     btnMais.classList.add("ativo");
   }
 
