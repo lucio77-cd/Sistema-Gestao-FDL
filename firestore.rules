@@ -1,140 +1,452 @@
 rules_version = '2';
+
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // Dados operacionais são isolados por estabelecimento. A página da gerente
-    // também exige autenticação via protegerPagina; não há escrita pública.
+    // =========================================================
+    // IDENTIDADE E ISOLAMENTO POR ESTABELECIMENTO
+    // =========================================================
+
     function autenticado() {
       return request.auth != null;
     }
 
-    function donoDoEstabelecimento(estabelecimentoId) {
+    function donoDoEstabelecimento(id) {
       return autenticado()
-        && estabelecimentoId is string
-        && exists(/databases/$(database)/documents/estabelecimentos/$(estabelecimentoId))
-        && get(/databases/$(database)/documents/estabelecimentos/$(estabelecimentoId)).data.ownerId == request.auth.uid;
+        && id is string
+        && exists(/databases/$(database)/documents/estabelecimentos/$(id))
+        && get(/databases/$(database)/documents/estabelecimentos/$(id)).data.ownerId == request.auth.uid;
+    }
+
+    function donoDosDados(data) {
+      return data.estabelecimentoId is string
+        && donoDoEstabelecimento(data.estabelecimentoId);
     }
 
     function mesmoEstabelecimento() {
-      return request.resource.data.estabelecimentoId is string
+      return donoDosDados(request.resource.data)
         && request.resource.data.estabelecimentoId == resource.data.estabelecimentoId
         && donoDoEstabelecimento(resource.data.estabelecimentoId);
     }
 
-    match /estabelecimentos/{id} {
-      // Dados do estabelecimento (inclusive ownerId e configurações) não são públicos.
-      // A consulta do app já filtra pelo UID autenticado.
-      allow read: if autenticado() && resource.data.ownerId == request.auth.uid;
+    function textoOpcional(data, campo, maximo) {
+      return !(campo in data)
+        || data[campo] == null
+        || (data[campo] is string && data[campo].size() <= maximo);
+    }
 
-      // O app só precisa atualizar estes campos operacionais/configuráveis.
-      // ownerId e demais campos de identidade/propriedade nunca podem ser
-      // alterados pelo cliente. Criação e exclusão ficam fora do fluxo cliente.
+    function numeroOpcional(data, campo, minimo, maximo) {
+      return !(campo in data)
+        || data[campo] == null
+        || (data[campo] is number && data[campo] >= minimo && data[campo] <= maximo);
+    }
+
+    function dataOpcional(data, campo) {
+      return !(campo in data)
+        || data[campo] == null
+        || (data[campo] is string && data[campo].matches('^[0-9]{4}-[0-9]{2}-[0-9]{2}$'));
+    }
+
+    function localValido(local) {
+      return local in ['geladeira', 'seco', 'Geladeira', 'Estoque seco', 'ambos', 'geral'];
+    }
+
+    function produtoDoEstabelecimento(produtoId, estabelecimentoId) {
+      return produtoId is string
+        && exists(/databases/$(database)/documents/produtos/$(produtoId))
+        && get(/databases/$(database)/documents/produtos/$(produtoId)).data.estabelecimentoId == estabelecimentoId;
+    }
+
+    // =========================================================
+    // ESTABELECIMENTOS
+    // =========================================================
+
+    match /estabelecimentos/{id} {
+      allow get, list: if autenticado()
+        && resource.data.ownerId == request.auth.uid;
+
+      // O cliente nunca cria, transfere a propriedade ou exclui
+      // um estabelecimento. A criação inicial deve ser administrativa.
+      allow create, delete: if false;
+
       allow update: if autenticado()
         && resource.data.ownerId == request.auth.uid
         && request.resource.data.ownerId == resource.data.ownerId
-        && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
-          "nome",
-          "diasAlertaPadrao",
-          "baixaAutomaticaAtiva",
-          "ultimaVistoria"
+        && request.resource.data.keys().hasOnly([
+          'ownerId', 'nome', 'diasAlertaPadrao',
+          'baixaAutomaticaAtiva', 'ultimaVistoria'
         ])
-        && (!request.resource.data.diff(resource.data).affectedKeys().hasAny(["nome"])
-          || (request.resource.data.nome is string
-            && request.resource.data.nome.size() > 0
-            && request.resource.data.nome.size() <= 120))
-        && (!request.resource.data.diff(resource.data).affectedKeys().hasAny(["diasAlertaPadrao"])
-          || (request.resource.data.diasAlertaPadrao is number
-            && request.resource.data.diasAlertaPadrao >= 0
-            && request.resource.data.diasAlertaPadrao <= 365))
-        && (!request.resource.data.diff(resource.data).affectedKeys().hasAny(["baixaAutomaticaAtiva"])
-          || request.resource.data.baixaAutomaticaAtiva is bool)
-        && (!request.resource.data.diff(resource.data).affectedKeys().hasAny(["ultimaVistoria"])
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+          'nome', 'diasAlertaPadrao', 'baixaAutomaticaAtiva', 'ultimaVistoria'
+        ])
+        && request.resource.data.nome is string
+        && request.resource.data.nome.size() > 0
+        && request.resource.data.nome.size() <= 120
+        && request.resource.data.diasAlertaPadrao is number
+        && request.resource.data.diasAlertaPadrao >= 0
+        && request.resource.data.diasAlertaPadrao <= 365
+        && request.resource.data.baixaAutomaticaAtiva is bool
+        && (!('ultimaVistoria' in request.resource.data)
           || request.resource.data.ultimaVistoria is timestamp);
-
-      allow create, delete: if false;
     }
 
-    // Saldos: o proprietário pode criar e atualizar, mas não apagar.
-    match /estoque/{id} {
-      allow read: if donoDoEstabelecimento(resource.data.estabelecimentoId);
-      allow create: if donoDoEstabelecimento(request.resource.data.estabelecimentoId);
-      allow update: if mesmoEstabelecimento();
-      allow delete: if false;
+    // =========================================================
+    // PRODUTOS
+    // =========================================================
+
+    function produtoValido(data) {
+      return data.keys().hasOnly([
+          'estabelecimentoId', 'nome', 'marca', 'categoria',
+          'localEstoque', 'locaisEstoque', 'variante', 'embalagem',
+          'volume', 'codigoBarras', 'precoCusto', 'precoVenda',
+          'diasAlerta', 'estoqueMinimo', 'ativo', 'criadoEm', 'atualizadoEm'
+        ])
+        && data.nome is string
+        && data.nome.size() > 0
+        && data.nome.size() <= 160
+        && textoOpcional(data, 'marca', 100)
+        && textoOpcional(data, 'categoria', 100)
+        && textoOpcional(data, 'variante', 100)
+        && textoOpcional(data, 'embalagem', 80)
+        && textoOpcional(data, 'volume', 40)
+        && textoOpcional(data, 'codigoBarras', 80)
+        && numeroOpcional(data, 'precoCusto', 0, 1000000)
+        && numeroOpcional(data, 'precoVenda', 0, 1000000)
+        && numeroOpcional(data, 'diasAlerta', 0, 365)
+        && numeroOpcional(data, 'estoqueMinimo', 0, 1000000)
+        && (!('localEstoque' in data) || data.localEstoque in ['geladeira', 'seco'])
+        && (!('locaisEstoque' in data)
+          || (data.locaisEstoque is list
+            && data.locaisEstoque.size() >= 1
+            && data.locaisEstoque.size() <= 2
+            && data.locaisEstoque.hasOnly(['geladeira', 'seco'])))
+        && (!('ativo' in data) || data.ativo is bool)
+        && (!('criadoEm' in data) || data.criadoEm is timestamp)
+        && (!('atualizadoEm' in data) || data.atualizadoEm is timestamp);
     }
 
-    // Livro de movimentos: append-only. Um movimento já registrado não pode
-    // ser editado nem apagado pelo cliente.
-    match /movimentosEstoque/{id} {
-      allow read: if donoDoEstabelecimento(resource.data.estabelecimentoId);
-      allow create: if donoDoEstabelecimento(request.resource.data.estabelecimentoId);
-      allow update, delete: if false;
-    }
-
-    // Sessões podem mudar de estado durante a vistoria, sem trocar de dono.
-    // A exclusão de sessões históricas é bloqueada.
-    match /vistoriasEstoque/{id} {
-      allow read: if donoDoEstabelecimento(resource.data.estabelecimentoId);
-      allow create: if donoDoEstabelecimento(request.resource.data.estabelecimentoId);
-      allow update: if mesmoEstabelecimento();
-      allow delete: if false;
-    }
-
-    // Contagens são atualizáveis durante a vistoria, mas não podem ser
-    // transferidas para outro estabelecimento ou excluídas pelo cliente.
-    match /contagensEstoque/{id} {
-      allow read: if donoDoEstabelecimento(resource.data.estabelecimentoId);
-      allow create: if donoDoEstabelecimento(request.resource.data.estabelecimentoId);
-      allow update: if mesmoEstabelecimento();
-      allow delete: if false;
-    }
-
-    // Lotes são privados ao estabelecimento. Atualizações promocionais da
-    // gerente usam a mesma autenticação e propriedade do restante do sistema.
-    // O encerramento é lógico; exclusão física permanece bloqueada.
-    match /lotes/{id} {
-      allow read: if donoDoEstabelecimento(resource.data.estabelecimentoId);
-      allow create: if donoDoEstabelecimento(request.resource.data.estabelecimentoId);
-      allow update: if mesmoEstabelecimento();
-      allow delete: if false;
-    }
-
-    // Produtos só podem ser consultados e alterados pelo dono do estabelecimento.
-    // Exclusão física é bloqueada; o fluxo usa desativação lógica.
     match /produtos/{id} {
-      allow read: if donoDoEstabelecimento(resource.data.estabelecimentoId);
-      allow create: if donoDoEstabelecimento(request.resource.data.estabelecimentoId);
-      allow update: if mesmoEstabelecimento();
+      allow read: if donoDosDados(resource.data);
+      allow create: if donoDosDados(request.resource.data)
+        && produtoValido(request.resource.data);
+      allow update: if mesmoEstabelecimento()
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+          'nome', 'marca', 'categoria', 'localEstoque', 'locaisEstoque',
+          'variante', 'embalagem', 'volume', 'codigoBarras',
+          'precoCusto', 'precoVenda', 'diasAlerta', 'estoqueMinimo',
+          'ativo', 'atualizadoEm'
+        ])
+        && produtoValido(request.resource.data);
       allow delete: if false;
     }
 
-    // Histórico de vistorias: acesso restrito ao estabelecimento de origem.
-    match /vistorias/{id} {
-      allow read: if donoDoEstabelecimento(resource.data.estabelecimentoId);
-      allow create: if donoDoEstabelecimento(request.resource.data.estabelecimentoId);
+    // =========================================================
+    // SALDO CONSOLIDADO
+    // =========================================================
+
+    function estoqueValido(data, id) {
+      return data.keys().hasOnly([
+          'estabelecimentoId', 'produtoId', 'produtoNome',
+          'geladeira', 'seco', 'atualizadoEm', 'ultimaContagemEm'
+        ])
+        && textoOpcional(data, 'produtoNome', 180)
+        && (!('produtoId' in data) || (data.produtoId is string && data.produtoId == id))
+        && numeroOpcional(data, 'geladeira', 0, 1000000)
+        && numeroOpcional(data, 'seco', 0, 1000000)
+        && (!('atualizadoEm' in data) || data.atualizadoEm is timestamp)
+        && (!('ultimaContagemEm' in data) || data.ultimaContagemEm is timestamp);
+    }
+
+    match /estoque/{id} {
+      allow read: if donoDosDados(resource.data);
+      allow create: if donoDosDados(request.resource.data)
+        && estoqueValido(request.resource.data, id)
+        && (!('produtoId' in request.resource.data)
+          || produtoDoEstabelecimento(request.resource.data.produtoId, request.resource.data.estabelecimentoId));
+      allow update: if mesmoEstabelecimento()
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+          'produtoId', 'produtoNome', 'geladeira', 'seco',
+          'atualizadoEm', 'ultimaContagemEm'
+        ])
+        && estoqueValido(request.resource.data, id)
+        && (!('produtoId' in request.resource.data)
+          || produtoDoEstabelecimento(request.resource.data.produtoId, request.resource.data.estabelecimentoId));
+      allow delete: if false;
+    }
+
+    // =========================================================
+    // LOTES E VALIDADE
+    // =========================================================
+
+    function loteValido(data) {
+      return data.keys().hasOnly([
+          'estabelecimentoId', 'produtoId', 'produtoNome', 'precoCusto',
+          'diasAlerta', 'quantidade', 'local', 'dataVencimento',
+          'promocaoAtiva', 'precoPromocional', 'importadoParaEstoque',
+          'encerrado', 'motivoEncerramento', 'encerradoEm',
+          'transferidoEm', 'transferidoDeLoteId'
+        ])
+        && data.produtoId is string
+        && data.produtoNome is string
+        && data.produtoNome.size() > 0
+        && data.quantidade is number
+        && data.quantidade >= 0
+        && data.quantidade <= 1000000
+        && data.local in ['Geladeira', 'Estoque seco']
+        && numeroOpcional(data, 'precoCusto', 0, 1000000)
+        && numeroOpcional(data, 'diasAlerta', 0, 365)
+        && dataOpcional(data, 'dataVencimento')
+        && (!('promocaoAtiva' in data) || data.promocaoAtiva is bool)
+        && numeroOpcional(data, 'precoPromocional', 0, 1000000)
+        && (!('importadoParaEstoque' in data) || data.importadoParaEstoque is bool)
+        && (!('encerrado' in data) || data.encerrado is bool)
+        && textoOpcional(data, 'motivoEncerramento', 40)
+        && (!('encerradoEm' in data) || data.encerradoEm is timestamp)
+        && (!('transferidoEm' in data) || data.transferidoEm is timestamp)
+        && textoOpcional(data, 'transferidoDeLoteId', 160);
+    }
+
+    match /lotes/{id} {
+      allow read: if donoDosDados(resource.data);
+      allow create: if donoDosDados(request.resource.data)
+        && loteValido(request.resource.data)
+        && produtoDoEstabelecimento(request.resource.data.produtoId, request.resource.data.estabelecimentoId);
+      allow update: if mesmoEstabelecimento()
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+          'produtoNome', 'precoCusto', 'diasAlerta', 'quantidade',
+          'local', 'dataVencimento', 'promocaoAtiva', 'precoPromocional',
+          'importadoParaEstoque', 'encerrado', 'motivoEncerramento',
+          'encerradoEm', 'transferidoEm', 'transferidoDeLoteId'
+        ])
+        && loteValido(request.resource.data)
+        && produtoDoEstabelecimento(request.resource.data.produtoId, request.resource.data.estabelecimentoId);
+      allow delete: if false;
+    }
+
+    // =========================================================
+    // LIVRO DE MOVIMENTAÇÕES (SOMENTE INCLUSÃO)
+    // =========================================================
+
+    function movimentoValido(data) {
+      return data.keys().hasOnly([
+          'estabelecimentoId', 'produtoId', 'produtoNome', 'local',
+          'tipo', 'quantidade', 'delta', 'origem', 'registradoEm',
+          'deLocal', 'paraLocal', 'geladeira', 'seco',
+          'quantidadeContada', 'deltaMovimentacoesPosteriores', 'sessaoId'
+        ])
+        && data.produtoId is string
+        && data.produtoNome is string
+        && data.produtoNome.size() > 0
+        && localValido(data.local)
+        && data.tipo in [
+          'entrada', 'venda', 'perda', 'vencido', 'ajuste',
+          'transferencia_saida', 'transferencia_entrada',
+          'contagem', 'importacao'
+        ]
+        && data.registradoEm is timestamp
+        && textoOpcional(data, 'origem', 60)
+        && textoOpcional(data, 'sessaoId', 180)
+        && textoOpcional(data, 'deLocal', 30)
+        && textoOpcional(data, 'paraLocal', 30)
+        && numeroOpcional(data, 'quantidade', 0, 1000000)
+        && numeroOpcional(data, 'delta', -1000000, 1000000)
+        && numeroOpcional(data, 'geladeira', 0, 1000000)
+        && numeroOpcional(data, 'seco', 0, 1000000)
+        && numeroOpcional(data, 'quantidadeContada', 0, 1000000)
+        && numeroOpcional(data, 'deltaMovimentacoesPosteriores', -1000000, 1000000);
+    }
+
+    match /movimentosEstoque/{id} {
+      allow read: if donoDosDados(resource.data);
+      allow create: if donoDosDados(request.resource.data)
+        && movimentoValido(request.resource.data)
+        && produtoDoEstabelecimento(request.resource.data.produtoId, request.resource.data.estabelecimentoId);
       allow update, delete: if false;
     }
 
-    // Módulo Cozinha: itens podem ser desativados logicamente; o histórico
-    // de vistorias também usa exclusão lógica para preservar rastreabilidade.
-    match /cozinhaItens/{id} {
-      allow read: if donoDoEstabelecimento(resource.data.estabelecimentoId);
-      allow create: if donoDoEstabelecimento(request.resource.data.estabelecimentoId);
-      allow update: if mesmoEstabelecimento();
+    // =========================================================
+    // SAÍDAS (VENDAS E PERDAS)
+    // =========================================================
+
+    function saidaValida(data) {
+      return data.keys().hasOnly([
+          'estabelecimentoId', 'produtoId', 'produtoNome', 'motivo',
+          'quantidade', 'precoCusto', 'valor', 'local',
+          'dataVencimentoOriginal', 'origem', 'registradoEm'
+        ])
+        && data.produtoId is string
+        && data.produtoNome is string
+        && data.produtoNome.size() > 0
+        && data.motivo in ['vendido', 'vencido']
+        && data.quantidade is number
+        && data.quantidade > 0
+        && data.quantidade <= 1000000
+        && numeroOpcional(data, 'precoCusto', 0, 1000000)
+        && numeroOpcional(data, 'valor', 0, 1000000000)
+        && textoOpcional(data, 'local', 40)
+        && dataOpcional(data, 'dataVencimentoOriginal')
+        && textoOpcional(data, 'origem', 40)
+        && data.registradoEm is timestamp;
+    }
+
+    match /saidas/{id} {
+      allow read: if donoDosDados(resource.data);
+      allow create: if donoDosDados(request.resource.data)
+        && saidaValida(request.resource.data)
+        && produtoDoEstabelecimento(request.resource.data.produtoId, request.resource.data.estabelecimentoId);
+      allow update, delete: if false;
+    }
+
+    // =========================================================
+    // VISTORIA DE LOTES (HISTÓRICO IMUTÁVEL)
+    // =========================================================
+
+    match /vistorias/{id} {
+      allow read: if donoDosDados(resource.data);
+      allow create: if donoDosDados(request.resource.data)
+        && request.resource.data.keys().hasOnly(['estabelecimentoId', 'data', 'itens'])
+        && request.resource.data.data is timestamp
+        && request.resource.data.itens is list
+        && request.resource.data.itens.size() <= 500;
+      allow update, delete: if false;
+    }
+
+    // =========================================================
+    // VISTORIA FÍSICA DO ESTOQUE
+    // =========================================================
+
+    function sessaoDoEstabelecimento(sessaoId, estabelecimentoId) {
+      return sessaoId is string
+        && exists(/databases/$(database)/documents/vistoriasEstoque/$(sessaoId))
+        && get(/databases/$(database)/documents/vistoriasEstoque/$(sessaoId)).data.estabelecimentoId == estabelecimentoId
+        && donoDoEstabelecimento(estabelecimentoId);
+    }
+
+    match /vistoriasEstoque/{id} {
+      allow read: if donoDosDados(resource.data);
+      allow create: if donoDosDados(request.resource.data)
+        && request.resource.data.keys().hasOnly([
+          'estabelecimentoId', 'local', 'status', 'categoriaFiltro',
+          'embalagemFiltro', 'criadaPor', 'criadaEm', 'createdAt', 'updatedAt'
+        ])
+        && request.resource.data.local in ['geladeira', 'seco']
+        && request.resource.data.status == 'em_andamento'
+        && textoOpcional(request.resource.data, 'categoriaFiltro', 100)
+        && textoOpcional(request.resource.data, 'embalagemFiltro', 80)
+        && textoOpcional(request.resource.data, 'criadaPor', 160)
+        && request.resource.data.criadaEm is timestamp
+        && request.resource.data.createdAt is timestamp
+        && request.resource.data.updatedAt is timestamp;
+      allow update: if mesmoEstabelecimento()
+        && resource.data.status != 'finalizada'
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+          'status', 'updatedAt', 'finalizadaEm', 'quantidadeItensContados'
+        ])
+        && request.resource.data.status in ['em_andamento', 'aguardando_revisao', 'finalizada']
+        && request.resource.data.updatedAt is timestamp
+        && (!('finalizadaEm' in request.resource.data) || request.resource.data.finalizadaEm is timestamp)
+        && numeroOpcional(request.resource.data, 'quantidadeItensContados', 0, 1000000);
       allow delete: if false;
+    }
+
+    function contagemValida(data) {
+      return data.keys().hasOnly([
+          'estabelecimentoId', 'sessaoId', 'produtoId', 'produtoNome',
+          'local', 'quantidade', 'contadoEm', 'contadoPor', 'atualizadoEm'
+        ])
+        && data.sessaoId is string
+        && data.produtoId is string
+        && data.produtoNome is string
+        && data.produtoNome.size() > 0
+        && data.local in ['geladeira', 'seco']
+        && data.quantidade is number
+        && data.quantidade >= 0
+        && data.quantidade <= 1000000
+        && data.contadoEm is timestamp
+        && data.atualizadoEm is timestamp
+        && textoOpcional(data, 'contadoPor', 160);
+    }
+
+    match /contagensEstoque/{id} {
+      allow read: if donoDosDados(resource.data);
+      allow create, update: if donoDosDados(request.resource.data)
+        && contagemValida(request.resource.data)
+        && sessaoDoEstabelecimento(request.resource.data.sessaoId, request.resource.data.estabelecimentoId)
+        && get(/databases/$(database)/documents/vistoriasEstoque/$(request.resource.data.sessaoId)).data.status in ['em_andamento', 'aguardando_revisao']
+        && produtoDoEstabelecimento(request.resource.data.produtoId, request.resource.data.estabelecimentoId)
+        && (!exists(/databases/$(database)/documents/contagensEstoque/$(id))
+          || resource.data.estabelecimentoId == request.resource.data.estabelecimentoId);
+      allow delete: if false;
+    }
+
+    // =========================================================
+    // COZINHA
+    // =========================================================
+
+    function cozinhaItemValido(data) {
+      return data.keys().hasOnly([
+          'estabelecimentoId', 'nome', 'unidade', 'grupo',
+          'estoqueMinimo', 'ativo', 'criadoEm', 'atualizadoEm'
+        ])
+        && data.nome is string
+        && data.nome.size() > 0
+        && data.nome.size() <= 160
+        && textoOpcional(data, 'unidade', 40)
+        && textoOpcional(data, 'grupo', 80)
+        && numeroOpcional(data, 'estoqueMinimo', 0, 1000000)
+        && (!('ativo' in data) || data.ativo is bool)
+        && (!('criadoEm' in data) || data.criadoEm is timestamp)
+        && (!('atualizadoEm' in data) || data.atualizadoEm is timestamp);
+    }
+
+    match /cozinhaItens/{id} {
+      allow read: if donoDosDados(resource.data);
+      allow create: if donoDosDados(request.resource.data)
+        && cozinhaItemValido(request.resource.data);
+      allow update: if mesmoEstabelecimento()
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+          'nome', 'unidade', 'grupo', 'estoqueMinimo', 'ativo', 'atualizadoEm'
+        ])
+        && cozinhaItemValido(request.resource.data);
+      allow delete: if false;
+    }
+
+    function cozinhaVistoriaValida(data) {
+      return data.keys().hasOnly([
+          'estabelecimentoId', 'dia', 'data', 'itens',
+          'totalItens', 'totalConferidos', 'criadoPor',
+          'excluida', 'excluidaEm', 'excluidaPor'
+        ])
+        && data.dia is string
+        && data.data is timestamp
+        && data.itens is list
+        && data.itens.size() <= 500
+        && data.totalItens is int
+        && data.totalItens >= 0
+        && data.totalConferidos is int
+        && data.totalConferidos >= 0
+        && data.totalConferidos <= data.totalItens
+        && textoOpcional(data, 'criadoPor', 160)
+        && (!('excluida' in data) || data.excluida is bool)
+        && (!('excluidaEm' in data) || data.excluidaEm is timestamp)
+        && textoOpcional(data, 'excluidaPor', 160);
     }
 
     match /cozinhaVistorias/{id} {
-      allow read: if donoDoEstabelecimento(resource.data.estabelecimentoId);
-      allow create: if donoDoEstabelecimento(request.resource.data.estabelecimentoId);
-      allow update: if mesmoEstabelecimento();
+      allow read: if donoDosDados(resource.data);
+      allow create: if donoDosDados(request.resource.data)
+        && cozinhaVistoriaValida(request.resource.data);
+      allow update: if mesmoEstabelecimento()
+        && resource.data.excluida != true
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+          'excluida', 'excluidaEm', 'excluidaPor'
+        ])
+        && request.resource.data.excluida == true
+        && request.resource.data.excluidaEm is timestamp
+        && textoOpcional(request.resource.data, 'excluidaPor', 160);
       allow delete: if false;
     }
 
-    // Saídas são eventos históricos e só podem ser lidas/criadas pelo proprietário.
-    match /saidas/{id} {
-      allow read: if donoDoEstabelecimento(resource.data.estabelecimentoId);
-      allow create: if donoDoEstabelecimento(request.resource.data.estabelecimentoId);
-      allow update, delete: if false;
-    }
+    // Nenhuma outra coleção é acessível pelo cliente por padrão.
   }
 }
