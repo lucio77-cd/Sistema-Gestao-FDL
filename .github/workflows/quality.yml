@@ -26,3 +26,21 @@ jobs:
 
       - name: Verificar projeto
         run: node scripts/check-project.mjs
+
+  testes-firestore:
+    name: Regras Firestore e isolamento
+    runs-on: ubuntu-latest
+    steps:
+      - name: Baixar código
+        uses: actions/checkout@v4
+
+      - name: Preparar Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Instalar dependências de teste
+        run: npm install --no-audit --no-fund
+
+      - name: Testar regras no emulador Firestore
+        run: npm run test:rules
