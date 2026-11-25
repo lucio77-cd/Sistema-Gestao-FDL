@@ -41,7 +41,7 @@ export function iniciarNavegacao() {
     const linkDoces = document.createElement("a");
     linkDoces.href = "validade-doces.html";
     linkDoces.dataset.pagina = "validade-doces";
-    linkDoces.textContent = "Validade dos doces";
+    linkDoces.textContent = "Validade dos produtos";
     const referencia = menuMais.querySelector('a[href="caixa.html"]') || menuMais.querySelector("#link-sair");
     if (referencia) menuMais.insertBefore(linkDoces, referencia);
     else menuMais.appendChild(linkDoces);
