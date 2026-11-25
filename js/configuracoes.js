@@ -32,17 +32,19 @@ document.getElementById("toggle-caixa").addEventListener("change", async (e) => 
     mostrarToast("Aguarde o carregamento das configurações.", "erro");
     return;
   }
+  const toggle = e.currentTarget;
+  toggle.disabled = true;
   try {
     await updateDoc(doc(db, "estabelecimentos", estabelecimentoAtual.id), {
-      baixaAutomaticaAtiva: e.target.checked,
+      baixaAutomaticaAtiva: toggle.checked,
     });
-    mostrarToast(e.target.checked ? "Caixa ativado." : "Caixa desativado.", "ok");
+    mostrarToast(toggle.checked ? "Caixa ativado." : "Caixa desativado.", "ok");
   } catch (erro) {
     console.error(erro);
-    e.target.checked = !e.target.checked;
+    toggle.checked = !toggle.checked;
     mostrarToast("Não foi possível salvar. Tente novamente.", "erro");
   } finally {
-    botao.disabled = false;
+    toggle.disabled = false;
   }
 });
 
