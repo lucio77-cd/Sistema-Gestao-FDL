@@ -1724,9 +1724,10 @@ label.switch {
 .doces-form { display:grid; grid-template-columns:2fr 1fr 1.2fr; gap:.85rem; margin-top:1.2rem; }
 .doces-campo { display:flex; flex-direction:column; gap:.35rem; min-width:0; }
 .doces-campo label { color:var(--ink-soft); font-size:.78rem; font-weight:650; }
-.doces-campo input,.doces-lista-topo select { width:100%; min-height:44px; }
+.doces-campo input,.doces-campo select,.doces-lista-topo select { width:100%; min-height:44px; }
 .doces-campo--nome { grid-column:span 1; }
 .doces-campo--obs { grid-column:1 / 3; }
+.doces-campo small.legenda { display:block; margin-top:.1rem; font-size:.7rem; line-height:1.4; }
 .doces-form-acoes { display:flex; align-items:end; gap:.55rem; flex-wrap:wrap; }
 .doces-lista-secao { margin-top:1.8rem; }
 .doces-lista-topo { align-items:center; margin-bottom:.8rem; }
