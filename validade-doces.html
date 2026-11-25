@@ -4,7 +4,7 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
 <meta name="robots" content="noindex, nofollow" />
-<title>Validade dos doces — Gestão FDL</title>
+<title>Validade dos produtos — Gestão FDL</title>
 <link rel="stylesheet" href="css/styles.css" />
 <meta name="theme-color" content="#171B20" />
 <link rel="stylesheet" href="css/theme-dark.css" id="theme-dark-stylesheet" media="not all" />
@@ -18,9 +18,9 @@
   <main class="doces-main">
     <div class="doces-cabecalho">
       <div>
-        <p class="doces-sobretitulo">CONTROLE DE VENDAS</p>
-        <h1>Validade dos doces</h1>
-        <p class="legenda">Registre os doces que estão à venda e acompanhe o que precisa sair primeiro. Este controle é separado do estoque de bebidas e não altera as quantidades do estoque.</p>
+        <p class="doces-sobretitulo">CONTROLE DE VALIDADE · PRODUTOS INDUSTRIALIZADOS</p>
+        <h1>Validade dos produtos</h1>
+        <p class="legenda">Acompanhe chocolates, wafers, biscoitos e outros produtos embalados por lote. Registre a quantidade e a data impressa na embalagem. Este controle não altera o saldo do estoque.</p>
       </div>
       <div class="doces-cabecalho-icone" aria-hidden="true">🍬</div>
     </div>
@@ -33,17 +33,22 @@
 
     <section class="painel doces-form-painel">
       <div class="doces-form-topo">
-        <div><h2 id="doces-form-titulo">Adicionar doce</h2><p class="legenda">Informe o produto, quantas unidades estão à venda e a data de validade.</p></div>
+        <div><h2 id="doces-form-titulo">Adicionar lote</h2><p class="legenda">Selecione o produto cadastrado e informe quantas unidades pertencem a este lote.</p></div>
         <span class="doces-form-selo">NOVO REGISTRO</span>
       </div>
       <form id="form-doce" class="doces-form">
         <div class="doces-campo doces-campo--nome">
-          <label for="doce-nome">Nome do doce</label>
-          <input id="doce-nome" type="text" maxlength="120" placeholder="Ex.: brigadeiro, pudim, torta de chocolate" required />
+          <label for="doce-produto">Produto cadastrado</label>
+          <select id="doce-produto" required><option value="">Carregando produtos…</option></select>
+          <small class="legenda">Ex.: Trento, KitKat, Bis, wafer e chocolates. Se não estiver na lista, cadastre primeiro em Produtos.</small>
         </div>
         <div class="doces-campo">
           <label for="doce-quantidade">Quantidade à venda</label>
           <input id="doce-quantidade" type="number" min="1" max="1000000" step="1" inputmode="numeric" value="1" required />
+        </div>
+        <div class="doces-campo">
+          <label for="doce-lote">Lote (opcional)</label>
+          <input id="doce-lote" type="text" maxlength="60" placeholder="Código impresso na embalagem" />
         </div>
         <div class="doces-campo">
           <label for="doce-validade">Data de vencimento</label>
@@ -62,8 +67,8 @@
 
     <section class="doces-lista-secao">
       <div class="doces-lista-topo">
-        <div><h2>Doces registrados</h2><p class="legenda">Os mais urgentes aparecem primeiro.</p></div>
-        <select id="doces-filtro" aria-label="Filtrar doces">
+        <div><h2>Lotes acompanhados</h2><p class="legenda">Os lotes com vencimento mais próximo aparecem primeiro.</p></div>
+        <select id="doces-filtro" aria-label="Filtrar lotes">
           <option value="ativos">À venda</option>
           <option value="todos">Todos</option>
           <option value="encerrados">Vendidos / retirados</option>
