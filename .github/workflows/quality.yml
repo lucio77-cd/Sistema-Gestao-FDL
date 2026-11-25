@@ -1,0 +1,28 @@
+name: Qualidade do projeto
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  verificacoes:
+    name: Sintaxe e referências locais
+    runs-on: ubuntu-latest
+    steps:
+      - name: Baixar código
+        uses: actions/checkout@v4
+
+      - name: Preparar Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Verificar projeto
+        run: node scripts/check-project.mjs
