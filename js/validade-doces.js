@@ -98,7 +98,7 @@ function atualizarResumo() {
   const vencidos = ativos.filter(r => statusDo(r).status === "vencido").length;
   const atencao = ativos.filter(r => statusDo(r).status === "atencao").length;
   $("doces-total-ativos").textContent = String(ativos.length);
-  $("doces-total-atencao").textContent = String(atencao.length);
+  $("doces-total-atencao").textContent = String(atencao);
   $("doces-total-vencidos").textContent = String(vencidos);
 }
 
