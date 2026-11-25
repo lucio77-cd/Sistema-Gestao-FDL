@@ -1,99 +1,74 @@
-# Sistema de Gestão de Bebidas & Produção (Padaria)
+# Sistema de Gestão FDL
 
-Sistema novo, separado do Sistema Cris. Composto por dois módulos independentes que compartilham o mesmo "motor" de vencimento/alerta, mas com dados e telas próprias.
+Sistema web de apoio à gestão operacional de estoque e produção, com foco no uso prático da padaria e no controle físico realizado por vistorias.
 
----
+> **Documentação técnica atual:** consulte [docs/DIAGNOSTICO-TECNICO.md](docs/DIAGNOSTICO-TECNICO.md) para a arquitetura observada, inventário, riscos e plano de profissionalização. Este README substitui a descrição histórica anterior, que já não correspondia às telas e módulos existentes no repositório.
 
-## 1. Visão Geral
+## Visão geral
 
-- **Módulo Bebidas**: genérico, pensado para ser usado em múltiplos estabelecimentos (não só a padaria). Controla estoque de bebidas por lote, com foco em evitar vencimento.
-- **Módulo Padaria**: separado, cuida de fabricação, vencimento, receitas e custo de produção dos produtos de padaria (pães, doces etc).
-- Os dois módulos moram no mesmo sistema/projeto, mas têm coleções e páginas independentes entre si.
+O projeto é uma aplicação web estática construída com HTML, CSS e JavaScript nativo (ES modules). Firebase Authentication controla o acesso e Cloud Firestore armazena os dados operacionais. A hospedagem é integrada ao repositório GitHub por meio da Vercel; o estado dessa integração deve ser conferido no painel da equipe.
 
----
+## Áreas funcionais
 
-## 2. Contexto e Restrições Reais (por que o sistema é do jeito que é)
+| Área | Página |
+|---|---|
+| Início e indicadores | `index.html` |
+| Estoque | `estoque.html` |
+| Vistoria | `vistoria.html` |
+| Produtos | `produtos.html` |
+| Movimentações | `movimentacoes.html` |
+| Perdas | `perdas.html` |
+| Caixa e leitura de código de barras | `caixa.html` |
+| Promoções | `promocoes.html` |
+| Validade de industrializados | `validade-doces.html` |
+| Cozinha | `cozinha.html` |
+| Gráficos | `graficos.html` |
+| Configurações e aparência | `configuracoes.html` |
+| Visão da gerente | `gerente.html` |
+| Autenticação | `login.html` |
 
-- A padaria usa um sistema que **só emite nota fiscal e recebe pagamento** — não há baixa de estoque na venda (sem registro de saída).
-- Não há adesão da equipe/gerência a ferramentas novas (ambiente resistente a mudança). O sistema não pode depender de terceiros alimentando dados.
-- Uso real: o **operador principal é o próprio dono do projeto**, que faz vistorias físicas periódicas na geladeira/estoque.
-- A gerente pode ou não vir a usar uma tela de visualização — o sistema não deve depender disso para funcionar.
+## Estrutura do repositório
 
-**Regra de arquitetura decorrente**: o sistema deve funcionar por **snapshot (vistoria manual)**, e não por livro-razão transacional (entrada/saída). Deve, porém, ser desenhado de forma que uma futura integração com um sistema que registre saída (PDV de verdade) possa alimentar o mesmo núcleo de dados como uma fonte de eventos alternativa/plugin — sem reescrever a lógica central de vencimento e alerta.
+- `*.html`: páginas da aplicação.
+- `css/`: estilos compartilhados, tema escuro e estilos específicos.
+- `js/`: módulos de interface, autenticação, navegação e operações.
+- `firestore.rules`: regras versionadas de segurança do Firestore.
+- `.github/workflows/`: verificações automatizadas do GitHub Actions.
+- `scripts/`: verificações locais executadas pelo pipeline.
+- `docs/`: documentação de arquitetura, riscos e evolução.
 
----
+## Modelo operacional
 
-## 3. Módulo Bebidas
+O controle físico por vistoria é uma parte central do funcionamento do sistema. A evolução deve preservar a reconciliação entre quantidades por local, lotes e saldo consolidado. O Caixa possui um fluxo experimental de leitura de código de barras com baixa de estoque; isso não deve ser confundido com fechamento financeiro, recebimento ou conciliação de pagamentos.
 
-### 3.1 Conceito de dados
-- Controle por **lote**, não só por produto (lotes diferentes do mesmo produto podem ter vencimentos diferentes).
-- **Vistoria** = snapshot manual: registra o que foi observado fisicamente em determinado momento (produto, lote, quantidade, local).
-- Comparação entre vistorias sucessivas indica o que sumiu (assumido como vendido ou perdido, sem diferenciar automaticamente — limitação conhecida do modo manual).
+Industrializados com validade própria possuem uma área de controle específica. Relatórios e indicadores precisam distinguir esse controle dos saldos gerais para evitar dupla contagem.
 
-### 3.2 Regras de negócio
-- Cada lote tem: produto, quantidade, data de vencimento, local (geladeira/estoque seco), preço de custo, preço de venda.
-- Cada lote é classificado em: **normal / atenção / vencido / promoção**, com base na configuração de antecedência de alerta.
-- A antecedência de alerta ("avisar X dias antes do vencimento") é configurável — pensar se é global ou por categoria/produto, já que produtos têm giro diferente.
-- Lotes que entram na janela de alerta podem ser marcados como **promoção**, com preço promocional associado.
+## Desenvolvimento e qualidade
 
-### 3.3 Telas
-1. **Dashboard**: gráfico (linha do tempo dos próximos N dias) + tabela (lotes em atenção/vencidos, ordenados por dias restantes, com valor em risco).
-2. **Vistoria**: tela de registro rápido para lançar quantidades observadas por produto/lote.
-3. **Promoções**: lotes marcados com preço promocional.
-4. **Configurações**: dias de antecedência do alerta.
-5. **Visão da gerente**: somente leitura, acesso via link direto com token na URL (sem login tradicional) — ver seção 5.
+Não há etapa de build de frontend no baseline atual. Os módulos JavaScript são carregados diretamente pelo navegador.
 
----
+O workflow **Qualidade do projeto** roda em push e pull request direcionados à `main`. Ele verifica:
 
-## 4. Módulo Padaria (fabricação, vencimento e custo)
+1. sintaxe dos módulos JavaScript em modo ES;
+2. existência de arquivos locais referenciados por scripts e folhas de estilo nas páginas HTML.
 
-### 4.1 Conceito de dados
-- **Produção**: registro de lotes fabricados (produto, data de fabricação, data de vencimento, quantidade).
-- **Perda**: baixa registrada no dia do vencimento do que sobrou (não vendido).
-- **Receita**: produto final associado a uma lista de ingredientes e suas quantidades.
-- **Ingrediente**: nome e custo unitário.
+Para executar a mesma verificação localmente, com Node.js 22 ou compatível:
 
-### 4.2 Regras de negócio
-- O custo de produção de um lote é calculado somando o custo dos ingredientes da receita, proporcional à quantidade produzida.
-- O cruzamento de produção x perda ao longo do tempo permite sugerir quantidade ideal de produção por produto/dia da semana, para reduzir desperdício.
-- O relatório de desperdício deve expressar a perda tanto em quantidade quanto em valor (R$), usando o custo de produção calculado.
+```bash
+node scripts/check-project.mjs
+```
 
-### 4.3 Telas
-1. **Receitas**: cadastro de receita + ingredientes.
-2. **Produção**: registro de lotes fabricados.
-3. **Perdas/Vencimento**: baixa no dia do vencimento.
-4. **Custo & Desperdício**: relatório cruzando produção, perda e custo.
+Essas verificações são uma primeira barreira de qualidade, não substituem testes funcionais, testes das regras Firestore ou testes com o Firebase Emulator Suite.
 
----
+## Segurança e dados
 
-## 5. Autenticação e Permissões
+- O acesso às páginas autenticadas é protegido por Firebase Authentication.
+- O estabelecimento é localizado pelo vínculo `ownerId` do usuário autenticado.
+- As regras Firestore devem permanecer alinhadas às consultas e operações feitas pelo frontend.
+- A configuração cliente do Firebase é pública por natureza; a proteção dos dados depende das regras, autenticação e restrições adequadas do projeto.
+- Não executar migrações, exclusões ou ajustes de saldo sem plano de reconciliação e validação.
+- Não publicar regras Firestore sem testes e confirmação do projeto de destino.
 
-- **MVP**: um único usuário admin (o dono do projeto) com acesso total via login padrão (Firebase Auth).
-- **Acesso da gerente (opcional)**: link direto e isolado, tipo `/vencimentos/{token}`, sem navegação para o resto do sistema, somente leitura. Token aleatório salvo no documento do estabelecimento (`estabelecimentos/{id}.linkToken`), validado via regra do Firestore — não exige Auth tradicional.
-- **Não implementar agora**: sistema de múltiplos papéis (`usuarios/{uid}` com `role` e `estabelecimentoId`) e distinção admin/visualizador/super-admin. Isso fica desenhado para ativação futura, caso o sistema passe a ser usado por outros estabelecimentos com equipes reais.
+## Evolução
 
----
-
-## 6. Modelo de Dados (Firestore — rascunho de coleções)
-
-**Módulo Bebidas**
-- `estabelecimentos` — dados do estabelecimento, incluindo `linkToken`
-- `produtos` — bebidas cadastradas (nome, categoria, custo, preço, `estabelecimentoId`)
-- `lotes` — `produtoId`, quantidade, data de vencimento, local, status
-- `vistorias` — histórico de snapshots (data, itens observados)
-- `configuracoes` — dias de antecedência de alerta (global ou por categoria)
-- `promocoes` — lotes marcados, preço promocional, data de início
-
-**Módulo Padaria**
-- `receitas` — produto final + ingredientes/quantidades
-- `ingredientes` — nome, custo unitário
-- `producoes` — lotes fabricados (data de fabricação, vencimento, quantidade)
-- `perdas` — baixas no vencimento, ligadas à produção correspondente
-
----
-
-## 7. Fora de Escopo (por enquanto)
-
-- Login/role completo para múltiplos usuários e estabelecimentos.
-- Integração automática com sistema de saída/PDV (arquitetura deve permitir, mas não será implementada agora).
-- Previsão automática de produção (começa como relatório manual de comparação histórica, não como algoritmo automático).
+A sequência técnica recomendada está em [docs/DIAGNOSTICO-TECNICO.md](docs/DIAGNOSTICO-TECNICO.md). A prioridade é comprovar integridade dos saldos e lotes, segurança por estabelecimento, confiabilidade do Caixa e capacidade de validar mudanças antes da publicação.
