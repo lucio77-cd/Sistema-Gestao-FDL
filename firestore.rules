@@ -386,7 +386,20 @@ service cloud.firestore {
         && data.quantidade >= 1
         && data.quantidade <= 1000000
         && data.dataVencimento is string
-        && data.dataVencimento.matches('^[0-9]{4}-(0[1-9]|1[0-2])-(0[1-9]|[12][0-9]|3[01])
+        && data.dataVencimento.matches('^[0-9]{4}-(0[1-9]|1[0-2])-(0[1-9]|[12][0-9]|3[01])$')
+        && textoOpcional(data, 'produtoId', 160)
+        && textoOpcional(data, 'marca', 100)
+        && textoOpcional(data, 'categoria', 100)
+        && textoOpcional(data, 'variante', 100)
+        && textoOpcional(data, 'embalagem', 80)
+        && textoOpcional(data, 'volume', 40)
+        && textoOpcional(data, 'lote', 60)
+        && textoOpcional(data, 'observacao', 240)
+        && (!('produtoId' in data) || produtoDoEstabelecimento(data.produtoId, data.estabelecimentoId))
+        && data.ativo is bool
+        && data.criadoEm is timestamp
+        && data.atualizadoEm is timestamp;
+    }
 
     match /docesValidade/{id} {
       // O usuário só acessa doces vinculados ao estabelecimento que possui.
