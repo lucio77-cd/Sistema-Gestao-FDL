@@ -36,6 +36,18 @@ export function iniciarNavegacao() {
     else menuMais.appendChild(linkMovimentacoes);
   }
 
+  // Previsão de estoque: quando cada produto acaba, quanto repor e
+  // comparação das contagens entre dias.
+  if (menuMais && !menuMais.querySelector('a[href="previsao.html"]')) {
+    const linkPrevisao = document.createElement("a");
+    linkPrevisao.href = "previsao.html";
+    linkPrevisao.dataset.pagina = "previsao";
+    linkPrevisao.textContent = "Previsão";
+    const referencia = menuMais.querySelector('a[href="graficos.html"]');
+    if (referencia) referencia.insertAdjacentElement("afterend", linkPrevisao);
+    else menuMais.appendChild(linkPrevisao);
+  }
+
   // Atalho para controle de validade dos doces vendidos no balcão.
   if (menuMais && !menuMais.querySelector('a[href="validade-doces.html"]')) {
     const linkDoces = document.createElement("a");
@@ -50,6 +62,7 @@ export function iniciarNavegacao() {
   // Ícones consistentes nos atalhos de gestão, inclusive no link Cozinha criado acima.
   const iconesMenu = {
     "graficos.html": '<path d="M4 19V5"/><path d="M4 19h16"/><path d="M8 15v-4"/><path d="M13 15V7"/><path d="M18 15V3"/>',
+    "previsao.html": '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>',
     "estoque.html": '<path d="m12 3 9 5-9 5-9-5 9-5Z"/><path d="M3 8v8l9 5 9-5V8"/><path d="M12 13v8"/>',
     "movimentacoes.html": '<path d="M3 12h4l3-8 4 16 3-8h4"/><path d="M3 5v14"/>',
     "cozinha.html": '<path d="M4 10h16l-1 10H5L4 10Z"/><path d="M7 10V7a5 5 0 0 1 10 0v3"/><path d="M9 4V2M15 4V2"/>',
@@ -82,7 +95,7 @@ export function iniciarNavegacao() {
     if (el.tagName === "A") el.setAttribute("aria-current", "page");
   });
 
-  if (btnMais && ["estoque", "movimentacoes", "cozinha", "caixa", "configuracoes", "graficos", "validade-doces"].includes(paginaAtual)) {
+  if (btnMais && ["estoque", "movimentacoes", "cozinha", "caixa", "configuracoes", "graficos", "previsao", "validade-doces"].includes(paginaAtual)) {
     btnMais.classList.add("ativo");
   }
 
