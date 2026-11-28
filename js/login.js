@@ -7,7 +7,7 @@ import {
 const PAGINAS_PERMITIDAS = new Set([
   "index.html", "vistoria.html", "estoque.html", "promocoes.html",
   "produtos.html", "caixa.html", "configuracoes.html", "gerente.html", "graficos.html",
-  "cozinha.html",
+  "cozinha.html", "movimentacoes.html", "validade-doces.html",
 ]);
 
 function obterDestino() {

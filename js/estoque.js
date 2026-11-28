@@ -7,7 +7,7 @@ import {
   CHAVE_SEM_VALOR, chaveOpcao, rotuloPadronizado
 } from "./opcoes-produto.js";
 import {
-  collection, query, where, getDocs, addDoc, setDoc, updateDoc, runTransaction,
+  collection, query, where, limit, getDocs, addDoc, setDoc, updateDoc, runTransaction,
   doc, writeBatch, increment, serverTimestamp, Timestamp
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
@@ -178,9 +178,12 @@ async function carregarTudo() {
 
   movimentosDisponiveis = true;
   try {
+    // Só confirma que o livro está acessível (1 leitura). O histórico completo
+    // é consultado apenas ao finalizar uma vistoria, em finalizarSessao().
     const movSnap = await getDocs(query(
       collection(db, "movimentosEstoque"),
-      where("estabelecimentoId", "==", estabelecimentoAtual.id)
+      where("estabelecimentoId", "==", estabelecimentoAtual.id),
+      limit(1)
     ));
     movimentos = movSnap.docs.map(d => ({ id:d.id, ...d.data() }));
   } catch (erro) {
@@ -930,6 +933,11 @@ document.getElementById("form-novo-produto-estoque").addEventListener("submit", 
   const chave = [dados.nome,dados.marca,dados.variante,dados.embalagem,dados.volume].join("|").toLocaleLowerCase("pt-BR");
   const duplicado = produtos.find(p => [p.nome,p.marca||"",p.variante||"",p.embalagem||"",p.volume||""].join("|").toLocaleLowerCase("pt-BR") === chave);
   if (duplicado) { mostrarToast("Este produto/apresentação já está cadastrado.", "erro"); return; }
+  // O Caixa recusa a venda quando um código de barras pertence a mais de um produto.
+  if (dados.codigoBarras) {
+    const mesmoCodigo = produtos.find(p => String(p.codigoBarras || "").trim() === dados.codigoBarras);
+    if (mesmoCodigo) { mostrarToast("Este código de barras já está em \"" + nomeApresentacao(mesmoCodigo) + "\".", "erro"); return; }
+  }
   const botao = e.submitter;
   botao.disabled = true;
   try {
@@ -989,8 +997,6 @@ async function registrarEntrada(produto, quantidade, dataVencimento) {
   }
   await batch.commit();
   estoqueMap[produto.id] = {...atual,[localAtual]:atual[localAtual]+quantidade};
-  const snap = await getDocs(query(collection(db,"movimentosEstoque"),where("estabelecimentoId","==",estabelecimentoAtual.id)));
-  movimentos = snap.docs.map(d=>({id:d.id,...d.data()}));
 }
 
 async function prepararImportacao() {

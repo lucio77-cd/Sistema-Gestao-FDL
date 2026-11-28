@@ -61,6 +61,7 @@ let graficoLinha = null;
 let graficoEstoque = null;
 let graficoConsumo = null;
 let mostrarZerados = false;
+let avisouLimiteEstoque = false;
 
 // Vistoria em andamento (rascunho). Fica só neste aparelho até "Salvar vistoria".
 //  quantidades: itemId -> número mostrado na tela (começa na última contagem)
@@ -130,6 +131,7 @@ function diaDaVistoria(v) {
 }
 
 function ordenarVistorias() {
+  invalidarIndiceUltimas();
   vistorias.sort((a, b) => (dataDaVistoria(b)?.getTime() || 0) - (dataDaVistoria(a)?.getTime() || 0));
 }
 
@@ -146,22 +148,40 @@ function rotuloDia(dia, completo = false) {
   return completo ? `${d}/${mes}/${ano}` : `${d}/${mes}`;
 }
 
+// Índice item -> última linha registrada / última linha conferida. Construído uma
+// vez por mudança nas vistorias, em vez de varrer todas elas a cada consulta.
+let indiceUltimas = null;
+
+function invalidarIndiceUltimas() {
+  indiceUltimas = null;
+}
+
+function obterIndiceUltimas() {
+  if (indiceUltimas) return indiceUltimas;
+  const ultima = new Map();
+  const conferida = new Map();
+  for (const v of vistorias) { // da mais recente para a mais antiga
+    const data = dataDaVistoria(v);
+    const dia = diaDaVistoria(v);
+    for (const e of v.itens || []) {
+      if (!ultima.has(e.itemId)) ultima.set(e.itemId, { quantidade: Number(e.quantidade) || 0, data });
+      if (e.conferido && !conferida.has(e.itemId)) {
+        conferida.set(e.itemId, { quantidade: Number(e.quantidade) || 0, data, dia });
+      }
+    }
+  }
+  indiceUltimas = { ultima, conferida };
+  return indiceUltimas;
+}
+
 // Última linha registrada deste item em qualquer vistoria (usada como ponto de partida).
 function ultimaEntrada(itemId) {
-  for (const v of vistorias) {
-    const e = (v.itens || []).find((i) => i.itemId === itemId);
-    if (e) return { quantidade: Number(e.quantidade) || 0, data: dataDaVistoria(v) };
-  }
-  return null;
+  return obterIndiceUltimas().ultima.get(itemId) || null;
 }
 
 // Última contagem CONFERIDA deste item (usada na Dashboard).
 function ultimoConferido(itemId) {
-  for (const v of vistorias) {
-    const e = (v.itens || []).find((i) => i.itemId === itemId && i.conferido);
-    if (e) return { quantidade: Number(e.quantidade) || 0, data: dataDaVistoria(v), dia: diaDaVistoria(v) };
-  }
-  return null;
+  return obterIndiceUltimas().conferida.get(itemId) || null;
 }
 
 function temValorConhecido(item) {
@@ -561,7 +581,8 @@ lista.addEventListener("change", (e) => {
 });
 
 $("btn-conferir-todos").addEventListener("click", async () => {
-  const ativos = itensAtivos();
+  // Só os itens que aparecem na lista: itens zerados ocultos não são conferidos às cegas.
+  const ativos = itensAtivos().filter((i) => mostrarZerados || !temValorConhecido(i) || qtd(i) > 0);
   const confirmou = await confirmarAcao({
     titulo: "Marcar todos como conferidos?",
     mensagem: `Use só se você conferiu os ${ativos.length} itens. Os que você não mexeu serão salvos com o valor que aparece na tela.`,
@@ -793,7 +814,8 @@ function limparLinha(linha) {
   return linha
     .replace(/^\s*(?:[-*•·]+|\d+\s*[.)])\s*/, "")
     .replace(/\s*[:\-–—]\s*\d+(?:[.,]\d+)?\s*[a-zA-Z.]*\s*$/, "")
-    .trim();
+    .trim()
+    .slice(0, 80); // mesmo limite do formulário; a regra do Firestore aceita até 160
 }
 
 $("btn-colar-lista").addEventListener("click", async (e) => {
@@ -1116,6 +1138,7 @@ $("lista-vistorias-salvas").addEventListener("click", async (e) => {
         excluidaPor: usuarioAtual?.uid || null,
       });
       vistorias = vistorias.filter((x) => x.id !== id);
+      invalidarIndiceUltimas();
       if (vistoriaSelecionada === id) vistoriaSelecionada = null;
       aplicarBaseAposMudancaDeVistorias();
       preencherSelectVistorias();
@@ -1484,7 +1507,8 @@ function renderizarEstoqueAtual() {
     },
   });
 
-  if (total > linhas.length) {
+  if (total > linhas.length && !avisouLimiteEstoque) {
+    avisouLimiteEstoque = true;
     mostrarToast(`Mostrando os ${linhas.length} itens com menor estoque de ${total}. Use os filtros para ver os outros.`, "ok");
   }
 }
@@ -1496,6 +1520,7 @@ function renderizarConsumo(de, ate) {
   const sem = $("sem-dados-consumo");
 
   const resultados = itensDoEscopo()
+    .filter((i) => i.ativo !== false)
     .filter((i) => filtroProdutos.size === 0 || filtroProdutos.has(i.id))
     .map((item) => {
       const pontos = pontosDoItem(item.id, de, ate);

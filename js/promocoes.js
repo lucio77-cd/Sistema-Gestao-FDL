@@ -1,7 +1,7 @@
 import { db } from "./firebase-config.js";
 import { protegerPagina } from "./auth-guard.js";
 import { iniciarNavegacao } from "./nav.js";
-import { calcularStatus, formatarDiasRestantes, STATUS_ICONE, escapeHtml } from "./status.js";
+import { calcularStatus, formatarDiasRestantes, STATUS_ICONE, escapeHtml, loteAtivo, diasAlertaDoLote } from "./status.js";
 import { mostrarToast } from "./toast.js";
 import { skeletonLotes } from "./skeleton.js";
 import {
@@ -38,10 +38,11 @@ async function carregar() {
   produtosSnap.forEach((d) => (produtos[d.id] = { id: d.id, ...d.data() }));
 
   const lotes = lotesSnap.docs
+    .filter((d) => loteAtivo(d.data()))
     .map((d) => {
       const dados = d.data();
       const produto = produtos[dados.produtoId] || { nome: dados.produtoNome || "(produto removido)" };
-      const diasAlerta = produto.diasAlerta ?? diasAlertaPadrao;
+      const diasAlerta = diasAlertaDoLote(dados, produto, diasAlertaPadrao);
       const { diasRestantes, status } = calcularStatus(dados.dataVencimento, diasAlerta, dados.promocaoAtiva);
       return { id: d.id, ...dados, produtoNome: produto.nome, diasRestantes, status };
     })
@@ -69,12 +70,12 @@ function renderizar(lotes) {
         <div class="lote-meta">${escapeHtml(l.local || "—")} · ${l.quantidade} un.</div>
         <div class="lote-preco-venda">
           <label class="switch">
-            <input type="checkbox" data-id="${l.id}" class="chk-promo" ${l.promocaoAtiva ? "checked" : ""} />
+            <input type="checkbox" data-id="${escapeHtml(l.id)}" class="chk-promo" ${l.promocaoAtiva ? "checked" : ""} />
             <span class="switch-trilho" aria-hidden="true"></span>
             <span class="switch-rotulo">Promoção</span>
           </label>
-          <input type="number" step="0.01" min="0" class="input-preco-promo" data-id="${l.id}" placeholder="Preço promo. (R$)" value="${l.precoPromocional ?? ""}" />
-          <button type="button" class="btn-secundario btn-salvar-promo" data-id="${l.id}">Salvar</button>
+          <input type="number" step="0.01" min="0" class="input-preco-promo" data-id="${escapeHtml(l.id)}" placeholder="Preço promo. (R$)" value="${escapeHtml(l.precoPromocional ?? "")}" />
+          <button type="button" class="btn-secundario btn-salvar-promo" data-id="${escapeHtml(l.id)}">Salvar</button>
         </div>
       </div>
       <div class="lote-dados">

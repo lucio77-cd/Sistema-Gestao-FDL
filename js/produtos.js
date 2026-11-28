@@ -341,14 +341,27 @@ async function salvarProduto(btn) {
     estoqueMinimo: numeroOuNulo(ler(".pe-minimo"))
   };
 
+  // O Caixa recusa a venda quando um código de barras pertence a mais de um produto.
+  if (dados.codigoBarras) {
+    const mesmoCodigo = produtos.find(p => p.id !== id && String(p.codigoBarras || "").trim() === dados.codigoBarras);
+    if (mesmoCodigo) {
+      mostrarToast('Este código de barras já está em "' + (mesmoCodigo.nome || "outro produto") + '".', "erro");
+      painel.querySelector(".pe-codigo").focus();
+      return;
+    }
+  }
+
   btn.disabled = true;
   const textoOriginal = btn.textContent;
   btn.textContent = "Salvando…";
   try {
     await updateDoc(doc(db, "produtos", id), dados);
     // Mantém o nome do produto alinhado no documento de estoque, quando já existir.
+    // Mesmo formato usado nas contagens e movimentos: marca · nome · variante · embalagem · volume.
+    const nomeApresentacao = [dados.marca, dados.nome, dados.variante, dados.embalagem, dados.volume]
+      .filter(Boolean).join(" · ");
     try {
-      await updateDoc(doc(db, "estoque", id), { produtoNome: nome });
+      await updateDoc(doc(db, "estoque", id), { produtoNome: nomeApresentacao });
     } catch (erroEstoque) {
       // Não há documento de estoque para este produto; não impede salvar o cadastro.
     }

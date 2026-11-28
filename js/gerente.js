@@ -9,6 +9,8 @@ import {
   STATUS_ICONE,
   montarGraficoPorProduto,
   calcularPercentuaisEstoque,
+  loteAtivo,
+  diasAlertaDoLote,
 } from "./status.js";
 import {
   collection,
@@ -96,9 +98,10 @@ protegerPagina(async ({ estabelecimento }) => {
       return;
     }
 
-    todosLotes = lotesSnap.docs.map((d) => {
+    // Lotes encerrados/importados ficam como histórico e não entram na lista da gerente.
+    todosLotes = lotesSnap.docs.filter((d) => loteAtivo(d.data())).map((d) => {
       const dados = d.data();
-      const diasAlerta = dados.diasAlerta ?? diasAlertaPadrao;
+      const diasAlerta = diasAlertaDoLote(dados, null, diasAlertaPadrao);
       const { diasRestantes, status } = calcularStatus(dados.dataVencimento, diasAlerta, dados.promocaoAtiva);
       return { id: d.id, ...dados, produtoNome: dados.produtoNome || "Produto", diasRestantes, status };
     });
@@ -272,7 +275,7 @@ function renderizarLista(lotes) {
 
 function mostrarErro(mensagem) {
   const el = document.getElementById("erro-token");
-  el.textContent = mensagem || "Link inválido ou expirado.";
+  el.textContent = mensagem || "Não foi possível carregar os dados.";
   el.hidden = false;
   document.getElementById("lista-lotes").innerHTML = "";
   document.getElementById("legenda-atualizacao").textContent = "";

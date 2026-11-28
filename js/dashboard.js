@@ -1,7 +1,7 @@
 import { db } from "./firebase-config.js";
 import { protegerPagina } from "./auth-guard.js";
 import { iniciarNavegacao } from "./nav.js";
-import { calcularStatus, formatarDiasRestantes, montarGraficoPorProduto, seloHtml, formatarValorOuAviso, escapeHtml } from "./status.js";
+import { calcularStatus, formatarDiasRestantes, montarGraficoPorProduto, seloHtml, formatarValorOuAviso, escapeHtml, loteAtivo, diasAlertaDoLote } from "./status.js";
 import {
   collection,
   query,
@@ -96,14 +96,15 @@ protegerPagina(async ({ estabelecimento }) => {
   const produtos = {};
   produtosSnap.forEach((d) => (produtos[d.id] = { id: d.id, ...d.data() }));
 
-  const lotes = lotesSnap.docs.map((d) => {
+  // Lotes encerrados/importados ficam como histórico e não entram nos indicadores.
+  const lotes = lotesSnap.docs.filter((d) => loteAtivo(d.data())).map((d) => {
     const dados = d.data();
     const produto = produtos[dados.produtoId] || {
       nome: dados.produtoNome || "(produto removido)",
       diasAlerta: dados.diasAlerta ?? null,
       precoCusto: dados.precoCusto ?? 0,
     };
-    const diasAlerta = produto.diasAlerta ?? diasAlertaPadrao;
+    const diasAlerta = diasAlertaDoLote(dados, produto, diasAlertaPadrao);
     const { diasRestantes, status } = calcularStatus(dados.dataVencimento, diasAlerta, dados.promocaoAtiva);
     return { id: d.id, ...dados, produtoNome: produto.nome, precoCusto: dados.precoCusto ?? produto.precoCusto, diasRestantes, status };
   });

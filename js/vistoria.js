@@ -1,7 +1,7 @@
 import { db } from "./firebase-config.js";
 import { protegerPagina } from "./auth-guard.js";
 import { iniciarNavegacao } from "./nav.js";
-import { calcularStatus, formatarData, formatarValorOuAviso } from "./status.js";
+import { calcularStatus, formatarData, formatarValorOuAviso, diasAlertaDoLote } from "./status.js";
 import { mostrarToast } from "./toast.js";
 import {
   collection,
@@ -244,8 +244,8 @@ async function carregarLotes() {
   container.innerHTML = "";
 
   // Migração silenciosa: lotes criados antes desta versão não têm o nome do
-  // produto gravado no próprio lote — necessário pra página da gerente ler
-  // sem depender da coleção "produtos" (restrita).
+  // produto gravado no próprio lote — necessário pra tela da gerente ler
+  // sem depender da coleção "produtos".
   const lotesMigrar = [];
 
   lotes.forEach((l) => {
@@ -278,7 +278,7 @@ async function carregarLotes() {
 
   lotes.forEach((l) => {
     const produto = produtosCache[l.produtoId] || { nome: l.produtoNome || "(produto removido)" };
-    const diasAlerta = (l.diasAlerta ?? produto.diasAlerta) ?? diasAlertaPadrao;
+    const diasAlerta = diasAlertaDoLote(l, produto, diasAlertaPadrao);
     const { status } = calcularStatus(l.dataVencimento, diasAlerta, l.promocaoAtiva);
 
     const div = document.createElement("div");
@@ -294,7 +294,7 @@ async function carregarLotes() {
           <button type="button" class="btn-texto btn-acao-zero" data-acao="excluir">Excluir</button>
         </div>
       </div>
-      <div class="stepper" data-lote-id="${l.id}">
+      <div class="stepper" data-lote-id="${escapeHtml(l.id)}">
         <button type="button" class="btn-menos" aria-label="Diminuir quantidade de ${escapeHtml(produto.nome)}">−</button>
         <input type="number" min="0" value="${l.quantidade}" inputmode="numeric" aria-label="Quantidade de ${escapeHtml(produto.nome)}" />
         <button type="button" class="btn-mais" aria-label="Aumentar quantidade de ${escapeHtml(produto.nome)}">+</button>
@@ -357,7 +357,11 @@ async function carregarLotes() {
     // estoque ativo ao salvar.
     areaAcaoZero.querySelectorAll(".btn-acao-zero").forEach((btn) => {
       btn.addEventListener("click", () => {
-        const quantidadeNoMomento = Number(input.value);
+        // Se uma ação já foi escolhida, o campo está em 0: trocar de ação
+        // (ex.: Vendido → Vencido) mantém a quantidade guardada no primeiro clique.
+        const quantidadeNoMomento = controlesQuantidade[l.id].acaoZero
+          ? controlesQuantidade[l.id].quantidadeParaAcao
+          : Number(input.value);
         controlesQuantidade[l.id].acaoZero = btn.dataset.acao;
         controlesQuantidade[l.id].quantidadeParaAcao = quantidadeNoMomento;
         input.value = 0;
@@ -523,15 +527,16 @@ document.getElementById("btn-salvar-vistoria").addEventListener("click", async (
       saidasPorProdutoLocal.set(chave, (saidasPorProdutoLocal.get(chave) || 0) + Number(c.quantidadeParaAcao || 0));
     });
 
-    for (const [chave, quantidadeSaida] of saidasPorProdutoLocal) {
+    // O saldo consolidado (estoque) e os lotes podem divergir depois de uma
+    // contagem física. Dar baixa em um lote vendido/vencido nunca deve ser
+    // bloqueado por isso: a baixa do lote e a saída são sempre registradas, e o
+    // saldo consolidado é reduzido só até o que existe (nunca fica negativo).
+    const saldoRestante = new Map();
+    for (const chave of saidasPorProdutoLocal.keys()) {
       const separador = chave.lastIndexOf("|");
       const produtoId = chave.slice(0, separador);
       const campo = chave.slice(separador + 1);
-      const saldoAtual = saldosEstoquePorProduto.get(produtoId)?.[campo] || 0;
-      if (quantidadeSaida > saldoAtual) {
-        const nome = prontos.find(([, c]) => c.produtoId === produtoId)?.[1].produtoNome || "Produto";
-        throw new Error("Saldo insuficiente para registrar a saída de " + nome + " em " + (campo === "geladeira" ? "Geladeira" : "Parte seca") + ". Disponível: " + saldoAtual + " un.; saída solicitada: " + quantidadeSaida + " un. Atualize o estoque antes de continuar.");
-      }
+      saldoRestante.set(chave, saldosEstoquePorProduto.get(produtoId)?.[campo] || 0);
     }
 
     const batch = writeBatch(db);
@@ -571,7 +576,7 @@ document.getElementById("btn-salvar-vistoria").addEventListener("click", async (
           precoCusto: c.precoCusto,
           valor: quantidadeDaAcao * c.precoCusto,
           local: c.local,
-          dataVencimentoOriginal: c.dataVencimento,
+          dataVencimentoOriginal: c.dataVencimento ?? null,
           origem: "vistoria",
           registradoEm: serverTimestamp(),
         });
@@ -580,21 +585,27 @@ document.getElementById("btn-salvar-vistoria").addEventListener("click", async (
         // existe. O Caixa usa o mesmo livro de movimentos para vendas.
         if (quantidadeDaAcao > 0 && produtosComEstoque.has(c.produtoId)) {
           const campo = campoEstoqueDoLocal(c.local);
-          batch.set(
-            doc(db, "estoque", c.produtoId),
-            { [campo]: increment(-quantidadeDaAcao), atualizadoEm: serverTimestamp() },
-            { merge: true }
-          );
-          batch.set(doc(collection(db, "movimentosEstoque")), {
-            estabelecimentoId: estabelecimentoAtual.id,
-            produtoId: c.produtoId,
-            produtoNome: c.produtoNome,
-            local: campo,
-            tipo: c.acaoZero === "vencido" ? "vencido" : "venda",
-            delta: -quantidadeDaAcao,
-            origem: "vistoria",
-            registradoEm: serverTimestamp(),
-          });
+          const chaveSaldo = c.produtoId + "|" + campo;
+          const disponivel = saldoRestante.get(chaveSaldo) || 0;
+          const baixaEstoque = Math.min(quantidadeDaAcao, disponivel);
+          saldoRestante.set(chaveSaldo, disponivel - baixaEstoque);
+          if (baixaEstoque > 0) {
+            batch.set(
+              doc(db, "estoque", c.produtoId),
+              { [campo]: increment(-baixaEstoque), atualizadoEm: serverTimestamp() },
+              { merge: true }
+            );
+            batch.set(doc(collection(db, "movimentosEstoque")), {
+              estabelecimentoId: estabelecimentoAtual.id,
+              produtoId: c.produtoId,
+              produtoNome: c.produtoNome,
+              local: campo,
+              tipo: c.acaoZero === "vencido" ? "vencido" : "venda",
+              delta: -baixaEstoque,
+              origem: "vistoria",
+              registradoEm: serverTimestamp(),
+            });
+          }
         }
       } else {
         batch.update(loteRef, { quantidade: quantidadeNova });

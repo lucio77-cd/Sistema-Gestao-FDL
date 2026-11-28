@@ -7,6 +7,24 @@ export function hojeSemHora() {
 }
 
 /**
+ * Um lote só conta como estoque ativo se não foi encerrado (vendido, vencido ou
+ * excluído na vistoria), não foi importado para o saldo consolidado e ainda tem
+ * quantidade. Lotes encerrados continuam no banco como histórico, mas não devem
+ * aparecer em telas operacionais (Início, Promoções, Gerente).
+ */
+export function loteAtivo(lote) {
+  return !lote.importadoParaEstoque && !lote.encerrado && Number(lote.quantidade) > 0;
+}
+
+/**
+ * Antecedência de alerta de um lote. Ordem única para todas as telas:
+ * valor do próprio lote, depois do produto, depois o padrão do estabelecimento.
+ */
+export function diasAlertaDoLote(lote, produto, padrao) {
+  return (lote.diasAlerta ?? produto?.diasAlerta) ?? padrao;
+}
+
+/**
  * Calcula quantos dias faltam para o vencimento e em qual status o lote se encontra.
  * @param {string} dataVencimento - formato "AAAA-MM-DD"
  * @param {number} diasAlerta - antecedência configurada para avisar

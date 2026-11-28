@@ -20,6 +20,13 @@ import {
 
 iniciarNavegacao();
 
+// Mesmo formato usado nas contagens e transferências do Estoque, para o livro
+// de movimentos mostrar o mesmo nome do produto em todas as origens.
+function nomeApresentacao(produto) {
+  return [produto.marca, produto.nome, produto.variante, produto.embalagem, produto.volume]
+    .filter(Boolean).join(" · ") || produto.nome;
+}
+
 let estabelecimentoAtual = null;
 const campoCodigo = document.getElementById("campo-codigo");
 
@@ -164,7 +171,7 @@ async function processarLeitura(codigo, tentativas = 0) {
         tx.set(refMovimento, {
           estabelecimentoId: estabelecimentoAtual.id,
           produtoId: produto.id,
-          produtoNome: produto.nome,
+          produtoNome: nomeApresentacao(produto),
           local: campoLocal,
           tipo: "venda",
           quantidade: 1,
@@ -177,7 +184,7 @@ async function processarLeitura(codigo, tentativas = 0) {
         tx.set(refSaida, {
           estabelecimentoId: estabelecimentoAtual.id,
           produtoId: produto.id,
-          produtoNome: produto.nome,
+          produtoNome: nomeApresentacao(produto),
           motivo: "vendido",
           quantidade: 1,
           precoCusto: custoVenda,
@@ -203,7 +210,7 @@ async function processarLeitura(codigo, tentativas = 0) {
       tx.set(refMovimento, {
         estabelecimentoId: estabelecimentoAtual.id,
         produtoId: produto.id,
-        produtoNome: produto.nome,
+        produtoNome: nomeApresentacao(produto),
         local,
         tipo: "venda",
         quantidade: 1,
@@ -227,7 +234,7 @@ async function processarLeitura(codigo, tentativas = 0) {
       tx.set(refSaida, {
         estabelecimentoId: estabelecimentoAtual.id,
         produtoId: produto.id,
-        produtoNome: produto.nome,
+        produtoNome: nomeApresentacao(produto),
         motivo: "vendido",
         quantidade: 1,
         precoCusto: custoVenda,
@@ -323,3 +330,14 @@ function renderizarCompra() {
     return `<div class="caixa-item-compra"><div class="caixa-item-nome">${escapeHtml(item.nome)}</div><div class="caixa-item-qtd">${item.quantidade}</div><div class="caixa-item-unitario">${unitario}</div><div class="caixa-item-total">${total}</div></div>`;
   }).join("");
 }
+
+// Encerra a compra na tela. A baixa de estoque de cada leitura já foi gravada;
+// este botão só limpa o resumo para começar a próxima compra.
+document.getElementById("btn-nova-compra")?.addEventListener("click", () => {
+  if (!itensCompra.size) return;
+  if (!window.confirm("Limpar a lista da compra atual? As baixas de estoque já registradas não serão desfeitas.")) return;
+  itensCompra.clear();
+  totalLeiturasSessao = 0;
+  renderizarCompra();
+  campoCodigo.focus();
+});
