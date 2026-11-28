@@ -63,14 +63,19 @@ function produtoEstaNoLocal(produto, local) {
   return locais.includes(local);
 }
 function produtosDoLocal() {
+  // A vistoria lista todos os produtos ativos, mesmo os que ainda não têm
+  // local definido. O local só indica quais contagens são obrigatórias.
   return produtos.filter(p => {
-    if (p.ativo === false || !produtoEstaNoLocal(p, localAtual)) return false;
+    if (p.ativo === false) return false;
     // A sessão guarda o foco escolhido no início. Campos ausentes em sessões
     // antigas significam "todos", preservando a compatibilidade histórica.
     if (sessaoAtual?.categoriaFiltro && chaveOpcao(p.categoria) !== chaveOpcao(sessaoAtual.categoriaFiltro)) return false;
     if (sessaoAtual?.embalagemFiltro && chaveOpcao(p.embalagem) !== chaveOpcao(sessaoAtual.embalagemFiltro)) return false;
     return true;
   });
+}
+function produtosObrigatoriosDoLocal() {
+  return produtosDoLocal().filter(p => produtoEstaNoLocal(p, localAtual));
 }
 function obterSessaoLocal() {
   return sessoes.filter(s => s.local === localAtual && s.status !== "finalizada")
@@ -644,13 +649,13 @@ function renderizarSessao() {
         (Number.isFinite(Number(ultimaFinalizada.quantidadeItensContados)) ? ' · ' + Number(ultimaFinalizada.quantidadeItensContados) + ' produtos registrados.' : '.') +
         '</p>'
       : '<p class="legenda">Nenhuma vistoria anterior registrada neste local.</p>';
-    const produtosDisponiveis = produtos.filter(p => p.ativo !== false && produtoEstaNoLocal(p, localAtual));
+    const produtosDisponiveis = produtos.filter(p => p.ativo !== false);
     const opcoesUnicas = campo => [...new Set(produtosDisponiveis.map(p => String(p[campo] || "").trim()).filter(Boolean))]
       .sort((a,b) => a.localeCompare(b, "pt-BR", {sensitivity:"base"}));
     const opcoesSelect = (campo, rotuloTodos) => '<option value="">' + rotuloTodos + '</option>' +
       opcoesUnicas(campo).map(valor => '<option value="' + esc(valor) + '">' + esc(valor) + '</option>').join("");
     painelSessao.innerHTML = '<h2>Vistoria: ' + esc(ROTULO_LOCAL[localAtual]) + '</h2>' + resumoAnterior +
-      '<p class="legenda">Escolha o grupo físico que vai conferir agora. A vistoria incluirá somente os produtos desse foco; os demais ficam para outra vistoria.</p>' +
+      '<p class="legenda">Escolha o grupo físico que vai conferir agora. A lista mostra todos os produtos cadastrados desse foco. Os cadastrados neste local precisam ser contados; os demais são opcionais.</p>' +
       '<div class="stock-form-grid stock-vistoria-filtros">' +
       '<div><label for="filtro-inicio-categoria">Tipo</label><select id="filtro-inicio-categoria">' + opcoesSelect("categoria", "Todos os tipos") + '</select></div>' +
       '<div><label for="filtro-inicio-embalagem">Embalagem</label><select id="filtro-inicio-embalagem">' + opcoesSelect("embalagem", "Todas as embalagens") + '</select></div></div>' +
@@ -661,7 +666,7 @@ function renderizarSessao() {
   }
   const produtosLocais = produtosDoLocal();
   const contados = Object.values(contagens).filter(c => c.local === localAtual && produtosLocais.some(p => p.id === c.produtoId)).length;
-  const focoSessao = [sessaoAtual.categoriaFiltro, sessaoAtual.embalagemFiltro].filter(Boolean).join(" · ") || "Todos os produtos deste local";
+  const focoSessao = [sessaoAtual.categoriaFiltro, sessaoAtual.embalagemFiltro].filter(Boolean).join(" · ") || "Todos os produtos cadastrados";
   painelSessao.innerHTML = '<h2>Vistoria: ' + esc(ROTULO_LOCAL[localAtual]) + '</h2>' +
     '<p class="legenda">Foco: <strong>' + esc(focoSessao) + '</strong> · Iniciada em ' + formatarDataHora(sessaoAtual.createdAt) + ' · ' + contados + ' de ' + produtosLocais.length + ' apresentações contadas.</p>' +
     '<p><span class="selo ' + (sessaoAtual.status === "aguardando_revisao" ? "selo--atencao" : "selo--normal") + '">' + (sessaoAtual.status === "aguardando_revisao" ? "Aguardando revisão" : "Em andamento") + '</span></p>';
@@ -711,13 +716,10 @@ function renderizarLista() {
     return;
   }
   const busca = campoBusca.value.trim().toLocaleLowerCase("pt-BR");
-  const semLocal = produtos.filter(p => p.ativo !== false && !["geladeira","seco"].includes(p.localEstoque));
   const visiveis = produtosDoLocal().filter(p => nomeApresentacao(p).toLocaleLowerCase("pt-BR").includes(busca) || String(p.codigoBarras || "").includes(busca));
-  lista.innerHTML = semLocal.length
-    ? '<p class="mensagem-vazio">' + semLocal.length + ' produto(s) ainda sem local definido. Escolha Geladeira ou Parte seca na <a href="produtos.html">aba Produtos</a>.</p>'
-    : "";
+  lista.innerHTML = "";
   if (!visiveis.length) {
-    lista.insertAdjacentHTML("beforeend", '<p class="mensagem-vazio">Nenhum produto deste local encontrado. Confira o cadastro ou use o cadastro rápido abaixo.</p>');
+    lista.insertAdjacentHTML("beforeend", '<p class="mensagem-vazio">Nenhum produto encontrado. Confira a busca ou use o cadastro rápido abaixo.</p>');
     return;
   }
   visiveis.forEach(p => {
@@ -778,10 +780,12 @@ async function salvarContagem(produtoId, botao, quantidadeForcada = null) {
 
 document.getElementById("btn-revisar").addEventListener("click", async () => {
   if (!sessaoAtual) { mostrarToast("Inicie uma vistoria antes de revisar.", "erro"); return; }
-  const esperados = produtosDoLocal();
-  const idsContados = new Set(Object.values(contagens).filter(c => c.local === localAtual).map(c => c.produtoId));
-  const pendentes = esperados.filter(p => !idsContados.has(p.id));
-  if (!esperados.length) { mostrarToast("Não há produtos ativos com este local definido. Revise os cadastros na aba Produtos.", "erro"); return; }
+  const listados = produtosDoLocal();
+  const idsListados = new Set(listados.map(p => p.id));
+  const idsContados = new Set(Object.values(contagens).filter(c => c.local === localAtual && idsListados.has(c.produtoId)).map(c => c.produtoId));
+  const pendentes = produtosObrigatoriosDoLocal().filter(p => !idsContados.has(p.id));
+  if (!listados.length) { mostrarToast("Não há produtos ativos cadastrados. Cadastre produtos na aba Produtos.", "erro"); return; }
+  if (!idsContados.size) { mostrarToast("Conte ao menos um produto antes de revisar.", "erro"); return; }
   if (pendentes.length) {
     mostrarToast("Ainda faltam " + pendentes.length + " produto(s). Conte a quantidade ou use Zerou: " + pendentes.slice(0,3).map(nomeApresentacao).join(", "), "erro");
     return;
@@ -807,12 +811,11 @@ document.getElementById("btn-voltar-contagem").addEventListener("click", async (
 
 function renderizarRevisao() {
   if (!sessaoAtual) return;
-  const esperados = produtosDoLocal();
-  const idsEsperados = new Set(esperados.map(p => p.id));
-  const itens = Object.values(contagens).filter(c => c.local === localAtual && idsEsperados.has(c.produtoId));
+  const idsListados = new Set(produtosDoLocal().map(p => p.id));
+  const itens = Object.values(contagens).filter(c => c.local === localAtual && idsListados.has(c.produtoId));
   const ids = new Set(itens.map(c => c.produtoId));
-  const pendentes = esperados.filter(p => !ids.has(p.id));
-  document.getElementById("texto-revisao").textContent = "Confira as quantidades. Todos os produtos deste local precisam ter uma contagem explícita; use Zerou quando não houver unidades.";
+  const pendentes = produtosObrigatoriosDoLocal().filter(p => !ids.has(p.id));
+  document.getElementById("texto-revisao").textContent = "Confira as quantidades. Os produtos cadastrados neste local precisam ter uma contagem explícita (use Zerou quando não houver unidades); os demais só entram se você contou.";
   const box = document.getElementById("resumo-revisao");
   box.innerHTML = '<div class="stock-review-stats"><strong>' + itens.length + ' contados</strong><strong>' + pendentes.length + ' pendentes</strong><strong>' + itens.filter(c => numero(c.quantidade) === 0).length + ' com zero</strong></div>';
   itens.sort((a,b) => String(a.produtoNome).localeCompare(String(b.produtoNome),"pt-BR")).forEach(c => {
@@ -839,11 +842,10 @@ async function finalizarSessao() {
     mostrarToast("Não é seguro finalizar sem consultar o histórico de movimentos. Atualize a página e tente novamente.", "erro");
     return;
   }
-  const esperados = produtosDoLocal();
-  const idsEsperados = new Set(esperados.map(p => p.id));
-  const itens = Object.values(contagens).filter(c => c.local === localAtual && idsEsperados.has(c.produtoId));
+  const idsListados = new Set(produtosDoLocal().map(p => p.id));
+  const itens = Object.values(contagens).filter(c => c.local === localAtual && idsListados.has(c.produtoId));
   const idsContados = new Set(itens.map(c => c.produtoId));
-  const pendentes = esperados.filter(p => !idsContados.has(p.id));
+  const pendentes = produtosObrigatoriosDoLocal().filter(p => !idsContados.has(p.id));
   if (!itens.length) { mostrarToast("Nenhum produto foi contado nesta vistoria.", "erro"); return; }
   if (pendentes.length) { mostrarToast("Não é possível finalizar: ainda faltam " + pendentes.length + " produto(s) sem contagem explícita.", "erro"); return; }
   if (!window.confirm("Aplicar " + itens.length + " contagens à " + ROTULO_LOCAL[localAtual].toLowerCase() + "?")) return;
@@ -875,6 +877,17 @@ async function finalizarSessao() {
           estabelecimentoId:estabelecimentoAtual.id, produtoId:c.produtoId, produtoNome:c.produtoNome,
           [localAtual]:c.quantidadeFinal, ultimaContagemEm:ultimaContagem, atualizadoEm:serverTimestamp()
         }, {merge:true});
+        // Produto encontrado com saldo num local que ainda não estava no cadastro:
+        // registra o local para que ele apareça nos gráficos e saldos desse local.
+        const produtoContado = produtos.find(p => p.id === c.produtoId);
+        if (produtoContado && c.quantidadeFinal > 0 && !produtoEstaNoLocal(produtoContado, localAtual)) {
+          const locaisAtuais = Array.isArray(produtoContado.locaisEstoque) && produtoContado.locaisEstoque.length
+            ? produtoContado.locaisEstoque
+            : ([produtoContado.localEstoque].filter(l => ["geladeira","seco"].includes(l)));
+          const dadosLocal = { locaisEstoque:[...new Set([...locaisAtuais, localAtual])], atualizadoEm:serverTimestamp() };
+          if (!["geladeira","seco"].includes(produtoContado.localEstoque)) dadosLocal.localEstoque = localAtual;
+          batch.update(doc(db,"produtos",c.produtoId), dadosLocal);
+        }
         // ID determinístico: se o lote de saldo for salvo e a atualização da sessão
         // falhar, uma nova tentativa sobrescreve o mesmo movimento em vez de duplicá-lo.
         batch.set(doc(db,"movimentosEstoque", sessaoAtual.id + "_" + c.produtoId), {
