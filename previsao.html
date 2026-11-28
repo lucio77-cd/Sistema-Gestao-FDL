@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+<meta name="robots" content="noindex, nofollow" />
+<title>Previsão — Controle de Bebidas</title>
+<link rel="stylesheet" href="css/styles.css" />
+<style>
+.previsao-periodos{display:grid;gap:.3rem;margin:.55rem 0 .35rem}
+.previsao-periodo{display:grid;grid-template-columns:5.2rem 1fr 2.6rem;align-items:center;gap:.5rem;font-size:.82rem}
+.previsao-barra{height:.55rem;border-radius:999px;background:var(--borda,#d5dbe2);overflow:hidden}
+.previsao-barra>div{height:100%;border-radius:999px;background:var(--cor-primaria,#245b91)}
+.previsao-periodo strong{text-align:right}
+.previsao-controles{display:flex;flex-wrap:wrap;gap:.75rem;align-items:flex-end}
+.previsao-controles label{display:block}
+.previsao-checagem{display:flex;align-items:center;gap:.5rem;margin-top:.6rem}
+.previsao-checagem input{width:auto}
+</style>
+<meta name="theme-color" content="#171B20" />
+<link rel="stylesheet" href="css/theme-dark.css" id="theme-dark-stylesheet" media="not all" />
+<script>(function(){try{var p=localStorage.getItem("fdl-theme-preference")||"dark";var d=p==="dark"||(p==="system"&&window.matchMedia&&window.matchMedia("(prefers-color-scheme: dark)").matches);document.documentElement.dataset.theme=d?"dark":"light";var s=document.getElementById("theme-dark-stylesheet");if(s)s.media=d?"all":"not all";}catch(_){document.documentElement.dataset.theme="dark";}})();</script>
+</head>
+<body data-pagina-atual="previsao">
+<header class="topo">
+  <div class="topo-marca">Controle de Bebidas</div>
+  <div class="topo-sub" id="nome-estabelecimento">Carregando…</div>
+</header>
+<main>
+  <h1>Previsão e histórico</h1>
+  <p class="legenda">Veja quando cada produto deve acabar, quanto repor e como as contagens mudaram de um dia para o outro.</p>
+
+  <section class="painel" id="aviso-indice" hidden>
+    <h2>Deixe a página mais rápida</h2>
+    <p class="legenda">A consulta por data precisa de um índice no Firebase, criado uma única vez. Enquanto ele não existe, a página lê todo o livro de movimentos e funciona, só que mais devagar.</p>
+    <a class="btn btn-secundario" id="link-indice" href="#" target="_blank" rel="noopener noreferrer" hidden>Criar índice no Firebase</a>
+  </section>
+
+  <section class="painel" id="aviso-sem-vendas" hidden>
+    <h2>Ainda não há vendas registradas</h2>
+    <p class="legenda">A previsão usa as vendas lidas pelo Caixa (leitor de código de barras). Sem elas, os produtos aparecem como “Sem vendas”. A comparação de contagens abaixo funciona normalmente.</p>
+  </section>
+
+  <h2>Quando acaba</h2>
+  <div class="stock-resumo-grid">
+    <div class="painel"><span>Sem estoque</span><strong id="resumo-sem-estoque">—</strong></div>
+    <div class="painel"><span>Repor em breve</span><strong id="resumo-em-risco">—</strong></div>
+    <div class="painel"><span>Sem vendas</span><strong id="resumo-sem-previsao">—</strong></div>
+  </div>
+
+  <section class="painel">
+    <div class="previsao-controles">
+      <div>
+        <label for="prev-horizonte">Quero cobrir</label>
+        <select id="prev-horizonte">
+          <option value="3">3 dias</option>
+          <option value="7" selected>7 dias</option>
+          <option value="14">14 dias</option>
+          <option value="30">30 dias</option>
+        </select>
+      </div>
+      <div>
+        <label for="prev-margem">Margem de segurança</label>
+        <select id="prev-margem">
+          <option value="0">Nenhuma</option>
+          <option value="10" selected>10%</option>
+          <option value="20">20%</option>
+          <option value="30">30%</option>
+        </select>
+      </div>
+    </div>
+    <label for="prev-busca" style="margin-top:.75rem">Buscar produto</label>
+    <input id="prev-busca" type="search" placeholder="Ex.: coca" autocomplete="off" />
+    <label class="previsao-checagem" for="prev-somente-risco">
+      <input id="prev-somente-risco" type="checkbox" />
+      <span>Mostrar só quem está em risco</span>
+    </label>
+  </section>
+
+  <div id="lista-previsao"><p class="mensagem-vazio">Carregando…</p></div>
+
+  <h2>Comparar contagens</h2>
+  <section class="painel">
+    <p class="legenda">Compare a última contagem de cada produto em dois dias. Mostra também o que o Caixa e as entradas registraram no intervalo, para apontar o que ficou sem explicação.</p>
+    <div class="stock-form-grid">
+      <div>
+        <label for="cmp-dia-a">Dia anterior</label>
+        <select id="cmp-dia-a"></select>
+      </div>
+      <div>
+        <label for="cmp-dia-b">Dia posterior</label>
+        <select id="cmp-dia-b"></select>
+      </div>
+    </div>
+    <label for="cmp-busca" style="margin-top:.75rem">Buscar produto</label>
+    <input id="cmp-busca" type="search" placeholder="Ex.: guaraná" autocomplete="off" />
+    <label class="previsao-checagem" for="cmp-somente-diferenca">
+      <input id="cmp-somente-diferenca" type="checkbox" />
+      <span>Mostrar só o que mudou</span>
+    </label>
+    <p class="legenda" id="cmp-resumo"></p>
+  </section>
+  <div id="lista-comparacao"><p class="mensagem-vazio">Carregando…</p></div>
+
+  <p class="legenda">Como a previsão é calculada: o sistema olha as vendas do Caixa dos últimos 28 dias completos, descobre quanto o produto sai por dia (ajustando por dia da semana quando há histórico suficiente) e em que horas do dia ele sai. Depois desconta, hora a hora, esse consumo do saldo atual até chegar a zero. Se o produto ficou sem estoque em algum dia, as vendas desse dia saem menores que a demanda real e a previsão pode demorar mais do que deveria. Produtos novos ficam subestimados nas primeiras semanas. Os dias seguem o horário do seu aparelho.</p>
+</main>
+<nav class="tabbar" aria-label="Navegação principal">
+    <a href="index.html" class="tabbar-item" data-pagina="dashboard">
+      <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 19V10M12 19V5M20 19v-7"/></svg>
+      <span>Início</span>
+    </a>
+    <a href="vistoria.html" class="tabbar-item" data-pagina="vistoria">
+      <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="4" width="14" height="17" rx="2"/><path d="M9 3h6v3H9z"/><path d="M9 12l2 2 4-4"/></svg>
+      <span>Vistoria</span>
+    </a>
+    <a href="promocoes.html" class="tabbar-item" data-pagina="promocoes">
+      <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 12l-8 8-9-9V4h7z"/><circle cx="7.5" cy="7.5" r="1.2" fill="currentColor" stroke="none"/></svg>
+      <span>Promoções</span>
+    </a>
+    <a href="produtos.html" class="tabbar-item" data-pagina="produtos">
+      <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 8l-9-5-9 5 9 5 9-5z"/><path d="M3 8v8l9 5 9-5V8"/><path d="M12 13v8"/></svg>
+      <span>Produtos</span>
+    </a>
+    <button type="button" class="tabbar-item" id="btn-mais" aria-haspopup="true" aria-expanded="false">
+      <svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor" aria-hidden="true"><circle cx="5" cy="12" r="1.8"/><circle cx="12" cy="12" r="1.8"/><circle cx="19" cy="12" r="1.8"/></svg>
+      <span>Mais</span>
+    </button>
+  </nav>
+<div class="menu-mais" id="menu-mais" hidden>
+  <a href="graficos.html" data-pagina="graficos">Gráficos</a>
+  <a href="estoque.html" data-pagina="estoque">Estoque</a>
+  <a href="caixa.html" data-pagina="caixa">Caixa</a>
+  <a href="configuracoes.html" data-pagina="configuracoes">Configurações</a>
+  <a href="#" id="link-sair">Sair</a>
+</div>
+<script type="module" src="js/previsao.js"></script>
+  <script type="module" src="js/theme.js"></script>
+</body>
+</html>
