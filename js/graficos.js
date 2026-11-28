@@ -401,6 +401,13 @@ function nomeCurtoGraficoEstoque(produto, todosProdutos) {
   return curto;
 }
 
+function produtoEstaNoLocal(produto, local) {
+  const locais = Array.isArray(produto.locaisEstoque) && produto.locaisEstoque.length
+    ? produto.locaisEstoque
+    : (produto.localEstoque ? [produto.localEstoque] : []);
+  return locais.includes(local);
+}
+
 function renderizarGraficoEstoqueGerente() {
   const canvas = document.getElementById("grafico-estoque-gerente");
   const area = document.getElementById("area-grafico-estoque-gerente");
@@ -414,7 +421,7 @@ function renderizarGraficoEstoqueGerente() {
   }
 
   const produtosAtivos = produtosEstoqueGrafico.filter(p =>
-    p.ativo !== false && p.localEstoque === localEstoqueGrafico &&
+    p.ativo !== false && produtoEstaNoLocal(p, localEstoqueGrafico) &&
     ["categoria","embalagem"].every(grupo => {
       const marcados = filtrosEstoqueGrafico[grupo];
       return marcados.size === 0 || marcados.has(chaveFiltroEstoqueGrafico(p, grupo));
